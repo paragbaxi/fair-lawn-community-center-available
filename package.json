@@ -1,0 +1,24 @@
+{
+  "name": "fair-lawn-community-center-available",
+  "version": "1.0.0",
+  "description": "Is the Fair Lawn Community Center gym available right now?",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "scrape": "npx tsx scraper/index.ts"
+  },
+  "license": "GPL-3.0",
+  "dependencies": {
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "playwright": "^1.50.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
