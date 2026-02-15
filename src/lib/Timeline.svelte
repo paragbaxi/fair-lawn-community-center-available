@@ -81,7 +81,7 @@
         class:current={seg.isCurrent}
         role="listitem"
       >
-        <span class="list-time">{seg.start}</span>
+        <span class="list-time">{seg.start}&ndash;{seg.end}</span>
         <span class="list-name">{seg.name}</span>
         {#if seg.isCurrent}
           <span class="list-badge">NOW</span>
@@ -145,7 +145,7 @@
   }
 
   .segment.open-gym.past {
-    opacity: 0.3;
+    opacity: 0.45;
   }
 
   .segment.scheduled {
@@ -158,7 +158,7 @@
   }
 
   .segment.scheduled.past {
-    opacity: 0.25;
+    opacity: 0.4;
   }
 
   .segment-label {
@@ -272,9 +272,10 @@
     }
 
     .list-time {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 600;
-      min-width: 80px;
+      min-width: 105px;
+      white-space: nowrap;
       color: var(--color-text-secondary);
     }
 

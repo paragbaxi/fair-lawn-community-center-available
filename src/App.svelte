@@ -9,20 +9,20 @@
   let data: ScheduleData | null = $state(null);
   let error: string | null = $state(null);
   let gymState: GymState | null = $state(null);
+  let lastFetchedAt = Date.now();
 
+  async function loadSchedule(): Promise<void> {
+    const r = await fetch('./data/latest.json');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d: ScheduleData = await r.json();
+    data = d;
+    gymState = computeGymState(d);
+    lastFetchedAt = Date.now();
+  }
+
+  // Initial load
   $effect(() => {
-    fetch('./data/latest.json')
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((d: ScheduleData) => {
-        data = d;
-        gymState = computeGymState(d);
-      })
-      .catch((e) => {
-        error = e.message;
-      });
+    loadSchedule().catch((e) => { error = e.message; });
   });
 
   // Re-compute gym state every 10 seconds
@@ -32,6 +32,17 @@
       gymState = computeGymState(data!);
     }, 10000);
     return () => clearInterval(interval);
+  });
+
+  // Refresh data when tab returns after 5+ minutes
+  $effect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastFetchedAt < 5 * 60 * 1000) return;
+      loadSchedule().catch(() => {});
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   });
 
   const isStale = $derived.by(() => {
@@ -92,6 +103,10 @@
       </p>
       <p class="disclaimer">
         Fair Lawn residents only. Schedule may change without notice.
+      </p>
+      <p class="disclaimer">
+        This is an unofficial community project, not affiliated with the
+        <a href="https://www.fairlawn.org/community-center" target="_blank" rel="noopener">Borough of Fair Lawn</a>.
       </p>
     </footer>
   {/if}
