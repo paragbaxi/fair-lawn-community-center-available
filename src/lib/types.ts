@@ -11,10 +11,15 @@ export interface DaySchedule {
   activities: Activity[];
 }
 
+export interface Notice {
+  text: string;
+  date: string; // ISO date, e.g. "2026-02-13"
+}
+
 export interface ScheduleData {
   scrapedAt: string;
   schedule: Record<string, DaySchedule>;
-  notices: string[];
+  notices: Notice[];
 }
 
 export type GymStatus = 'available' | 'in-use' | 'closed';

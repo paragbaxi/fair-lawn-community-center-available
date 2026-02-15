@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { ScheduleData, GymState } from './lib/types.js';
-  import { computeGymState } from './lib/time.js';
+  import type { ScheduleData, GymState, Notice } from './lib/types.js';
+  import { computeGymState, getEasternNow } from './lib/time.js';
   import StatusCard from './lib/StatusCard.svelte';
   import Timeline from './lib/Timeline.svelte';
   import UpNext from './lib/UpNext.svelte';
@@ -40,6 +40,13 @@
     const now = Date.now();
     return now - scraped > 48 * 60 * 60 * 1000;
   });
+
+  // Only show notices for today or future dates
+  const activeNotices = $derived.by((): Notice[] => {
+    if (!data) return [];
+    const today = getEasternNow().toISOString().split('T')[0];
+    return data.notices.filter(n => n.date >= today);
+  });
 </script>
 
 <main>
@@ -60,10 +67,10 @@
       </div>
     {/if}
 
-    {#if data.notices.length > 0}
+    {#if activeNotices.length > 0}
       <div class="notices" role="alert">
-        {#each data.notices as notice}
-          <p>{notice}</p>
+        {#each activeNotices as notice}
+          <p>{notice.text}</p>
         {/each}
       </div>
     {/if}
