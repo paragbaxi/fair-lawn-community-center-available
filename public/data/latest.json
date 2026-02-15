@@ -1,0 +1,208 @@
+{
+  "scrapedAt": "2026-02-15T18:12:06.148Z",
+  "schedule": {
+    "Monday": {
+      "open": "7:00 AM",
+      "close": "9:00 PM",
+      "activities": [
+        {
+          "name": "Open Gym",
+          "start": "7:00 AM",
+          "end": "9:00 AM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Pickleball (Half Gym)",
+          "start": "9:00 AM",
+          "end": "12:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "12:00 PM",
+          "end": "5:00 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "FLAS Basketball",
+          "start": "5:00 PM",
+          "end": "7:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Men's Basketball",
+          "start": "7:00 PM",
+          "end": "9:00 PM",
+          "isOpenGym": false
+        }
+      ]
+    },
+    "Tuesday": {
+      "open": "7:00 AM",
+      "close": "9:30 PM",
+      "activities": [
+        {
+          "name": "Open Gym",
+          "start": "7:00 AM",
+          "end": "9:00 AM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Table Tennis (Half Gym)",
+          "start": "9:00 AM",
+          "end": "12:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "12:00 PM",
+          "end": "2:30 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Pickleball",
+          "start": "2:30 PM",
+          "end": "5:30 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "FLAS Basketball",
+          "start": "5:30 PM",
+          "end": "9:30 PM",
+          "isOpenGym": false
+        }
+      ]
+    },
+    "Wednesday": {
+      "open": "7:00 AM",
+      "close": "9:30 PM",
+      "activities": [
+        {
+          "name": "Open Gym",
+          "start": "7:00 AM",
+          "end": "9:00 AM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Pickleball (Half Gym)",
+          "start": "9:00 AM",
+          "end": "12:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "12:00 PM",
+          "end": "5:00 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "FLAS Basketball",
+          "start": "5:00 PM",
+          "end": "9:30 PM",
+          "isOpenGym": false
+        }
+      ]
+    },
+    "Thursday": {
+      "open": "7:00 AM",
+      "close": "9:00 PM",
+      "activities": [
+        {
+          "name": "Table Tennis (Half Gym)",
+          "start": "9:00 AM",
+          "end": "12:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "12:00 PM",
+          "end": "4:00 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "FLAS Basketball",
+          "start": "4:00 PM",
+          "end": "7:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Coed Adult Volleyball",
+          "start": "7:00 PM",
+          "end": "9:00 PM",
+          "isOpenGym": false
+        }
+      ]
+    },
+    "Friday": {
+      "open": "7:00 AM",
+      "close": "9:00 PM",
+      "activities": [
+        {
+          "name": "Access for All Dance",
+          "start": "6:00 PM",
+          "end": "9:00 PM",
+          "isOpenGym": false
+        }
+      ]
+    },
+    "Saturday": {
+      "open": "9:00 AM",
+      "close": "9:30 PM",
+      "activities": [
+        {
+          "name": "FLAS Pee Wee/Stars Basketball",
+          "start": "3:00 PM",
+          "end": "4:30 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "5:00 PM",
+          "end": "6:30 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Youth Center (5th-8th Grade)",
+          "start": "7:00 PM",
+          "end": "9:30 PM",
+          "isOpenGym": false
+        }
+      ]
+    },
+    "Sunday": {
+      "open": "9:00 AM",
+      "close": "9:00 PM",
+      "activities": [
+        {
+          "name": "Badminton",
+          "start": "9:00 AM",
+          "end": "12:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "ADA Wheelchair Event",
+          "start": "12:00 PM",
+          "end": "2:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "2:00 PM",
+          "end": "5:00 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Table Tennis",
+          "start": "5:00 PM",
+          "end": "9:00 PM",
+          "isOpenGym": false
+        }
+      ]
+    }
+  },
+  "notices": [
+    "Friday, February 13 - Gym Closed",
+    "Indoor Tennis: Cancelled",
+    "Youth Center (5th-8th Grade): Cancelled"
+  ]
+}
