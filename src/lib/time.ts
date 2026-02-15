@@ -35,12 +35,22 @@ export function formatCountdown(ms: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
+  // Over 1 hour: hours and minutes
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
-  if (minutes > 0) {
+
+  // Over 5 minutes: minutes only (ceil so each label holds for ~60s)
+  if (totalSeconds > 5 * 60) {
+    return `${Math.ceil(totalSeconds / 60)}m`;
+  }
+
+  // 1–5 minutes: minutes and seconds (urgency zone)
+  if (minutes >= 1) {
     return `${minutes}m ${seconds}s`;
   }
+
+  // Under 1 minute: seconds only
   return `${seconds}s`;
 }
 

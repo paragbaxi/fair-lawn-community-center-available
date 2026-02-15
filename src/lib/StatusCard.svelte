@@ -60,6 +60,7 @@
 
   {#if countdownMs > 0}
     <p class="countdown" aria-label="Time remaining: {formatCountdown(countdownMs)}">
+      <span class="live-dot" aria-hidden="true"></span>
       {#if gymState.status === 'available'}
         {formatCountdown(countdownMs)} left
       {:else if gymState.status === 'in-use' && gymState.nextOpenGym}
@@ -141,10 +142,35 @@
   }
 
   .countdown {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     font-size: 2rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     margin-bottom: 4px;
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.8); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot {
+      animation: none;
+      opacity: 0.6;
+    }
   }
 
   .available .countdown { color: var(--color-available); }
