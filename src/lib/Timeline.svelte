@@ -166,6 +166,9 @@
     font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
     padding: 0 4px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }

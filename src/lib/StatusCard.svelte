@@ -182,4 +182,11 @@
     color: var(--color-text-secondary);
     font-size: 0.85rem;
   }
+
+  @media (prefers-color-scheme: dark) {
+    .status-detail,
+    .status-subtext {
+      color: rgba(255, 255, 255, 0.85);
+    }
+  }
 </style>
