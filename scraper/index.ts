@@ -27,10 +27,15 @@ interface DaySchedule {
   activities: Activity[];
 }
 
+interface Notice {
+  text: string;
+  date: string; // ISO date, e.g. "2026-02-13"
+}
+
 interface ScheduleData {
   scrapedAt: string;
   schedule: Record<string, DaySchedule>;
-  notices: string[];
+  notices: Notice[];
 }
 
 // Time range regex for patterns like "9:00 a.m. to 12:00 p.m." or "7:00 AM - 9:00 PM"
@@ -181,24 +186,31 @@ function parseCenterHours(lines: string[]): Record<string, { open: string; close
 
 interface DayParseInfo {
   day: string;
+  dateStr: string; // ISO date from the header, e.g. "2026-02-13"
   gymClosed: boolean;
   openGymStart: string | null;
   openGymEnd: string | null;
   scheduledActivities: Activity[];
 }
 
-function parseSchedule(text: string): { schedule: Record<string, DaySchedule>; notices: string[] } {
+// Parse "February 13" + year into "2026-02-13"
+function parseHeaderDate(monthName: string, dayNum: string): string {
+  const d = new Date(`${monthName} ${dayNum}, ${new Date().getFullYear()}`);
+  return d.toISOString().split('T')[0];
+}
+
+function parseSchedule(text: string): { schedule: Record<string, DaySchedule>; notices: Notice[] } {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const centerHours = parseCenterHours(lines);
 
   // Find the "Open Gym Hours" section
   const openGymIdx = lines.findIndex(l => /^open\s+gym\s+hours$/i.test(l));
   const dayInfos: DayParseInfo[] = [];
-  const notices: string[] = [];
+  const notices: Notice[] = [];
 
   if (openGymIdx !== -1) {
     // Day header: "Monday, February 9 - 7:00 a.m. to 5:00 p.m." or "Friday, February 13 - Gym Closed"
-    const dayHeaderRe = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d+\s*[-–]\s*(.*)/i;
+    const dayHeaderRe = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(\w+)\s+(\d+)\s*[-–]\s*(.*)/i;
     // Activity: "Pickleball (Half Gym): 9:00 a.m. to 12:00 p.m."
     const activityRe = /^(.+?):\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))\s*(?:to|-|–)\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))/i;
     // Cancelled: "Indoor Tennis: Cancelled"
@@ -218,15 +230,19 @@ function parseSchedule(text: string): { schedule: Record<string, DaySchedule>; n
         if (current) dayInfos.push(current);
 
         const dayName = headerMatch[1].charAt(0).toUpperCase() + headerMatch[1].slice(1).toLowerCase();
-        const rest = headerMatch[2].trim();
+        const monthName = headerMatch[2];
+        const dayNum = headerMatch[3];
+        const dateStr = parseHeaderDate(monthName, dayNum);
+        const rest = headerMatch[4].trim();
 
         if (/gym\s*closed/i.test(rest)) {
-          current = { day: dayName, gymClosed: true, openGymStart: null, openGymEnd: null, scheduledActivities: [] };
-          notices.push(line);
+          current = { day: dayName, dateStr, gymClosed: true, openGymStart: null, openGymEnd: null, scheduledActivities: [] };
+          notices.push({ text: line, date: dateStr });
         } else {
           const tm = rest.match(TIME_RANGE_RE);
           current = {
             day: dayName,
+            dateStr,
             gymClosed: false,
             openGymStart: tm ? normalizeTime(tm[1]) : null,
             openGymEnd: tm ? normalizeTime(tm[2]) : null,
@@ -240,7 +256,7 @@ function parseSchedule(text: string): { schedule: Record<string, DaySchedule>; n
 
       // Cancelled activity → add to notices, skip
       if (cancelledRe.test(line)) {
-        notices.push(line);
+        notices.push({ text: line, date: current.dateStr });
         continue;
       }
 
