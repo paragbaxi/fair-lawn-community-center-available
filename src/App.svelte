@@ -107,6 +107,7 @@
       <p class="disclaimer">
         This is an unofficial community project, not affiliated with the
         <a href="https://www.fairlawn.org/community-center" target="_blank" rel="noopener">Borough of Fair Lawn</a>.
+        <a href="https://github.com/paragbaxi/fair-lawn-community-center-available/issues" target="_blank" rel="noopener">Feedback &amp; suggestions</a> welcome.
       </p>
     </footer>
   {/if}
