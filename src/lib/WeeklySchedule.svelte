@@ -6,11 +6,26 @@
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const today = getEasternDayName();
+
+  let isOpen = $state(false);
 </script>
 
-<details class="weekly-schedule">
-  <summary class="weekly-toggle">Full Weekly Schedule</summary>
-  <div class="weekly-content">
+<details class="weekly-schedule" bind:open={isOpen}>
+  <summary class="weekly-toggle">
+    <span class="toggle-label">Full Weekly Schedule</span>
+    <svg
+      class="chevron"
+      class:chevron-open={isOpen}
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </summary>
+  <div class="weekly-content" class:weekly-content-open={isOpen}>
     {#each days as day}
       {#if data.schedule[day]}
         <div class="day-block" class:is-today={day === today}>
@@ -44,22 +59,79 @@
     cursor: pointer;
     font-weight: 600;
     font-size: 1rem;
-    padding: 12px 0;
+    padding: 14px 16px;
     color: var(--color-text);
-    min-height: 44px;
+    min-height: 48px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    list-style: none;
   }
 
   .weekly-toggle::-webkit-details-marker {
-    margin-right: 8px;
+    display: none;
+  }
+
+  .weekly-toggle::marker {
+    content: '';
+  }
+
+  .weekly-toggle:active {
+    opacity: 0.8;
+  }
+
+  @media (hover: hover) {
+    .weekly-toggle:hover {
+      background: var(--color-border);
+    }
+  }
+
+  .toggle-label {
+    pointer-events: none;
+  }
+
+  .chevron {
+    flex-shrink: 0;
+    transition: transform 0.25s ease;
+    color: var(--color-text-secondary);
+  }
+
+  .chevron-open {
+    transform: rotate(180deg);
   }
 
   .weekly-content {
-    padding-top: 12px;
     display: flex;
     flex-direction: column;
     gap: 16px;
+    overflow: hidden;
+    animation: slideDown 0.25s ease;
+    padding-top: 12px;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 2000px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .weekly-content {
+      animation: none;
+    }
+    .chevron {
+      transition: none;
+    }
   }
 
   .day-block {

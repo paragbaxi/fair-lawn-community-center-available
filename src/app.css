@@ -33,7 +33,7 @@
     --color-closed-bg: #450a0a;
     --color-closed-border: #991b1b;
     --color-text: #f3f4f6;
-    --color-text-secondary: #9ca3af;
+    --color-text-secondary: #b0b7c3;
     --color-bg: #111827;
     --color-surface: #1f2937;
     --color-border: #374151;
@@ -46,6 +46,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  touch-action: manipulation;
 }
 
 html {
@@ -53,11 +54,13 @@ html {
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   min-height: 100dvh;
   padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
 
 #app {

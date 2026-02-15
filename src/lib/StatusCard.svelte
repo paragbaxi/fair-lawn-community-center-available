@@ -89,8 +89,9 @@
     border-radius: var(--radius);
     padding: 24px;
     text-align: center;
-    border-left: 6px solid;
+    border-left: 4px solid;
     margin-bottom: 24px;
+    transition: background-color 0.4s ease, border-color 0.4s ease;
   }
 
   .status-card.available {
