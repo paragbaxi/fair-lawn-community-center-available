@@ -33,27 +33,38 @@ interface ScheduleData {
   notices: string[];
 }
 
-function isOpenGymActivity(name: string): boolean {
-  const lower = name.toLowerCase();
-  return lower.includes('open gym') || lower.includes('open play') || lower.includes('free play');
-}
+// Time range regex for patterns like "9:00 a.m. to 12:00 p.m." or "7:00 AM - 9:00 PM"
+const TIME_RANGE_RE = /(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.))\s*(?:to|-|–)\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.))/i;
 
-// Parse time strings like "9:00 AM", "12:00 PM", "7:00 a.m."
+// Normalize time strings like "9:00 a.m.", "12:00 PM" to "H:MM AM/PM"
 function normalizeTime(raw: string): string {
-  let t = raw.trim()
-    .replace(/\./g, '')
-    .replace(/\s+/g, ' ')
-    .toUpperCase();
-
-  // Ensure format is "H:MM AM/PM"
+  const t = raw.trim().replace(/\./g, '').replace(/\s+/g, ' ').toUpperCase();
   const match = t.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)/);
   if (match) {
-    const h = match[1];
-    const m = match[2] || '00';
-    const p = match[3];
-    return `${h}:${m} ${p}`;
+    return `${match[1]}:${match[2] || '00'} ${match[3]}`;
   }
   return t;
+}
+
+// Parse "H:MM AM/PM" to minutes since midnight
+function parseTimeMinutes(timeStr: string): number {
+  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+// Convert minutes since midnight to "H:MM AM/PM"
+function minutesToTime(minutes: number): string {
+  const hours24 = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 === 0 ? 12 : hours24 > 12 ? hours24 - 12 : hours24;
+  return `${hours12}:${mins.toString().padStart(2, '0')} ${period}`;
 }
 
 async function scrape(): Promise<void> {
@@ -71,6 +82,15 @@ async function scrape(): Promise<void> {
       console.log(`Navigating to ${url}...`);
       await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       await page.waitForTimeout(2000);
+
+      // Try to expand all accordion sections for full content
+      try {
+        const expandAll = page.locator('text=EXPAND ALL').first();
+        await expandAll.click({ timeout: 3000 });
+        await page.waitForTimeout(1000);
+      } catch {
+        // No expand button found, that's OK
+      }
 
       const text = await page.innerText('body');
       const html = await page.content();
@@ -93,7 +113,7 @@ async function scrape(): Promise<void> {
     process.exit(1);
   }
 
-  // Dump HTML for debugging / selector discovery
+  // Dump content for debugging
   const debugDir = path.join(__dirname, '..', '.debug');
   if (!fs.existsSync(debugDir)) {
     fs.mkdirSync(debugDir, { recursive: true });
@@ -102,13 +122,12 @@ async function scrape(): Promise<void> {
   fs.writeFileSync(path.join(debugDir, 'page.txt'), pageText);
   console.log(`Dumped page content to .debug/ (${pageText.length} chars)`);
 
-  // Extract schedule from text content
-  const schedule = parseScheduleFromText(pageText);
+  const { schedule, notices } = parseSchedule(pageText);
 
   const data: ScheduleData = {
     scrapedAt: new Date().toISOString(),
     schedule,
-    notices: extractNotices(pageText),
+    notices,
   };
 
   if (!fs.existsSync(OUTPUT_DIR)) {
@@ -120,107 +139,208 @@ async function scrape(): Promise<void> {
   console.log(JSON.stringify(data, null, 2));
 }
 
-function parseScheduleFromText(text: string): Record<string, DaySchedule> {
-  const schedule: Record<string, DaySchedule> = {};
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-
-  // Default hours by day
-  const defaultHours: Record<string, { open: string; close: string }> = {
+// Parse the community center general hours from the page text.
+// Looks for lines like "Monday through Friday - 7:00 a.m. to 9:00 p.m."
+function parseCenterHours(lines: string[]): Record<string, { open: string; close: string }> {
+  const hours: Record<string, { open: string; close: string }> = {
     Monday: { open: '7:00 AM', close: '9:00 PM' },
     Tuesday: { open: '7:00 AM', close: '9:00 PM' },
     Wednesday: { open: '7:00 AM', close: '9:00 PM' },
     Thursday: { open: '7:00 AM', close: '9:00 PM' },
     Friday: { open: '7:00 AM', close: '9:00 PM' },
     Saturday: { open: '9:00 AM', close: '9:00 PM' },
-    Sunday: { open: '9:00 AM', close: '9:00 PM' },
+    Sunday: { open: '9:00 AM', close: '5:00 PM' },
   };
 
-  // Strategy: look for day names followed by time ranges and activity names
-  // Common patterns:
-  //   "Monday: 9:00 AM - 12:00 PM Pickleball"
-  //   "Monday"  (as a header, followed by activities on subsequent lines)
-  //   "9:00 AM - 12:00 PM  Pickleball"
-
-  let currentDay: string | null = null;
-  const timeRangePattern = /(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.))\s*[-–to]+\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.))/i;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Check if line starts with a day name
-    for (const day of DAYS) {
-      if (line.match(new RegExp(`^${day}\\b`, 'i'))) {
-        currentDay = day;
-        if (!schedule[day]) {
-          schedule[day] = {
-            open: defaultHours[day].open,
-            close: defaultHours[day].close,
-            activities: [],
-          };
+  for (const line of lines) {
+    // "Monday through Friday - 7:00 a.m. to 9:00 p.m."
+    if (/monday\s+through\s+friday/i.test(line)) {
+      const tm = line.match(TIME_RANGE_RE);
+      if (tm) {
+        const open = normalizeTime(tm[1]);
+        const close = normalizeTime(tm[2]);
+        for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
+          hours[day] = { open, close };
         }
-
-        // Check if there's a time range on the same line
-        const timeMatch = line.match(timeRangePattern);
-        if (timeMatch) {
-          const activityName = line
-            .replace(new RegExp(`^${day}:?\\s*`, 'i'), '')
-            .replace(timeRangePattern, '')
-            .trim()
-            .replace(/^[-–:]\s*/, '');
-
-          if (activityName) {
-            schedule[day].activities.push({
-              name: activityName,
-              start: normalizeTime(timeMatch[1]),
-              end: normalizeTime(timeMatch[2]),
-              isOpenGym: isOpenGymActivity(activityName),
-            });
-          }
-        }
-        break;
       }
     }
-
-    // Check for time range patterns (activities under a day header)
-    if (currentDay && !DAYS.some(d => line.match(new RegExp(`^${d}\\b`, 'i')))) {
-      const timeMatch = line.match(timeRangePattern);
-      if (timeMatch) {
-        const activityName = line
-          .replace(timeRangePattern, '')
-          .trim()
-          .replace(/^[-–:]\s*/, '')
-          .replace(/[-–:]\s*$/, '');
-
-        if (activityName && schedule[currentDay]) {
-          schedule[currentDay].activities.push({
-            name: activityName,
-            start: normalizeTime(timeMatch[1]),
-            end: normalizeTime(timeMatch[2]),
-            isOpenGym: isOpenGymActivity(activityName),
-          });
-        }
-      }
+    // "Saturday - 9:00 a.m. to 9:00 p.m." (skip day headers like "Saturday, February 14 - ...")
+    if (/^saturday\s*[-–]/i.test(line) && !/,\s*\w+\s+\d+/i.test(line)) {
+      const tm = line.match(TIME_RANGE_RE);
+      if (tm) hours.Saturday = { open: normalizeTime(tm[1]), close: normalizeTime(tm[2]) };
+    }
+    // "Sunday - 9:00 a.m. to 5:00 p.m."
+    if (/^sunday\s*[-–]/i.test(line) && !/,\s*\w+\s+\d+/i.test(line)) {
+      const tm = line.match(TIME_RANGE_RE);
+      if (tm) hours.Sunday = { open: normalizeTime(tm[1]), close: normalizeTime(tm[2]) };
     }
   }
 
-  return schedule;
+  return hours;
 }
 
-function extractNotices(text: string): string[] {
-  const notices: string[] = [];
-  const lower = text.toLowerCase();
+interface DayParseInfo {
+  day: string;
+  gymClosed: boolean;
+  openGymStart: string | null;
+  openGymEnd: string | null;
+  scheduledActivities: Activity[];
+}
 
-  const keywords = ['closed', 'closure', 'cancelled', 'canceled', 'holiday', 'notice', 'important'];
+function parseSchedule(text: string): { schedule: Record<string, DaySchedule>; notices: string[] } {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const centerHours = parseCenterHours(lines);
 
-  for (const line of lines) {
-    const lineLower = line.toLowerCase();
-    if (keywords.some(k => lineLower.includes(k)) && line.length < 200) {
-      notices.push(line);
+  // Find the "Open Gym Hours" section
+  const openGymIdx = lines.findIndex(l => /^open\s+gym\s+hours$/i.test(l));
+  const dayInfos: DayParseInfo[] = [];
+  const notices: string[] = [];
+
+  if (openGymIdx !== -1) {
+    // Day header: "Monday, February 9 - 7:00 a.m. to 5:00 p.m." or "Friday, February 13 - Gym Closed"
+    const dayHeaderRe = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d+\s*[-–]\s*(.*)/i;
+    // Activity: "Pickleball (Half Gym): 9:00 a.m. to 12:00 p.m."
+    const activityRe = /^(.+?):\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))\s*(?:to|-|–)\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))/i;
+    // Cancelled: "Indoor Tennis: Cancelled"
+    const cancelledRe = /:\s*cancell?ed/i;
+
+    let current: DayParseInfo | null = null;
+
+    for (let i = openGymIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Stop at non-schedule sections
+      if (/^(Recreation\s+&\s+Parks|Program\s+Announcements|Resource\s+Links|Department\s+Directory|How\s+To\s+Reach)/i.test(line)) break;
+
+      // Day header?
+      const headerMatch = line.match(dayHeaderRe);
+      if (headerMatch) {
+        if (current) dayInfos.push(current);
+
+        const dayName = headerMatch[1].charAt(0).toUpperCase() + headerMatch[1].slice(1).toLowerCase();
+        const rest = headerMatch[2].trim();
+
+        if (/gym\s*closed/i.test(rest)) {
+          current = { day: dayName, gymClosed: true, openGymStart: null, openGymEnd: null, scheduledActivities: [] };
+          notices.push(line);
+        } else {
+          const tm = rest.match(TIME_RANGE_RE);
+          current = {
+            day: dayName,
+            gymClosed: false,
+            openGymStart: tm ? normalizeTime(tm[1]) : null,
+            openGymEnd: tm ? normalizeTime(tm[2]) : null,
+            scheduledActivities: [],
+          };
+        }
+        continue;
+      }
+
+      if (!current) continue;
+
+      // Cancelled activity → add to notices, skip
+      if (cancelledRe.test(line)) {
+        notices.push(line);
+        continue;
+      }
+
+      // Scheduled activity?
+      const actMatch = line.match(activityRe);
+      if (actMatch) {
+        current.scheduledActivities.push({
+          name: actMatch[1].trim(),
+          start: normalizeTime(actMatch[2]),
+          end: normalizeTime(actMatch[3]),
+          isOpenGym: false,
+        });
+      }
     }
+    if (current) dayInfos.push(current);
   }
 
-  return notices;
+  // Build final schedule: compute open gym slots from gaps
+  const schedule: Record<string, DaySchedule> = {};
+
+  for (const day of DAYS) {
+    const info = dayInfos.find(d => d.day === day);
+    const hours = centerHours[day];
+
+    // Extend close time if any activity runs past default close
+    let closeTime = hours.close;
+    if (info) {
+      for (const act of info.scheduledActivities) {
+        if (parseTimeMinutes(act.end) > parseTimeMinutes(closeTime)) {
+          closeTime = act.end;
+        }
+      }
+    }
+
+    const daySchedule: DaySchedule = {
+      open: hours.open,
+      close: closeTime,
+      activities: [],
+    };
+
+    if (info && !info.gymClosed) {
+      const activities: Activity[] = [];
+
+      if (info.openGymStart && info.openGymEnd) {
+        const ogStart = parseTimeMinutes(info.openGymStart);
+        const ogEnd = parseTimeMinutes(info.openGymEnd);
+
+        // Sort scheduled activities by start time
+        const sorted = [...info.scheduledActivities].sort(
+          (a, b) => parseTimeMinutes(a.start) - parseTimeMinutes(b.start)
+        );
+
+        // Fill gaps within the open gym window with "Open Gym" slots
+        let cursor = ogStart;
+        for (const act of sorted) {
+          const actStart = parseTimeMinutes(act.start);
+          const actEnd = parseTimeMinutes(act.end);
+
+          // Gap before this activity within the open gym window?
+          if (cursor < ogEnd && actStart > cursor) {
+            const gapEnd = Math.min(actStart, ogEnd);
+            if (gapEnd > cursor) {
+              activities.push({
+                name: 'Open Gym',
+                start: minutesToTime(cursor),
+                end: minutesToTime(gapEnd),
+                isOpenGym: true,
+              });
+            }
+          }
+
+          activities.push(act);
+          cursor = Math.max(cursor, actEnd);
+        }
+
+        // Remaining open gym time after last scheduled activity
+        if (cursor < ogEnd) {
+          activities.push({
+            name: 'Open Gym',
+            start: minutesToTime(cursor),
+            end: minutesToTime(ogEnd),
+            isOpenGym: true,
+          });
+        }
+      } else {
+        // No open gym range parsed, just include scheduled activities
+        activities.push(...info.scheduledActivities);
+      }
+
+      activities.sort((a, b) => parseTimeMinutes(a.start) - parseTimeMinutes(b.start));
+      daySchedule.activities = activities;
+    } else if (info?.gymClosed) {
+      // Gym closed but may still have non-gym events
+      daySchedule.activities = info.scheduledActivities;
+    }
+
+    schedule[day] = daySchedule;
+  }
+
+  return { schedule, notices };
 }
 
 scrape().catch((err) => {
