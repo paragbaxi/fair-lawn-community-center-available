@@ -22,7 +22,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request).then((response) => {
         if (response.ok) {
-          try { caches.open(SHELL_CACHE).then((c) => c.put(event.request, response.clone())); } catch (e) {}
+          caches.open(SHELL_CACHE).then((c) => c.put(event.request, response.clone())).catch(() => {});
         }
         return response;
       }).catch(() => caches.match(event.request))
@@ -35,7 +35,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request).then((response) => {
         if (response.ok && (response.headers.get('content-type') || '').includes('application/json')) {
-          try { caches.open(DATA_CACHE).then((c) => c.put(event.request, response.clone())); } catch (e) {}
+          caches.open(DATA_CACHE).then((c) => c.put(event.request, response.clone())).catch(() => {});
         }
         return response;
       }).catch(() => caches.match(event.request))
@@ -50,7 +50,7 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         return fetch(event.request).then((response) => {
           if (response.ok) {
-            try { caches.open(ASSETS_CACHE).then((c) => c.put(event.request, response.clone())); } catch (e) {}
+            caches.open(ASSETS_CACHE).then((c) => c.put(event.request, response.clone())).catch(() => {});
           }
           return response;
         });
