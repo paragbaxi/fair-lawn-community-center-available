@@ -163,7 +163,7 @@
   }
 
   .today-badge {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     background: var(--color-available);
     color: white;
@@ -172,7 +172,7 @@
   }
 
   .day-hours {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: var(--color-text-secondary);
     margin-bottom: 8px;
   }
@@ -187,7 +187,7 @@
   .day-activities li {
     display: flex;
     gap: 8px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     padding: 4px 0;
     border-left: 3px solid var(--color-timeline-scheduled);
     padding-left: 8px;
@@ -200,7 +200,7 @@
   .act-time {
     min-width: 120px;
     color: var(--color-text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
 
   .act-name {

@@ -200,7 +200,7 @@
     padding: 10px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     text-align: center;
   }
 
@@ -211,7 +211,7 @@
     padding: 10px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     text-align: center;
   }
 
@@ -221,7 +221,7 @@
     padding: 10px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
 
   .loading {
@@ -250,7 +250,7 @@
     gap: 10px;
     text-align: center;
     color: var(--color-text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     padding-top: 16px;
     border-top: 1px solid var(--color-border);
   }
@@ -271,7 +271,7 @@
 
   .footer-notice,
   .footer-meta {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
   }
 
   .footer-notice {

@@ -112,7 +112,7 @@
 
   .timeline-range {
     color: var(--color-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 
   /* Desktop horizontal bar */
@@ -165,7 +165,7 @@
 
   .segment-label {
     color: white;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     padding: 0 4px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -197,7 +197,7 @@
     top: -18px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--color-text);
   }
@@ -205,7 +205,7 @@
   .timeline-legend {
     display: flex;
     gap: 16px;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     color: var(--color-text-secondary);
     margin-bottom: 16px;
   }
@@ -274,7 +274,7 @@
     }
 
     .list-time {
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       font-weight: 600;
       min-width: 105px;
       white-space: nowrap;
@@ -287,7 +287,7 @@
     }
 
     .list-badge {
-      font-size: 0.7rem;
+      font-size: 0.8rem;
       font-weight: 700;
       background: var(--color-available);
       color: white;

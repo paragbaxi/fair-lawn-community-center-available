@@ -233,12 +233,12 @@
 
   .status-subtext {
     color: var(--color-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
 
   .motivational-message {
     color: var(--color-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-style: italic;
     margin-top: 12px;
     padding-top: 10px;

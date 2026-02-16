@@ -61,7 +61,7 @@
   }
 
   .activity-time {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 600;
     min-width: 80px;
     color: var(--color-text-secondary);
@@ -73,7 +73,7 @@
   }
 
   .open-badge {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     background: var(--color-available);
     color: white;
