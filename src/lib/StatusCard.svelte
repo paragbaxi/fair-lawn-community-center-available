@@ -80,7 +80,7 @@
     <span class="status-label">{statusConfig.label}</span>
   </div>
 
-  {#if gymState.status === 'available' && gymState.currentActivity}
+  {#if gymState.status === 'available' && gymState.currentActivity && gymState.currentActivity.name !== 'Open Gym'}
     {@const emoji = activityEmoji(gymState.currentActivity.name)}
     <p class="status-detail">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{gymState.currentActivity.name} right now</p>
   {:else if gymState.status === 'in-use' && gymState.currentActivity}
