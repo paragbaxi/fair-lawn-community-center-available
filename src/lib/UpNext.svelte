@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { DaySchedule } from './types.js';
   import { getEasternNow, parseTime } from './time.js';
+  import { activityEmoji } from './emoji.js';
 
   let { schedule }: { schedule: DaySchedule } = $props();
 
@@ -18,9 +19,10 @@
     <h2 class="section-title">Up Next</h2>
     <ul class="activity-list" role="list">
       {#each upcoming as act}
+        {@const emoji = activityEmoji(act.name)}
         <li class="activity-item" class:open-gym={act.isOpenGym}>
           <span class="activity-time">{act.start}</span>
-          <span class="activity-name">{act.name}</span>
+          <span class="activity-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
           {#if act.isOpenGym}
             <span class="open-badge">Open</span>
           {/if}
@@ -77,5 +79,10 @@
     color: white;
     padding: 2px 8px;
     border-radius: 10px;
+  }
+
+  .activity-emoji {
+    font-size: 1.1em;
+    margin-right: 3px;
   }
 </style>

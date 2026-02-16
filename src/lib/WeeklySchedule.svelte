@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ScheduleData } from './types.js';
   import { getEasternDayName } from './time.js';
+  import { activityEmoji } from './emoji.js';
 
   let { data }: { data: ScheduleData } = $props();
 
@@ -38,9 +39,10 @@
           <p class="day-hours">{data.schedule[day].open} &mdash; {data.schedule[day].close}</p>
           <ul class="day-activities">
             {#each data.schedule[day].activities as act}
+              {@const emoji = activityEmoji(act.name)}
               <li class:open-gym={act.isOpenGym}>
                 <span class="act-time">{act.start} &ndash; {act.end}</span>
-                <span class="act-name">{act.name}</span>
+                <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
               </li>
             {/each}
           </ul>
@@ -123,6 +125,11 @@
       opacity: 1;
       max-height: 2000px;
     }
+  }
+
+  .activity-emoji {
+    font-size: 1em;
+    margin-right: 2px;
   }
 
   @media (prefers-reduced-motion: reduce) {

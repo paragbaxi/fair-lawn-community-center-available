@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GymState } from './types.js';
   import { formatCountdown } from './time.js';
+  import { activityEmoji } from './emoji.js';
 
   let { gymState }: { gymState: GymState } = $props();
 
@@ -53,9 +54,11 @@
   </div>
 
   {#if gymState.status === 'available' && gymState.currentActivity}
-    <p class="status-detail">{gymState.currentActivity.name} right now</p>
+    {@const emoji = activityEmoji(gymState.currentActivity.name)}
+    <p class="status-detail">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{gymState.currentActivity.name} right now</p>
   {:else if gymState.status === 'in-use' && gymState.currentActivity}
-    <p class="status-detail">{gymState.currentActivity.name} until {gymState.currentActivity.end}</p>
+    {@const emoji = activityEmoji(gymState.currentActivity.name)}
+    <p class="status-detail">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{gymState.currentActivity.name} until {gymState.currentActivity.end}</p>
   {/if}
 
   {#if countdownMs > 0}
@@ -167,10 +170,27 @@
     50% { opacity: 0.3; transform: scale(0.8); }
   }
 
+  .activity-emoji {
+    display: inline-block;
+    font-size: 1.1em;
+    line-height: 1;
+    vertical-align: middle;
+    margin-right: 4px;
+    animation: emoji-breathe 3s ease-in-out infinite;
+  }
+
+  @keyframes emoji-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .live-dot {
       animation: none;
       opacity: 0.6;
+    }
+    .activity-emoji {
+      animation: none;
     }
   }
 

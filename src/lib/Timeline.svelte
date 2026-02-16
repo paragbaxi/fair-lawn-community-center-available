@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { DaySchedule } from './types.js';
   import { getEasternNow, parseTime } from './time.js';
+  import { activityEmoji } from './emoji.js';
 
   let { schedule, dayName }: { schedule: DaySchedule; dayName: string } = $props();
 
@@ -74,6 +75,7 @@
   <!-- Mobile: vertical list -->
   <div class="timeline-list" role="list" aria-label="Today's schedule">
     {#each segments as seg}
+      {@const emoji = activityEmoji(seg.name)}
       <div
         class="list-item"
         class:open-gym={seg.isOpenGym}
@@ -82,7 +84,7 @@
         role="listitem"
       >
         <span class="list-time">{seg.start}&ndash;{seg.end}</span>
-        <span class="list-name">{seg.name}</span>
+        <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{seg.name}</span>
         {#if seg.isCurrent}
           <span class="list-badge">NOW</span>
         {/if}
@@ -291,6 +293,11 @@
       color: white;
       padding: 2px 8px;
       border-radius: 10px;
+    }
+
+    .activity-emoji {
+      font-size: 1.1em;
+      margin-right: 3px;
     }
   }
 </style>
