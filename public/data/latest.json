@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-02-16T13:37:34.791Z",
+  "scrapedAt": "2026-02-16T15:21:32.211Z",
   "schedule": {
     "Monday": {
       "open": "7:00 AM",
@@ -18,10 +18,10 @@
           "isOpenGym": false
         },
         {
-          "name": "Open Gym",
+          "name": "FLHS Basketball",
           "start": "12:00 PM",
-          "end": "5:00 PM",
-          "isOpenGym": true
+          "end": "1:30 PM",
+          "isOpenGym": false
         },
         {
           "name": "FLAS Basketball",
@@ -116,12 +116,12 @@
         {
           "name": "Open Gym",
           "start": "12:00 PM",
-          "end": "4:00 PM",
+          "end": "5:00 PM",
           "isOpenGym": true
         },
         {
           "name": "FLAS Basketball",
-          "start": "4:00 PM",
+          "start": "5:00 PM",
           "end": "7:00 PM",
           "isOpenGym": false
         },
@@ -135,12 +135,24 @@
     },
     "Friday": {
       "open": "7:00 AM",
-      "close": "9:00 PM",
+      "close": "9:30 PM",
       "activities": [
         {
-          "name": "Access for All Dance",
-          "start": "6:00 PM",
-          "end": "9:00 PM",
+          "name": "Open Gym",
+          "start": "7:00 AM",
+          "end": "3:00 PM",
+          "isOpenGym": true
+        },
+        {
+          "name": "Indoor Tennis",
+          "start": "3:00 PM",
+          "end": "6:30 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Youth Center (5th-8th Grade)",
+          "start": "7:00 PM",
+          "end": "9:30 PM",
           "isOpenGym": false
         }
       ]
@@ -180,14 +192,8 @@
           "isOpenGym": false
         },
         {
-          "name": "ADA Wheelchair Event",
-          "start": "12:00 PM",
-          "end": "2:00 PM",
-          "isOpenGym": false
-        },
-        {
           "name": "Open Gym",
-          "start": "2:00 PM",
+          "start": "12:00 PM",
           "end": "5:00 PM",
           "isOpenGym": true
         },
@@ -200,18 +206,5 @@
       ]
     }
   },
-  "notices": [
-    {
-      "text": "Friday, February 13 - Gym Closed",
-      "date": "2026-02-13"
-    },
-    {
-      "text": "Indoor Tennis: Cancelled",
-      "date": "2026-02-13"
-    },
-    {
-      "text": "Youth Center (5th-8th Grade): Cancelled",
-      "date": "2026-02-13"
-    }
-  ]
+  "notices": []
 }
