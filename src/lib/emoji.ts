@@ -7,5 +7,7 @@ export function activityEmoji(name: string): string {
   if (lower.includes('badminton'))    return '\u{1F3F8}'; // 🏸
   if (/\bdance\b/.test(lower))        return '\u{1F483}'; // 💃
   if (lower.includes('youth center')) return '\u{1F31F}'; // 🌟
+  if (/\bada\b/.test(lower))          return '\u{1F9D1}\u{200D}\u{1F9BD}'; // 🧑‍🦽
+  if (lower.includes('open gym'))     return '\u{1F45F}'; // 👟
   return '';
 }
