@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__plugin_playwright_playwright__browser_close",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rm -rf .screenshots"
+          }
+        ]
+      }
+    ]
+  }
+}
