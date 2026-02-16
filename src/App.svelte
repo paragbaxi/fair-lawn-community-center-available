@@ -11,6 +11,7 @@
   let error: string | null = $state(null);
   let gymState: GymState | null = $state(null);
   let messages: MessageData | null = $state(null);
+  let isOffline = $state(!navigator.onLine);
   let lastFetchedAt = Date.now();
 
   async function loadSchedule(): Promise<void> {
@@ -42,10 +43,23 @@
     return () => clearInterval(interval);
   });
 
+  // Track online/offline state
+  $effect(() => {
+    const goOffline = () => { isOffline = true; };
+    const goOnline = () => { isOffline = false; };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  });
+
   // Refresh data when tab returns after 5+ minutes
   $effect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== 'visible') return;
+      navigator.serviceWorker?.getRegistration().then(r => r?.update());
       if (Date.now() - lastFetchedAt < 5 * 60 * 1000) return;
       loadSchedule().catch(() => {});
     }
@@ -80,6 +94,12 @@
       <div class="spinner"></div>
     </div>
   {:else}
+    {#if isOffline}
+      <div class="offline-banner" role="status">
+        You're offline — showing cached schedule.
+      </div>
+    {/if}
+
     {#if isStale}
       <div class="stale-banner" role="alert">
         Schedule data may be outdated. Last updated: {new Date(data.scrapedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
@@ -142,6 +162,17 @@
     padding: 12px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .offline-banner {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    font-size: 0.85rem;
     text-align: center;
   }
 

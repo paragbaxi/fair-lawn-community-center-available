@@ -1,8 +1,11 @@
 {
   "name": "Fair Lawn Community Center - Gym Availability",
   "short_name": "FL Gym",
+  "description": "Check real-time open gym availability at Fair Lawn Community Center",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#111827",
   "background_color": "#111827",
   "icons": [
@@ -15,6 +18,12 @@
       "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
