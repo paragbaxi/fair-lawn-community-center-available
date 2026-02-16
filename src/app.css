@@ -63,6 +63,17 @@ body {
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
 
+:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: #93c5fd;
+  }
+}
+
 #app {
   max-width: 600px;
   margin: 0 auto;

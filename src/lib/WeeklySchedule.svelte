@@ -26,7 +26,7 @@
       <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
   </summary>
-  <div class="weekly-content" class:weekly-content-open={isOpen}>
+  <div class="weekly-content">
     {#each days as day}
       {#if data.schedule[day]}
         <div class="day-block" class:is-today={day === today}>

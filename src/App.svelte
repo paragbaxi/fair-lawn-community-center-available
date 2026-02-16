@@ -83,6 +83,7 @@
 </script>
 
 <main>
+  <a href="#main-content" class="skip-link">Skip to content</a>
   <h1 class="title">Fair Lawn Community Center</h1>
 
   {#if error}
@@ -94,6 +95,7 @@
       <div class="spinner"></div>
     </div>
   {:else}
+    <div id="main-content"></div>
     {#if isOffline}
       <div class="offline-banner" role="status">
         You're offline — showing cached schedule.
@@ -144,6 +146,32 @@
 </main>
 
 <style>
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    z-index: 100;
+    padding: 8px 16px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 2px solid var(--color-text);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .skip-link:focus {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    width: auto;
+    height: auto;
+  }
+
   main {
     padding: 8px 0 32px;
   }
