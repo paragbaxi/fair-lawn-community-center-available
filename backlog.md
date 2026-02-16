@@ -20,13 +20,23 @@ Extracted loadSchedule() and added visibilitychange listener to refresh after 5+
 ### ~~P3: Mobile timeline list — show end times~~
 Added end times with ndash separator, adjusted min-width and font-size. Deployed 2026-02-15.
 
-## Open
-
-### P2: Subtle activity emoji animations
-Add small animated emoji/icons per activity type (e.g., basketball for FLAS Basketball, ping pong paddle for Table Tennis, shuttlecock for Badminton). Consider subtle animations like a gentle bounce, spin, or sway to add personality without being distracting. Consult UX design agent for best practices on micro-animations and icon selection.
-
 ### ~~P3: Deployment cache busting~~
 Resolved by P4 PWA offline support — service worker uses network-first for HTML and data, cache-first for hashed assets. Users get fresh content on every online visit.
 
-### P5: Accessibility audit & unit testing setup
-Skip link, focus-visible styles, color contrast verification. Vitest for core business logic (time.ts, emoji.ts, motivational.ts).
+### ~~P5: Accessibility audit & unit testing setup~~
+Skip link, focus-visible styles, color contrast verification (all pass WCAG AA). Vitest with 62 tests for time.ts, emoji.ts, motivational.ts. Merged 2026-02-16.
+
+### ~~P2: Subtle activity emoji animations~~
+StatusCard already has `emoji-breathe` animation (scale 1→1.12, 3s, with `prefers-reduced-motion` support). WeeklySchedule intentionally omits animation — animating dozens of emojis in a static list would be distracting. Done.
+
+### ~~P3: CI — run tests on push~~
+Added `.github/workflows/ci.yml` with parallel `test` (vitest + build) and `e2e` (Playwright) jobs. Triggers on push/PR to main, ignores `public/data/**` bot commits. Merged 2026-02-16.
+
+### ~~P4: Scraper test coverage~~
+Extracted pure parsing functions to `scraper/parse.ts`, deduplicated types (imports from `src/lib/types.ts`), fixed `parseHeaderDate` TZ/year-boundary bugs. Added ~32 tests in `scraper/parse.test.ts` with committed fixture (`scraper/fixtures/page.txt`). Merged 2026-02-16.
+
+### ~~P4: E2E smoke test with Playwright~~
+Added `@playwright/test`, `playwright.config.ts`, and 4 E2E smoke tests in `e2e/smoke.spec.ts`: page load, status card render, skip link focus, weekly schedule toggle. Uses `vite preview` for production-like testing. Merged 2026-02-16.
+
+### ~~P5: `computeGymState` gap behavior refinement~~
+Won't fix. The scraper fills all gaps within open gym ranges with "Open Gym" slots, so gaps in `computeGymState` only occur when no open gym range is defined — an edge case that doesn't happen with real data. Current behavior (countdown to next activity) is reasonable.

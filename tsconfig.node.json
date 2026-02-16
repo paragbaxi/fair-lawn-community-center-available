@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["scraper/**/*.ts"]
+  "include": ["scraper/**/*.ts", "src/lib/types.ts"]
 }

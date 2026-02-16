@@ -9,13 +9,15 @@
     "preview": "vite preview",
     "scrape": "npx tsx scraper/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "license": "GPL-3.0",
   "dependencies": {
     "svelte": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@types/node": "^22.0.0",
     "jsdom": "^28.1.0",
