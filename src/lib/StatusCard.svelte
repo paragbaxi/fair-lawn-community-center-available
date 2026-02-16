@@ -1,11 +1,15 @@
 <script lang="ts">
   import type { GymState } from './types.js';
   import { formatCountdown } from './time.js';
+  import { getEasternNow } from './time.js';
   import { activityEmoji } from './emoji.js';
+  import { getTimeBucket, buildCandidatePool, pickMessage, type TimeBucket, type MessageData } from './motivational.js';
 
-  let { gymState }: { gymState: GymState } = $props();
+  let { gymState, messages }: { gymState: GymState; messages: MessageData | null } = $props();
 
   let countdownMs = $state(0);
+  let currentBucket = $state<TimeBucket | null>(null);
+  let motivationalMessage = $state('');
 
   $effect(() => {
     countdownMs = gymState.countdownMs;
@@ -13,6 +17,29 @@
       countdownMs = Math.max(0, countdownMs - 1000);
     }, 1000);
     return () => clearInterval(interval);
+  });
+
+  const bucket = $derived(
+    gymState.status === 'available' && countdownMs > 60_000
+      ? getTimeBucket(countdownMs)
+      : null
+  );
+
+  $effect(() => {
+    if (bucket === null || !messages) {
+      currentBucket = null;
+      motivationalMessage = '';
+      return;
+    }
+    if (bucket !== currentBucket) {
+      currentBucket = bucket;
+      const now = getEasternNow();
+      const pool = buildCandidatePool(
+        messages, bucket, gymState.dayName,
+        now.getMonth() + 1, now.getDate()
+      );
+      motivationalMessage = pickMessage(pool);
+    }
   });
 
   const statusConfig = $derived.by(() => {
@@ -84,6 +111,12 @@
     <p class="status-subtext">No more open gym today</p>
   {:else if gymState.status === 'closed' && gymState.nextOpenDay}
     <p class="status-subtext">{gymState.countdownLabel}</p>
+  {/if}
+
+  {#if motivationalMessage}
+    <p class="motivational-message" aria-hidden="true">
+      {motivationalMessage}
+    </p>
   {/if}
 </div>
 
@@ -203,9 +236,20 @@
     font-size: 0.85rem;
   }
 
+  .motivational-message {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    font-style: italic;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-available-border);
+    line-height: 1.4;
+  }
+
   @media (prefers-color-scheme: dark) {
     .status-detail,
-    .status-subtext {
+    .status-subtext,
+    .motivational-message {
       color: rgba(255, 255, 255, 0.85);
     }
   }

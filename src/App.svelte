@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ScheduleData, GymState, Notice } from './lib/types.js';
+  import type { MessageData } from './lib/motivational.js';
   import { computeGymState, getEasternNow } from './lib/time.js';
   import StatusCard from './lib/StatusCard.svelte';
   import Timeline from './lib/Timeline.svelte';
@@ -9,6 +10,7 @@
   let data: ScheduleData | null = $state(null);
   let error: string | null = $state(null);
   let gymState: GymState | null = $state(null);
+  let messages: MessageData | null = $state(null);
   let lastFetchedAt = Date.now();
 
   async function loadSchedule(): Promise<void> {
@@ -20,9 +22,15 @@
     lastFetchedAt = Date.now();
   }
 
+  async function loadMessages(): Promise<void> {
+    const r = await fetch('./data/messages.json');
+    if (r.ok) messages = await r.json();
+  }
+
   // Initial load
   $effect(() => {
     loadSchedule().catch((e) => { error = e.message; });
+    loadMessages().catch(() => {});
   });
 
   // Re-compute gym state every 10 seconds
@@ -86,7 +94,7 @@
       </div>
     {/if}
 
-    <StatusCard {gymState} />
+    <StatusCard {gymState} {messages} />
 
     {#if gymState.todaySchedule}
       <Timeline schedule={gymState.todaySchedule} dayName={gymState.dayName} />
