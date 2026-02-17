@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseTime, formatCountdown, computeGymState, getEasternNow } from './time.js';
+import { parseTime, formatCountdown, computeGymState, getEasternNow, DISPLAY_DAYS } from './time.js';
 import type { ScheduleData, DaySchedule, Activity } from './types.js';
 
 // --- parseTime ---
@@ -233,7 +233,7 @@ describe('computeGymState', () => {
     expect(state.countdownMs).toBe(3 * 3600_000); // 3h until 6pm
   });
 
-  it('reports no more open gym when last activity is not open gym', () => {
+  it('finds cross-day open gym when no more same-day open gym', () => {
     const noTrailingOpen: DaySchedule = {
       open: '8:00 AM',
       close: '10:00 PM',
@@ -247,7 +247,9 @@ describe('computeGymState', () => {
     const state = computeGymState(makeSchedule({ Monday: noTrailingOpen }));
 
     expect(state.status).toBe('in-use');
-    expect(state.nextOpenGym).toBeNull();
+    // Cross-day: finds Tuesday's open gym
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+    expect(state.nextOpenGymDay).toBe('Tuesday');
   });
 
   it('finds next open day when multiple days have no schedule', () => {
@@ -286,5 +288,226 @@ describe('getEasternNow', () => {
     const result = getEasternNow();
     expect(result.getHours()).toBe(14);
     expect(result.getMinutes()).toBe(30);
+  });
+});
+
+// --- DISPLAY_DAYS ---
+
+describe('DISPLAY_DAYS', () => {
+  it('has 7 entries, starts with Monday, ends with Sunday', () => {
+    expect(DISPLAY_DAYS).toHaveLength(7);
+    expect(DISPLAY_DAYS[0].full).toBe('Monday');
+    expect(DISPLAY_DAYS[6].full).toBe('Sunday');
+  });
+
+  it('each entry has full and short string properties', () => {
+    for (const day of DISPLAY_DAYS) {
+      expect(typeof day.full).toBe('string');
+      expect(typeof day.short).toBe('string');
+    }
+  });
+
+  it('short values are 3-char abbreviations of full', () => {
+    for (const day of DISPLAY_DAYS) {
+      expect(day.short).toHaveLength(3);
+      expect(day.full.startsWith(day.short)).toBe(true);
+    }
+  });
+});
+
+// --- Cross-day next open gym (tested via computeGymState) ---
+
+describe('computeGymState cross-day open gym', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const defaultDay: DaySchedule = {
+    open: '8:00 AM',
+    close: '10:00 PM',
+    activities: [
+      { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+      { name: 'Basketball', start: '12:00 PM', end: '2:00 PM', isOpenGym: false },
+      { name: 'Open Gym', start: '2:00 PM', end: '6:00 PM', isOpenGym: true },
+      { name: 'Volleyball', start: '6:00 PM', end: '8:00 PM', isOpenGym: false },
+      { name: 'Open Gym', start: '8:00 PM', end: '10:00 PM', isOpenGym: true },
+    ],
+  };
+
+  function makeSchedule(overrides: Partial<Record<string, DaySchedule>> = {}): ScheduleData {
+    return {
+      scrapedAt: '2026-02-16T00:00:00Z',
+      schedule: {
+        Monday: defaultDay,
+        Tuesday: defaultDay,
+        Wednesday: defaultDay,
+        Thursday: defaultDay,
+        Friday: defaultDay,
+        Saturday: defaultDay,
+        Sunday: defaultDay,
+        ...overrides,
+      },
+      notices: [],
+    };
+  }
+
+  it('in-use with same-day nextOpenGym: nextOpenGymDay is null', () => {
+    // Monday 1pm during Basketball, next open gym at 2pm same day
+    vi.setSystemTime(new Date(2026, 1, 16, 13, 0, 0));
+    const state = computeGymState(makeSchedule());
+
+    expect(state.status).toBe('in-use');
+    expect(state.nextOpenGym?.start).toBe('2:00 PM');
+    expect(state.nextOpenGymDay).toBeNull();
+  });
+
+  it('between activities (path #4c): no same-day open gym uses cross-day', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '9:00 AM', end: '11:00 AM', isOpenGym: false },
+        { name: 'Volleyball', start: '1:00 PM', end: '3:00 PM', isOpenGym: false },
+      ],
+    };
+
+    vi.setSystemTime(new Date(2026, 1, 16, 12, 0, 0)); // noon, in the gap
+    const state = computeGymState(makeSchedule({ Monday: noOpenGymDay }));
+
+    expect(state.status).toBe('in-use');
+    expect(state.nextOpenGymDay).toBe('Tuesday');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+  });
+
+  it('skips days with no schedule', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '10:00 PM', isOpenGym: false },
+      ],
+    };
+
+    vi.setSystemTime(new Date(2026, 1, 16, 14, 0, 0)); // Monday 2pm
+    const schedule = makeSchedule({ Monday: noOpenGymDay });
+    delete (schedule.schedule as Record<string, DaySchedule>)['Tuesday'];
+
+    const state = computeGymState(schedule);
+    expect(state.nextOpenGymDay).toBe('Wednesday');
+  });
+
+  it('skips days with no open gym activities', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '10:00 PM', isOpenGym: false },
+      ],
+    };
+
+    vi.setSystemTime(new Date(2026, 1, 16, 14, 0, 0)); // Monday 2pm
+    const state = computeGymState(makeSchedule({
+      Monday: noOpenGymDay,
+      Tuesday: noOpenGymDay,
+    }));
+
+    expect(state.nextOpenGymDay).toBe('Wednesday');
+  });
+
+  it('wraps around week (Saturday to Monday)', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '10:00 PM', isOpenGym: false },
+      ],
+    };
+
+    // Saturday Feb 21 2026 at 2pm
+    vi.setSystemTime(new Date(2026, 1, 21, 14, 0, 0));
+    const state = computeGymState(makeSchedule({
+      Saturday: noOpenGymDay,
+      Sunday: noOpenGymDay,
+    }));
+
+    expect(state.nextOpenGymDay).toBe('Monday');
+  });
+
+  it('returns null when no open gym in entire schedule', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '10:00 PM', isOpenGym: false },
+      ],
+    };
+
+    const allNoOpenGym: Record<string, DaySchedule> = {};
+    for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
+      allNoOpenGym[day] = noOpenGymDay;
+    }
+
+    vi.setSystemTime(new Date(2026, 1, 16, 14, 0, 0));
+    const state = computeGymState(makeSchedule(allNoOpenGym));
+
+    expect(state.nextOpenGymDay).toBeNull();
+    expect(state.nextOpenGym).toBeNull();
+  });
+
+  it('returns earliest open gym activity on the found day', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '10:00 PM', isOpenGym: false },
+      ],
+    };
+
+    vi.setSystemTime(new Date(2026, 1, 16, 14, 0, 0));
+    const state = computeGymState(makeSchedule({ Monday: noOpenGymDay }));
+
+    // Tuesday's first open gym starts at 8:00 AM
+    expect(state.nextOpenGym?.start).toBe('8:00 AM');
+  });
+
+  it('closed before opening: today has open gym means same-day (nextOpenGymDay null)', () => {
+    // Monday 6am, today has open gym
+    vi.setSystemTime(new Date(2026, 1, 16, 6, 0, 0));
+    const state = computeGymState(makeSchedule());
+
+    expect(state.status).toBe('closed');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+    expect(state.nextOpenGymDay).toBeNull(); // same-day
+  });
+
+  it('closed before opening: today has NO open gym uses cross-day', () => {
+    const noOpenGymDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '10:00 PM', isOpenGym: false },
+      ],
+    };
+
+    vi.setSystemTime(new Date(2026, 1, 16, 6, 0, 0)); // Monday 6am
+    const state = computeGymState(makeSchedule({ Monday: noOpenGymDay }));
+
+    expect(state.status).toBe('closed');
+    expect(state.nextOpenGymDay).toBe('Tuesday');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+  });
+
+  it('closed after hours: cross-day lookup populates nextOpenGymDay', () => {
+    // Monday 10:30pm (after close)
+    vi.setSystemTime(new Date(2026, 1, 16, 22, 30, 0));
+    const state = computeGymState(makeSchedule());
+
+    expect(state.status).toBe('closed');
+    expect(state.nextOpenGymDay).toBe('Tuesday');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
   });
 });

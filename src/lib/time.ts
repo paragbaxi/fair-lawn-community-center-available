@@ -2,6 +2,17 @@ import type { Activity, DaySchedule, GymState, ScheduleData } from './types.js';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+/** Monday-first display order for UI components (DayPicker, WeeklySchedule). */
+export const DISPLAY_DAYS: { full: string; short: string }[] = [
+  { full: 'Monday', short: 'Mon' },
+  { full: 'Tuesday', short: 'Tue' },
+  { full: 'Wednesday', short: 'Wed' },
+  { full: 'Thursday', short: 'Thu' },
+  { full: 'Friday', short: 'Fri' },
+  { full: 'Saturday', short: 'Sat' },
+  { full: 'Sunday', short: 'Sun' },
+];
+
 export function getEasternNow(): Date {
   const str = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
   return new Date(str);
@@ -81,12 +92,14 @@ export function computeGymState(data: ScheduleData): GymState {
     }
   }
 
+  // Path #1: Currently in open gym
   if (currentActivity?.isOpenGym) {
     const end = parseTime(currentActivity.end, now);
     return {
       status: 'available',
       currentActivity,
       nextOpenGym: null,
+      nextOpenGymDay: null,
       nextOpenDay: null,
       nextOpenTime: null,
       countdownMs: end.getTime() - now.getTime(),
@@ -96,38 +109,56 @@ export function computeGymState(data: ScheduleData): GymState {
     };
   }
 
-  // Gym is in use or between activities — find next open gym
+  // Gym is in use or between activities — find next open gym today
   const nextOpen = findNextOpenGym(todaySchedule.activities, now);
 
+  // Paths #2/#3: In a scheduled non-open-gym activity
   if (currentActivity && !currentActivity.isOpenGym) {
-    const countdownTarget = nextOpen
-      ? parseTime(nextOpen.start, now)
-      : closeTime;
-
-    return {
-      status: 'in-use',
-      currentActivity,
-      nextOpenGym: nextOpen,
-      nextOpenDay: null,
-      nextOpenTime: null,
-      countdownMs: countdownTarget.getTime() - now.getTime(),
-      countdownLabel: nextOpen ? `Next: Open Gym at ${nextOpen.start}` : `Closes at ${todaySchedule.close}`,
-      todaySchedule,
-      dayName,
-    };
+    if (nextOpen) {
+      // Path #2: same-day open gym coming
+      const countdownTarget = parseTime(nextOpen.start, now);
+      return {
+        status: 'in-use',
+        currentActivity,
+        nextOpenGym: nextOpen,
+        nextOpenGymDay: null,
+        nextOpenDay: null,
+        nextOpenTime: null,
+        countdownMs: countdownTarget.getTime() - now.getTime(),
+        countdownLabel: `Next: Open Gym at ${nextOpen.start}`,
+        todaySchedule,
+        dayName,
+      };
+    } else {
+      // Path #3: no same-day open gym, try cross-day
+      const crossDay = findNextOpenGymAcrossDays(data, dayName);
+      return {
+        status: 'in-use',
+        currentActivity,
+        nextOpenGym: crossDay?.activity ?? null,
+        nextOpenGymDay: crossDay?.day ?? null,
+        nextOpenDay: null,
+        nextOpenTime: null,
+        countdownMs: closeTime.getTime() - now.getTime(),
+        countdownLabel: `Closes at ${todaySchedule.close}`,
+        todaySchedule,
+        dayName,
+      };
+    }
   }
 
-  // Between activities during open hours — check if it's effectively open gym
+  // Paths #4a/#4b/#4c: Between activities during open hours
   if (!currentActivity) {
-    // No explicit activity right now during open hours
-    // Check if next activity is soon
     const nextAny = findNextActivity(todaySchedule.activities, now);
     if (nextAny) {
       const nextStart = parseTime(nextAny.start, now);
+      const sameDayOpenGym = nextAny.isOpenGym ? nextAny : findNextOpenGym(todaySchedule.activities, now);
+      const crossDay = !sameDayOpenGym ? findNextOpenGymAcrossDays(data, dayName) : null;
       return {
         status: nextAny.isOpenGym ? 'available' : 'in-use',
         currentActivity: null,
-        nextOpenGym: nextAny.isOpenGym ? nextAny : findNextOpenGym(todaySchedule.activities, now),
+        nextOpenGym: sameDayOpenGym ?? crossDay?.activity ?? null,
+        nextOpenGymDay: !sameDayOpenGym ? (crossDay?.day ?? null) : null,
         nextOpenDay: null,
         nextOpenTime: null,
         countdownMs: nextStart.getTime() - now.getTime(),
@@ -159,19 +190,36 @@ function findNextActivity(activities: Activity[], now: Date): Activity | null {
   return null;
 }
 
+/** Find the next day (after currentDay) that has open gym, searching up to 7 days ahead. */
+function findNextOpenGymAcrossDays(
+  data: ScheduleData, currentDay: string
+): { day: string; activity: Activity } | null {
+  const dayIdx = DAYS.indexOf(currentDay);
+  for (let i = 1; i <= 7; i++) {
+    const nextDay = DAYS[(dayIdx + i) % 7];
+    const schedule = data.schedule[nextDay];
+    if (!schedule) continue;
+    const openGym = schedule.activities.find(a => a.isOpenGym);
+    if (openGym) return { day: nextDay, activity: openGym };
+  }
+  return null;
+}
+
 function closedState(data: ScheduleData, now: Date, currentDay: string): GymState {
-  // Find next opening
   const todaySchedule = data.schedule[currentDay] ?? null;
   const currentDayIdx = DAYS.indexOf(currentDay);
 
-  // Check if still before today's opening
+  // Path #5: Before today's opening
   if (todaySchedule) {
     const openTime = parseTime(todaySchedule.open, now);
     if (now < openTime) {
+      const todayOpenGym = todaySchedule.activities.find(a => a.isOpenGym) ?? null;
+      const crossDay = !todayOpenGym ? findNextOpenGymAcrossDays(data, currentDay) : null;
       return {
         status: 'closed',
         currentActivity: null,
-        nextOpenGym: null,
+        nextOpenGym: todayOpenGym ?? crossDay?.activity ?? null,
+        nextOpenGymDay: todayOpenGym ? null : (crossDay?.day ?? null),
         nextOpenDay: currentDay,
         nextOpenTime: todaySchedule.open,
         countdownMs: openTime.getTime() - now.getTime(),
@@ -182,26 +230,25 @@ function closedState(data: ScheduleData, now: Date, currentDay: string): GymStat
     }
   }
 
-  // Find next day with a schedule
+  // Path #6: After close, find next day with a schedule
   for (let i = 1; i <= 7; i++) {
     const nextDayIdx = (currentDayIdx + i) % 7;
     const nextDay = DAYS[nextDayIdx];
     const nextSchedule = data.schedule[nextDay];
     if (nextSchedule) {
-      const nextOpen = parseTime(nextSchedule.open, now);
-      // Calculate ms until next opening (approximate — add days)
+      const nextOpenTime = parseTime(nextSchedule.open, now);
       const msPerDay = 24 * 60 * 60 * 1000;
-      let daysUntil = i;
-      // If after close today, we need to go to the next occurrence
-      const targetMs = now.getTime() + daysUntil * msPerDay;
+      const targetMs = now.getTime() + i * msPerDay;
       const target = new Date(targetMs);
-      target.setHours(nextOpen.getHours(), nextOpen.getMinutes(), 0, 0);
+      target.setHours(nextOpenTime.getHours(), nextOpenTime.getMinutes(), 0, 0);
       const countdown = target.getTime() - now.getTime();
 
+      const crossDay = findNextOpenGymAcrossDays(data, currentDay);
       return {
         status: 'closed',
         currentActivity: null,
-        nextOpenGym: null,
+        nextOpenGym: crossDay?.activity ?? null,
+        nextOpenGymDay: crossDay?.day ?? null,
         nextOpenDay: nextDay,
         nextOpenTime: nextSchedule.open,
         countdownMs: Math.max(0, countdown),
@@ -212,10 +259,12 @@ function closedState(data: ScheduleData, now: Date, currentDay: string): GymStat
     }
   }
 
+  // Path #7: No schedule anywhere
   return {
     status: 'closed',
     currentActivity: null,
     nextOpenGym: null,
+    nextOpenGymDay: null,
     nextOpenDay: null,
     nextOpenTime: null,
     countdownMs: 0,

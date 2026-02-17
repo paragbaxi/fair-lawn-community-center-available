@@ -1,20 +1,16 @@
 <script lang="ts">
   import type { ScheduleData } from './types.js';
-  import { getEasternDayName } from './time.js';
+  import { DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { filterActivities } from './filters.js';
 
-  let { data, activeFilter = 'all' }: {
+  let { data, activeFilter = 'all', today }: {
     data: ScheduleData;
     activeFilter?: string;
+    today: string;
   } = $props();
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const today = getEasternDayName();
-
   let isOpen = $state(false);
-
-  const isFiltering = $derived(activeFilter !== 'all');
 </script>
 
 <details class="weekly-schedule" bind:open={isOpen}>
@@ -33,29 +29,29 @@
     </svg>
   </summary>
   <div class="weekly-content">
-    {#each days as day}
-      {#if data.schedule[day]}
-        {@const filtered = filterActivities(data.schedule[day].activities, activeFilter)}
-        {#if !isFiltering || filtered.length > 0}
-          <div class="day-block" class:is-today={day === today}>
-            <h3 class="day-name">
-              {day}
-              {#if day === today}
-                <span class="today-badge">Today</span>
-              {/if}
-            </h3>
-            <p class="day-hours">{data.schedule[day].open} &mdash; {data.schedule[day].close}</p>
-            <ul class="day-activities">
-              {#each filtered as act}
-                {@const emoji = activityEmoji(act.name)}
-                <li class:open-gym={act.isOpenGym}>
-                  <span class="act-time">{act.start} &ndash; {act.end}</span>
-                  <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
+    {#each DISPLAY_DAYS as day}
+      {#if data.schedule[day.full]}
+        {@const filtered = filterActivities(data.schedule[day.full].activities, activeFilter)}
+        {@const hasMatches = activeFilter === 'all' || filtered.length > 0}
+        {@const activitiesToShow = hasMatches ? filtered : data.schedule[day.full].activities}
+        <div class="day-block" class:is-today={day.full === today}>
+          <h3 class="day-name">
+            {day.full}
+            {#if day.full === today}
+              <span class="today-badge">Today</span>
+            {/if}
+          </h3>
+          <p class="day-hours">{data.schedule[day.full].open} &mdash; {data.schedule[day.full].close}</p>
+          <ul class="day-activities">
+            {#each activitiesToShow as act}
+              {@const emoji = activityEmoji(act.name)}
+              <li class:open-gym={act.isOpenGym}>
+                <span class="act-time">{act.start} &ndash; {act.end}</span>
+                <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
       {/if}
     {/each}
   </div>

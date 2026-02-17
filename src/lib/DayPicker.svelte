@@ -1,28 +1,17 @@
 <script lang="ts">
   import type { ScheduleData } from './types.js';
-  import { getEasternDayName } from './time.js';
+  import { DISPLAY_DAYS } from './time.js';
 
-  let { data, selectedDay, onSelectDay }: {
+  let { data, selectedDay, today, onSelectDay }: {
     data: ScheduleData;
     selectedDay: string;
+    today: string;
     onSelectDay: (day: string) => void;
   } = $props();
-
-  const days: { full: string; short: string }[] = [
-    { full: 'Monday', short: 'Mon' },
-    { full: 'Tuesday', short: 'Tue' },
-    { full: 'Wednesday', short: 'Wed' },
-    { full: 'Thursday', short: 'Thu' },
-    { full: 'Friday', short: 'Fri' },
-    { full: 'Saturday', short: 'Sat' },
-    { full: 'Sunday', short: 'Sun' },
-  ];
-
-  const today = getEasternDayName();
 </script>
 
 <div class="day-picker" role="group" aria-label="Select day">
-  {#each days as day}
+  {#each DISPLAY_DAYS as day}
     <button
       class="day-btn"
       class:selected={selectedDay === day.full}
@@ -92,10 +81,6 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: var(--color-available);
-  }
-
-  .day-btn.selected .today-dot {
     background: var(--color-available);
   }
 
