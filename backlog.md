@@ -44,10 +44,10 @@ Won't fix. The scraper fills all gaps within open gym ranges with "Open Gym" slo
 ### ~~P3: Scraper resilience monitoring~~
 Added `scraper/validate.ts` with 8 validation rules (timestamp, day completeness, activity counts, time format/logic). Scraper exits non-zero on failure, preventing bad data from being committed. Workflow creates/updates a GitHub issue on failure with deduplication. 13 unit tests in `scraper/validate.test.ts`. Deployed 2026-02-16.
 
-## Open
+### ~~P4: Playwright browser caching in CI~~
+Cache `~/.cache/ms-playwright` with `actions/cache@v4` keyed on exact Playwright version. On cache hit, only install OS deps (`install-deps`); on miss, full `install --with-deps`. Applied to both `ci.yml` and `scrape-and-deploy.yml`. Merged 2026-02-16.
 
-### P4: Playwright browser caching in CI
-The E2E job installs Chromium on every run (~30s). Cache `~/.cache/ms-playwright` to speed up cold runners. Low priority since GitHub Actions minutes are free for public repos.
+## Open
 
 ### P4: Service worker test coverage
 The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
