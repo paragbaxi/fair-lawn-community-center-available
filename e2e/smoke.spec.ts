@@ -160,7 +160,10 @@ test('Sports tab shows chips and responds to selection', async ({ page }) => {
 
   const sportChips = page.locator('#panel-sports .sport-chip');
   const chipCount = await sportChips.count();
-  if (chipCount === 0) return; // No sports available
+  if (chipCount === 0) {
+    test.skip(true, 'No sport chips available — cannot test chip interaction');
+    return;
+  }
 
   // Hint text should be visible before selection
   await expect(page.locator('#panel-sports .hint-text')).toBeVisible();
@@ -302,7 +305,10 @@ test('chip deselect clears sport URL param', async ({ page }) => {
   await expect(page.locator('#tab-sports')).toHaveAttribute('aria-selected', 'true');
 
   const sportChips = page.locator('#panel-sports .sport-chip');
-  if (await sportChips.count() === 0) return;
+  if (await sportChips.count() === 0) {
+    test.skip(true, 'No sport chips available — cannot test chip deselect');
+    return;
+  }
 
   const firstChip = sportChips.first();
   // Select chip — URL should gain sport param
