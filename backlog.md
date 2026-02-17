@@ -61,6 +61,12 @@ Restructured the entire app from a single scrolling page into 4 tab-based views:
 
 ## Open
 
+### ⚠️ P2: `closedState` Path #6 — open gym anchor mismatch (user-facing bug)
+`findNextOpenGymAcrossDays(data, currentDay)` anchors from today, but `nextOpenDay` (first day with any schedule) is found independently. If the building is closed for several days and reopens mid-week, StatusCard may display "Next Open Gym: [day]" that is before the building actually reopens — showing users incorrect next-session information. Needs a guard: only surface next open gym if that day is on or after `nextOpenDay`.
+
+### P3: Apply `test.skip()` consistently in E2E tests
+Three tests (`Sports tab shows chips`, `chip deselect clears sport URL param`, `back navigation`) guard on `sportChips.count() === 0` with a bare `return`. The back-nav test was updated to `test.skip()` in code review. Align the other two for consistent CI visibility when sport data is missing.
+
 ### P4: Service worker test coverage
 The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
 
@@ -79,8 +85,8 @@ Added `let staleClock = $state(Date.now())` with hourly `setInterval` in `$effec
 ### ~~P2: Shareable / deep-linkable URLs~~
 `#today?day=Wednesday`, `#sports?sport=basketball`, `#schedule?day=Friday` pre-select state on direct navigation. URL updates reactively via a single `$effect` in `App.svelte`. `src/lib/url.ts` owns all encode/decode logic. `selectedSport` lifted from `SportWeekCard` to `App.svelte` (controlled component). 22 unit tests + 7 E2E deep-link tests. Deployed 2026-02-17.
 
-### P3: E2E — back/forward navigation restores URL state
-The `hashchange` listener handles browser back/forward, but no test validates it. Add a Playwright test: navigate to `#sports?sport=basketball`, click Today tab (URL becomes `#today?day=…`), press browser back, assert Sports tab is active and basketball chip is pressed. Uses `page.goBack()`.
+### ~~P3: E2E — back/forward navigation restores URL state~~
+Added `back navigation restores previous tab and filter state` test in `e2e/smoke.spec.ts`. Uses two `page.goto()` calls to manufacture genuine history entries (required because all in-app nav uses `replaceState`). `test.skip()` guards the data-dependent chip path. Code review confirmed: `replaceState` for all tab/filter navigation is correct UX — tab switches are view modes, not destinations. 17 E2E tests passing. Deployed 2026-02-17.
 
 ### P4: DRY — extract `formatEasternDate()` helper
 `toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })` appears verbatim in 3 files: `StatusView.svelte:15`, `ScheduleView.svelte:16`, `App.svelte:175`. Extract to `formatEasternDate(isoString: string): string` in `src/lib/time.ts` and update all three call sites.
