@@ -79,8 +79,10 @@
   {:else if gymState.status === 'in-use' && !gymState.nextOpenGym}
     <p class="status-subtext">No more open gym this week</p>
   {:else if gymState.status === 'closed' && gymState.nextOpenDay}
-    <p class="status-subtext">{gymState.countdownLabel}</p>
-    {#if gymState.nextOpenGymDay && gymState.nextOpenGym}
+    <p class="status-subtext">
+      {gymState.countdownLabel}{#if gymState.nextOpenGym && gymState.nextOpenGymDay === gymState.nextOpenDay} · Open Gym at {gymState.nextOpenGym.start}{/if}
+    </p>
+    {#if gymState.nextOpenGymDay && gymState.nextOpenGym && gymState.nextOpenGymDay !== gymState.nextOpenDay}
       <p class="status-subtext-secondary">First Open Gym: {gymState.nextOpenGymDay} at {gymState.nextOpenGym.start}</p>
     {/if}
   {/if}
