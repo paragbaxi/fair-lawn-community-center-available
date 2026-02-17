@@ -64,8 +64,8 @@ Restructured the entire app from a single scrolling page into 4 tab-based views:
 ### ~~⚠️ P2: `closedState` Path #6 — open gym anchor mismatch~~
 `findNextOpenGymAcrossDays` used `i=1..7`, which at `i=7` wraps back to `currentDay`. In Path #6 this could surface today's already-past open gym as `nextOpenGymDay` while `nextOpenDay` was a future day — e.g. "Opens Saturday" + "First Open Gym: Friday" (Friday visually before Saturday in the week). Fixed by checking `nextDay` itself for open gym first, then anchoring `findNextOpenGymAcrossDays` from `nextDay` instead of `currentDay`. 2 targeted unit tests added (156 unit + 17 E2E passing). Deployed 2026-02-17.
 
-### P3: Apply `test.skip()` consistently in E2E tests
-Three tests (`Sports tab shows chips`, `chip deselect clears sport URL param`, `back navigation`) guard on `sportChips.count() === 0` with a bare `return`. The back-nav test was updated to `test.skip()` in code review. Align the other two for consistent CI visibility when sport data is missing.
+### ~~P3: Apply `test.skip()` consistently in E2E tests~~
+All three sport-chip guards (`Sports tab shows chips`, `chip deselect clears sport URL param`, `back navigation`) now use `test.skip()` with an explanatory message instead of bare `return`. Deployed 2026-02-17.
 
 ### ~~P4: StatusCard — redundant "First Open Gym" line when same day as reopening~~
 When `nextOpenGymDay === nextOpenDay`, combined into one line: "Tuesday at 9:00 AM · Open Gym at 2:00 PM". When they differ, the two-line layout is unchanged. Deployed 2026-02-17.
