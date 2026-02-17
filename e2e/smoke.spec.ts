@@ -315,3 +315,30 @@ test('chip deselect clears sport URL param', async ({ page }) => {
   const url = page.url();
   expect(url).not.toContain('sport=');
 });
+
+test('back navigation restores previous tab and filter state', async ({ page }) => {
+  // Start on Sports tab, wait for data to load
+  await page.goto('/#sports');
+  await expect(page.locator('#tab-sports')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#tab-sports')).toHaveAttribute('aria-selected', 'true');
+
+  // Click first available chip (data-independent; replaceState updates H1 to #sports?sport=X)
+  const sportChips = page.locator('#panel-sports .sport-chip');
+  if (await sportChips.count() === 0) return;
+  const firstChip = sportChips.first();
+  await firstChip.click();
+  await expect(page).toHaveURL(/sport=/); // confirm URL was updated
+
+  // Navigate to today tab — creates new history entry H2
+  await page.goto('/#today');
+  await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#tab-today')).toHaveAttribute('aria-selected', 'true');
+
+  // Browser back → H1 (#sports?sport=X), fires hashchange
+  // hashchange handler restores: activeTab='sports', selectedSport=X
+  await page.goBack();
+  await expect(page.locator('#tab-sports')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#panel-sports')).not.toHaveAttribute('hidden', '');
+  await expect(page.locator('#panel-sports .sport-chip[aria-pressed="true"]').first()).toBeVisible();
+  await expect(page).toHaveURL(/sport=/); // URL also reflects restored state
+});
