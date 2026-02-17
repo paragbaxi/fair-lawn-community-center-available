@@ -80,8 +80,7 @@ describe('parseUrlState', () => {
 
   it('all 7 SPORT_CATEGORIES ids parse correctly', () => {
     // SPORT_CATEGORIES = FILTER_CATEGORIES minus 'all' and 'open-gym'
-    const pb = 'pick' + 'leball';
-    const validSports = ['basketball', pb, 'table-tennis', 'volleyball', 'badminton', 'tennis', 'youth'];
+    const validSports = ['basketball', 'pickleball', 'table-tennis', 'volleyball', 'badminton', 'tennis', 'youth'];
     for (const sport of validSports) {
       window.location.hash = `#sports?sport=${sport}`;
       const s = parseUrlState();
