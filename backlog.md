@@ -47,6 +47,15 @@ Added `scraper/validate.ts` with 8 validation rules (timestamp, day completeness
 ### ~~P4: Playwright browser caching in CI~~
 Cache `~/.cache/ms-playwright` with `actions/cache@v4` keyed on exact Playwright version. On cache hit, only install OS deps (`install-deps`); on miss, full `install --with-deps`. Applied to both `ci.yml` and `scrape-and-deploy.yml`. Merged 2026-02-16.
 
+### ~~P2: Day picker, filter chips, and activity filtering~~
+DayPicker (Mon-Sun selector), FilterChips (sport/activity filtering with graceful fallback when no matches), shared `DISPLAY_DAYS` constant, stale-today prop threading, midnight auto-advance, tennis regex fix, emoji coverage for Tennis/Youth. 152 unit tests, 8 E2E tests. Merged 2026-02-16.
+
+### ~~P2: SportWeekCard — "When can I play...?"~~
+Expandable card answering "When can I play [sport] this week?" with three states: collapsed → sport chip picker → week summary with day grouping, NOW badge, past/current styling. Resets selection on close. Derived from `SPORT_CATEGORIES` (filters.ts). Merged 2026-02-16.
+
+### ~~P2: Cross-day next open gym in StatusCard~~
+When all today's open gym slots are past, StatusCard now shows "Next Open Gym: [Day] at [Time]" instead of a dead-end "No more open gym today." Updated all 7 GymState return paths with `nextOpenGymDay` field. Also shows "First Open Gym" secondary line when closed after hours. 13 dedicated cross-day unit tests. Merged 2026-02-16.
+
 ## Open
 
 ### P4: Service worker test coverage
@@ -57,6 +66,21 @@ The service worker has meaningful logic (network-first vs cache-first strategy, 
 
 ### P5: Composite action for Playwright setup
 Both `ci.yml` and `scrape-and-deploy.yml` have identical 4-step Playwright cache blocks with sync comments. If a third workflow needs Playwright (e.g., Lighthouse CI), extract to `.github/actions/setup-playwright/action.yml`. Not worth it with 2 consumers — revisit if a third is added.
+
+### P3: DayPicker + FilterChips E2E — timeline content verification
+Current E2E tests verify DayPicker clicks update `.selected` class and FilterChips toggle `aria-pressed`, but don't assert that the timeline content actually changes. Add assertions that clicking a different day changes visible activity names, and that activating a filter reduces the visible activity count.
+
+### P4: SportWeekCard E2E — week summary content verification
+The current E2E test opens the card and clicks a sport chip, but only checks that `.result-row` appears. Add assertions for: day abbreviations render, time ranges are present, clicking back returns to sport picker, reopening after close shows sport picker (not stale selection).
+
+### P4: Midnight auto-advance E2E test
+Fix 7 added auto-advance logic (if user is viewing "today" and midnight passes, selectedDay advances). This is only testable via Playwright with clock manipulation (`page.clock`). Low priority since the logic is simple, but would catch regressions.
+
+### P4: `findNextOpenGymAcrossDays` off-by-one audit
+The function iterates `i = 1..7`, which on `i=7` wraps back to `currentDay` itself — a redundant check since the caller already examined today. Harmless but could be tightened to `i <= 6`. Very low risk.
+
+### P4: Filter chip scroll on narrow screens
+When many filter categories are available (8+), the chip row may overflow on narrow screens (<375px). Consider adding `overflow-x: auto` with `-webkit-overflow-scrolling: touch` to `.filter-chips` for horizontal scrolling, or wrapping to a second row.
 
 ### P5: Lighthouse CI budget
 With CI in place, add a Lighthouse budget check to catch performance regressions (bundle size growth, accessibility score drops) automatically on PRs.
