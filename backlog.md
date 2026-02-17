@@ -41,10 +41,10 @@ Added `@playwright/test`, `playwright.config.ts`, and 4 E2E smoke tests in `e2e/
 ### ~~P5: `computeGymState` gap behavior refinement~~
 Won't fix. The scraper fills all gaps within open gym ranges with "Open Gym" slots, so gaps in `computeGymState` only occur when no open gym range is defined — an edge case that doesn't happen with real data. Current behavior (countdown to next activity) is reasonable.
 
-## Open
+### ~~P3: Scraper resilience monitoring~~
+Added `scraper/validate.ts` with 8 validation rules (timestamp, day completeness, activity counts, time format/logic). Scraper exits non-zero on failure, preventing bad data from being committed. Workflow creates/updates a GitHub issue on failure with deduplication. 13 unit tests in `scraper/validate.test.ts`.
 
-### P3: Scraper resilience monitoring
-The scraper runs on a schedule but has no alerting. If the Fair Lawn website changes its HTML structure, scraping silently produces bad data. Add a GitHub Actions step that validates the output JSON (e.g., at least 5 days with activities, reasonable time ranges) and opens an issue on failure.
+## Open
 
 ### P4: Playwright browser caching in CI
 The E2E job installs Chromium on every run (~30s). Cache `~/.cache/ms-playwright` to speed up cold runners. Low priority since GitHub Actions minutes are free for public repos.

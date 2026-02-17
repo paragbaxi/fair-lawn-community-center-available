@@ -24,6 +24,11 @@ export function normalizeTime(raw: string): string {
   return t;
 }
 
+// Strict format check for normalized "H:MM AM/PM" times
+export function isValidTime(timeStr: string): boolean {
+  return /^\d{1,2}:\d{2} (AM|PM)$/.test(timeStr.trim());
+}
+
 // Parse "H:MM AM/PM" to minutes since midnight
 export function parseTimeMinutes(timeStr: string): number {
   const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);

@@ -10,6 +10,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: pages
@@ -40,7 +41,39 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run scraper
+        id: scrape
         run: npx tsx scraper/index.ts
+
+      - name: Open issue on scraper failure
+        if: failure() && steps.scrape.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          # Ensure label exists (idempotent)
+          gh label create scraper-failure --description "Automated: scraper validation failed" --color d73a4a 2>/dev/null || true
+          # Check for existing open issue to avoid duplicates
+          existing=$(gh issue list --label "scraper-failure" --state open --limit 1 --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Scraper still failing as of $(date -u +%Y-%m-%d). [Workflow run](https://github.com/$REPO/actions/runs/$RUN_ID)"
+            echo "Commented on existing issue #$existing"
+          else
+            gh issue create \
+              --title "Scraper validation failed" \
+              --label "scraper-failure" \
+              --body "The daily scraper failed on **$(date -u +%Y-%m-%d)**.
+
+          This likely means the Fair Lawn website changed its HTML structure or was temporarily unavailable.
+
+          **[View workflow logs](https://github.com/$REPO/actions/runs/$RUN_ID)**
+
+          ### Next steps
+          1. Check workflow logs for specific validation errors
+          2. Visit [fairlawn.org/community-center](https://www.fairlawn.org/community-center) to check for structural changes
+          3. Update \`scraper/parse.ts\` if needed
+          4. Close this issue when resolved"
+          fi
 
       - name: Commit updated schedule data
         run: |

@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSchedule } from './parse.js';
+import { validateSchedule } from './validate.js';
 import type { ScheduleData } from '../src/lib/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,6 +77,13 @@ async function scrape(): Promise<void> {
     schedule,
     notices,
   };
+
+  const validation = validateSchedule(data);
+  if (!validation.valid) {
+    console.error('Schedule validation failed:');
+    for (const err of validation.errors) console.error(`  - ${err}`);
+    process.exit(1);
+  }
 
   if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
