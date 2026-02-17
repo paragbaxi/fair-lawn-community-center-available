@@ -13,6 +13,15 @@ export const DISPLAY_DAYS: { full: string; short: string }[] = [
   { full: 'Sunday', short: 'Sun' },
 ];
 
+export function formatEasternDate(isoString: string): string {
+  return new Date(isoString).toLocaleDateString('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 export function getEasternNow(): Date {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',

@@ -91,8 +91,8 @@ Added `let staleClock = $state(Date.now())` with hourly `setInterval` in `$effec
 ### ~~P3: E2E — back/forward navigation restores URL state~~
 Added `back navigation restores previous tab and filter state` test in `e2e/smoke.spec.ts`. Uses two `page.goto()` calls to manufacture genuine history entries (required because all in-app nav uses `replaceState`). `test.skip()` guards the data-dependent chip path. Code review confirmed: `replaceState` for all tab/filter navigation is correct UX — tab switches are view modes, not destinations. 17 E2E tests passing. Deployed 2026-02-17.
 
-### P4: DRY — extract `formatEasternDate()` helper
-`toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })` appears verbatim in 3 files: `StatusView.svelte:15`, `ScheduleView.svelte:16`, `App.svelte:175`. Extract to `formatEasternDate(isoString: string): string` in `src/lib/time.ts` and update all three call sites.
+### ~~P4: DRY — extract `formatEasternDate()` helper~~
+Extracted to `src/lib/time.ts`. Updated 3 call sites: `StatusView.svelte`, `ScheduleView.svelte`, `App.svelte`. Deployed 2026-02-17.
 
 ### P4: DRY — extract shared reactive Eastern clock
 The `$state(getEasternNow())` + 60-second `setInterval(() => now = getEasternNow())` + `$effect` cleanup pattern is independently duplicated in `Timeline.svelte:12-20` and `SportWeekCard.svelte:28-47`. Extract to a shared utility (e.g. `useEasternClock(intervalMs)` returning a getter, or a Svelte 5 rune-compatible store in `src/lib/clock.svelte.ts`).

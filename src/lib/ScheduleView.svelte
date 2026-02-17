@@ -2,6 +2,7 @@
   import type { ScheduleData } from './types.js';
   import WeeklySchedule from './WeeklySchedule.svelte';
   import AboutFaq from './AboutFaq.svelte';
+  import { formatEasternDate } from './time.js';
 
   let { data, today, scrapedAt, initialDay = null }: {
     data: ScheduleData;
@@ -17,7 +18,7 @@
 
 <footer class="footer">
   <p class="footer-source">
-    <span>Updated {new Date(scrapedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+    <span>Updated {formatEasternDate(scrapedAt)}</span>
     <span class="footer-sep" aria-hidden="true">&middot;</span>
     <span>Source: <a href="https://www.fairlawn.org/park-rec" target="_blank" rel="noopener">fairlawn.org</a></span>
   </p>

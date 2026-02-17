@@ -2,6 +2,7 @@
   import type { GymState, ScheduleData } from './types.js';
   import StatusCard from './StatusCard.svelte';
   import AboutFaq from './AboutFaq.svelte';
+  import { formatEasternDate } from './time.js';
 
   let { gymState, data }: {
     gymState: GymState;
@@ -15,7 +16,7 @@
 
 <footer class="micro-footer">
   <p>
-    Unofficial &middot; Updated {new Date(data.scrapedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
+    Unofficial &middot; Updated {formatEasternDate(data.scrapedAt)}
     &middot; Schedule may change without notice.
   </p>
 </footer>

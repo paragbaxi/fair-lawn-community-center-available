@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ScheduleData, GymState, DaySchedule, Notice, TabId } from './lib/types.js';
-  import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS } from './lib/time.js';
+  import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS, formatEasternDate } from './lib/time.js';
   import type { FilterCategory } from './lib/filters.js';
   import { SPORT_CATEGORIES, getAvailableSports } from './lib/filters.js';
   import { parseUrlState, buildUrlHash } from './lib/url.js';
@@ -188,7 +188,7 @@
 
     {#if isStale}
       <div class="stale-banner" role="alert">
-        Schedule data may be outdated. Last updated: {new Date(data.scrapedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}
+        Schedule data may be outdated. Last updated: {formatEasternDate(data.scrapedAt)}
       </div>
     {/if}
 
