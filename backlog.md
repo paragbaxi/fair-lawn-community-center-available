@@ -67,8 +67,8 @@ Restructured the entire app from a single scrolling page into 4 tab-based views:
 ### P3: Apply `test.skip()` consistently in E2E tests
 Three tests (`Sports tab shows chips`, `chip deselect clears sport URL param`, `back navigation`) guard on `sportChips.count() === 0` with a bare `return`. The back-nav test was updated to `test.skip()` in code review. Align the other two for consistent CI visibility when sport data is missing.
 
-### P4: StatusCard — redundant "First Open Gym" line when same day as reopening
-When `nextOpenGymDay === nextOpenDay`, StatusCard shows both "Opens Tuesday at 9:00 AM" (countdown label) and "First Open Gym: Tuesday at 2:00 PM" (secondary). The secondary is informative (open gym start time differs from building open time) but visually redundant. Consider combining into one line: "Opens Tuesday at 9:00 AM · Open Gym at 2:00 PM". Discovered during closedState audit.
+### ~~P4: StatusCard — redundant "First Open Gym" line when same day as reopening~~
+When `nextOpenGymDay === nextOpenDay`, combined into one line: "Tuesday at 9:00 AM · Open Gym at 2:00 PM". When they differ, the two-line layout is unchanged. Deployed 2026-02-17.
 
 ### P4: Service worker test coverage
 The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
