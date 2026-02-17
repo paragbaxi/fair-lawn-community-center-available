@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { ScheduleData, GymState, DaySchedule, Notice, TabId } from './lib/types.js';
   import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS } from './lib/time.js';
+  import type { FilterCategory } from './lib/filters.js';
+  import { SPORT_CATEGORIES, getAvailableSports } from './lib/filters.js';
+  import { parseUrlState, buildUrlHash } from './lib/url.js';
   import { tick } from 'svelte';
   import TabBar from './lib/TabBar.svelte';
   import StatusView from './lib/StatusView.svelte';
@@ -9,18 +12,19 @@
   import ScheduleView from './lib/ScheduleView.svelte';
 
   // --- Tab routing ---
-  const VALID_TABS: TabId[] = ['status', 'today', 'sports', 'schedule'];
+  // Parse URL once synchronously before any $state declarations
+  const _initialUrl = parseUrlState();
 
-  function getTabFromHash(): TabId {
-    const hash = location.hash.slice(1).toLowerCase();
-    return VALID_TABS.includes(hash as TabId) ? (hash as TabId) : 'status';
-  }
-
-  let activeTab: TabId = $state(getTabFromHash());
+  let activeTab: TabId = $state(_initialUrl.tab);
+  let selectedDay = $state(_initialUrl.day ?? getEasternDayName());
+  let selectedSport = $state<FilterCategory | null>(
+    _initialUrl.sport ? (SPORT_CATEGORIES.find(c => c.id === _initialUrl.sport) ?? null) : null
+  );
+  // Only seed initialDay for WeeklySchedule when the URL starts on the schedule tab
+  const scheduleInitialDay = _initialUrl.tab === 'schedule' ? _initialUrl.day : null;
 
   async function setTab(tab: TabId, focusPanel = true) {
     activeTab = tab;
-    history.replaceState(null, '', `#${tab}`);
     window.scrollTo(0, 0);
     if (focusPanel) {
       await tick();
@@ -30,10 +34,12 @@
 
   $effect(() => {
     const onHashChange = () => {
-      const hash = location.hash.slice(1).toLowerCase();
-      if (VALID_TABS.includes(hash as TabId)) {
-        activeTab = hash as TabId;
-      }
+      const { tab, day, sport } = parseUrlState();
+      activeTab = tab;
+      if (day) selectedDay = day;
+      const newSport = sport ? (SPORT_CATEGORIES.find(c => c.id === sport) ?? null) : null;
+      if (tab === 'sports') selectedSport = newSport; // only update sport when on sports tab
+      // day persists across tab switches by design
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -45,9 +51,6 @@
   let gymState: GymState | null = $state(null);
   let isOffline = $state(!navigator.onLine);
   let lastFetchedAt = Date.now();
-
-  // Day picker state
-  let selectedDay = $state(getEasternDayName());
 
   async function loadSchedule(): Promise<void> {
     const r = await fetch('./data/latest.json');
@@ -96,11 +99,17 @@
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   });
 
+  let staleClock = $state(Date.now());
+
+  $effect(() => {
+    const interval = setInterval(() => { staleClock = Date.now(); }, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  });
+
   const isStale = $derived.by(() => {
     if (!data) return false;
     const scraped = new Date(data.scrapedAt).getTime();
-    const now = Date.now();
-    return now - scraped > 48 * 60 * 60 * 1000;
+    return staleClock - scraped > 48 * 60 * 60 * 1000;
   });
 
   // Only show notices for today or future dates
@@ -141,6 +150,19 @@
       const next = DISPLAY_DAYS.find(d => data!.schedule[d.full]);
       if (next) selectedDay = next.full;
     }
+  });
+
+  // Stale-sport guard: reset selectedSport if it's no longer in the schedule
+  $effect(() => {
+    if (!data || !selectedSport) return;
+    const available = getAvailableSports(data.schedule);
+    if (!available.some(c => c.id === selectedSport!.id)) selectedSport = null;
+  });
+
+  // URL sync — declared after validation effects so state is already corrected
+  $effect(() => {
+    if (!data) return; // wait for data so validation effects have run first
+    history.replaceState(null, '', buildUrlHash(activeTab, selectedDay, selectedSport?.id ?? null));
   });
 </script>
 
@@ -196,11 +218,11 @@
     </div>
 
     <div role="tabpanel" id="panel-sports" aria-labelledby="tab-sports" tabindex="-1" hidden={activeTab !== 'sports'}>
-      <SportsView {data} />
+      <SportsView {data} {selectedSport} onSelectSport={(s) => { selectedSport = s; }} />
     </div>
 
     <div role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule" tabindex="-1" hidden={activeTab !== 'schedule'}>
-      <ScheduleView {data} today={gymState.dayName} scrapedAt={data.scrapedAt} />
+      <ScheduleView {data} today={gymState.dayName} scrapedAt={data.scrapedAt} initialDay={scheduleInitialDay} />
     </div>
 
     <TabBar {activeTab} onSelectTab={setTab} />

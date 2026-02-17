@@ -64,17 +64,63 @@ Restructured the entire app from a single scrolling page into 4 tab-based views:
 ### P4: Service worker test coverage
 The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
 
-### P3: E2E — timeline content verification on day switch
-DayPicker test verifies `aria-pressed` toggles, but doesn't assert that the timeline content actually changes when switching days. Add assertions that clicking a different day shows different activity names.
+### ~~P3: E2E — timeline content verification on day switch~~
+After clicking a different day, assert `.timeline-day` header text changes (with null guard) and at least one `.list-item` is visible when activities exist. Deployed 2026-02-17.
 
-### P3: E2E — Sports tab week summary content verification
-The Sports tab E2E test clicks a sport chip and checks results appear, but doesn't verify: day abbreviations render, time ranges are present, chip deselection clears results.
+### ~~P3: E2E — Sports tab week summary content verification~~
+After clicking a sport chip, assert result-row contains day abbreviation, en-dash time range, and activity name; click same chip to deselect and assert hint text reappears. Deployed 2026-02-17.
 
-### P3: `getEasternNow()` spec-safety
-`getEasternNow()` relies on `toLocaleString('en-US', { timeZone })` producing a `Date`-parseable string. This is implementation-defined behavior — works on all modern browsers but not spec-guaranteed. Replace with `Intl.DateTimeFormat.formatToParts()` for robustness.
+### ~~P3: `getEasternNow()` spec-safety~~
+Replaced `toLocaleString` + `new Date(str)` with `Intl.DateTimeFormat.formatToParts()` using `hourCycle: 'h23'`. All 41 time tests pass. Deployed 2026-02-17.
 
-### P3: `isStale` derived doesn't re-evaluate over time
-`isStale` in App.svelte calls `Date.now()` inside a `$derived` with no reactive clock signal. If the app stays open for days without a visibility change (e.g. kiosk), the stale banner never appears. Add a periodic `$state` clock (hourly) to trigger re-evaluation.
+### ~~P3: `isStale` derived doesn't re-evaluate over time~~
+Added `let staleClock = $state(Date.now())` with hourly `setInterval` in `$effect`. `isStale` now reads `staleClock` instead of non-reactive `Date.now()`. Deployed 2026-02-17.
+
+### P2: Shareable / deep-linkable URLs
+Currently the URL stays at `#sports` even when a sport chip is selected — sharing the link loses the filter context. Users want to share things like "when can I play [sport] this week?" with a friend and have the URL pre-select that state. Full design reviewed by agent 2026-02-17.
+
+**Complete URL pattern catalog:**
+```
+#status                      (existing, no change)
+#today                       (existing, no change)
+#today?day=Wednesday         (pre-select a day in Today tab)
+#sports                      (existing, no change)
+#sports?sport=basketball     (pre-select a sport chip)
+#sports?sport=volleyball
+#sports?sport=table-tennis
+#sports?sport=badminton
+#sports?sport=tennis
+#sports?sport=youth
+#schedule                    (existing, no change)
+#schedule?day=Friday         (pre-expand a day in Schedule accordion)
+```
+Valid sport IDs come from `FilterCategory.id` in `filters.ts`. Valid day values are the 7 full day names from `DISPLAY_DAYS` (case-insensitive on parse, stored canonical).
+
+**Design principles:**
+- One shared utility `src/lib/url.ts` — `parseUrlState()` and `buildUrlHash()` — no component parses `location.hash` directly for sub-params (DRY)
+- Graceful degrade: unknown sport/day → default state, no errors; `#schedule?day=Funday` → today expanded
+- Bookmarkable and shareable; works on direct navigation; GitHub Pages hash routing unaffected
+- `history.replaceState` (not `pushState`) to avoid polluting recipient's history
+- No external library; `URLSearchParams` built-in suffices
+
+**State ownership changes:**
+- `selectedSport` must be lifted from `SportWeekCard.svelte` (currently local `$state`) up to `App.svelte` so App can encode/decode it
+- `WeeklySchedule.svelte` gets a new optional `initialDay` prop to pre-expand a specific day
+
+**Files to create/modify:**
+1. **CREATE** `src/lib/url.ts` — `parseUrlState()` (reads `location.hash`, validates, returns `{tab, day, sport}`), `buildUrlHash(tab, opts)` (builds hash string)
+2. **MODIFY** `App.svelte` — replace `getTabFromHash()` with `parseUrlState()`, add `selectedSport $state`, add unified `$effect` to call `buildUrlHash` on any state change, update `hashchange` listener
+3. **MODIFY** `SportsView.svelte` — accept/forward `selectedSport` + `onSelectSport` props
+4. **MODIFY** `SportWeekCard.svelte` — remove local `selectedSport $state`, accept as prop + callback; move stale-sport guard to `App.svelte`
+5. **MODIFY** `ScheduleView.svelte` + `WeeklySchedule.svelte` — add `initialDay` prop, seed `expandedDays` with it on init
+
+**Build sequence:** Phase 1 — `url.ts` + unit tests; Phase 2 — lift `selectedSport`; Phase 3 — wire URL encoding; Phase 4 — schedule accordion deep-link; Phase 5 — edge case validation (nonexistent sport ID, tab switch clears irrelevant params, back/forward restores state).
+
+### P4: DRY — extract `formatEasternDate()` helper
+`toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })` appears verbatim in 3 files: `StatusView.svelte:15`, `ScheduleView.svelte:16`, `App.svelte:175`. Extract to `formatEasternDate(isoString: string): string` in `src/lib/time.ts` and update all three call sites.
+
+### P4: DRY — extract shared reactive Eastern clock
+The `$state(getEasternNow())` + 60-second `setInterval(() => now = getEasternNow())` + `$effect` cleanup pattern is independently duplicated in `Timeline.svelte:12-20` and `SportWeekCard.svelte:28-47`. Extract to a shared utility (e.g. `useEasternClock(intervalMs)` returning a getter, or a Svelte 5 rune-compatible store in `src/lib/clock.svelte.ts`).
 
 ### P4: Sport chip horizontal scroll on narrow screens
 With 7 sport categories, the chip row wraps to 2 lines. On very narrow screens (<375px) with more categories, consider `overflow-x: auto` with `-webkit-overflow-scrolling: touch` for horizontal scrolling.

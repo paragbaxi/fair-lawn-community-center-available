@@ -2,14 +2,15 @@
   import type { ScheduleData } from './types.js';
   import WeeklySchedule from './WeeklySchedule.svelte';
 
-  let { data, today, scrapedAt }: {
+  let { data, today, scrapedAt, initialDay = null }: {
     data: ScheduleData;
     today: string;
     scrapedAt: string;
+    initialDay?: string | null;
   } = $props();
 </script>
 
-<WeeklySchedule {data} {today} expanded={true} />
+<WeeklySchedule {data} {today} expanded={true} {initialDay} />
 
 <footer class="footer">
   <p class="footer-source">

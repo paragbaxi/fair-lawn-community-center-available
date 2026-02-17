@@ -5,19 +5,21 @@
   import { getEasternNow, isActivityPast, isActivityCurrent, shortDayName, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
 
-  let { data, expanded = false }: { data: ScheduleData; expanded?: boolean } = $props();
+  let {
+    data,
+    expanded = false,
+    selectedSport = null,
+    onSelectSport = () => {},
+  }: {
+    data: ScheduleData;
+    expanded?: boolean;
+    selectedSport?: FilterCategory | null;
+    onSelectSport?: (sport: FilterCategory | null) => void;
+  } = $props();
 
   let isOpen = $state(false);
-  let selectedSport = $state<FilterCategory | null>(null);
 
   const availableSports = $derived(getAvailableSports(data.schedule));
-
-  // Stale sport guard: reset if selected sport no longer available after data refresh
-  $effect(() => {
-    if (selectedSport && !availableSports.some(s => s.id === selectedSport!.id)) {
-      selectedSport = null;
-    }
-  });
 
   const weekSummary = $derived.by(() => {
     if (!selectedSport) return [];
@@ -39,7 +41,7 @@
   });
 
   $effect(() => {
-    if (!expanded && !isOpen) { selectedSport = null; return; }
+    if (!expanded && !isOpen) { onSelectSport(null); return; }
     // Always update now when visible — todayName depends on it for "Today" highlight
     now = getEasternNow();
     const interval = setInterval(() => { now = getEasternNow(); }, 60_000);
@@ -65,7 +67,7 @@
             class="sport-chip"
             class:sport-chip-active={selectedSport?.id === sport.id}
             aria-pressed={selectedSport?.id === sport.id}
-            onclick={() => { selectedSport = selectedSport?.id === sport.id ? null : sport; }}
+            onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
           >
             {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
           </button>
@@ -125,7 +127,7 @@
           {#if selectedSport}
             {@const sportEmoji = activityEmoji(selectedSport.label)}
             <div class="sport-result-header">
-              <button class="back-btn" onclick={() => { selectedSport = null; }} aria-label="Back to sport selection">
+              <button class="back-btn" onclick={() => { onSelectSport(null); }} aria-label="Back to sport selection">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -167,7 +169,7 @@
                 <button
                   class="sport-chip"
                   aria-pressed={selectedSport?.id === sport.id}
-                  onclick={() => { selectedSport = selectedSport?.id === sport.id ? null : sport; }}
+                  onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
                 >
                   {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
                 </button>
