@@ -1,11 +1,15 @@
 <script lang="ts">
-  import type { ScheduleData, GymState, Notice } from './lib/types.js';
+  import type { ScheduleData, GymState, DaySchedule, Notice } from './lib/types.js';
   import type { MessageData } from './lib/motivational.js';
-  import { computeGymState, getEasternNow } from './lib/time.js';
+  import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS } from './lib/time.js';
+  import { getAvailableFilters, filterActivities, FILTER_CATEGORIES } from './lib/filters.js';
   import StatusCard from './lib/StatusCard.svelte';
   import Timeline from './lib/Timeline.svelte';
   import UpNext from './lib/UpNext.svelte';
   import WeeklySchedule from './lib/WeeklySchedule.svelte';
+  import DayPicker from './lib/DayPicker.svelte';
+  import FilterChips from './lib/FilterChips.svelte';
+  import SportWeekCard from './lib/SportWeekCard.svelte';
 
   let data: ScheduleData | null = $state(null);
   let error: string | null = $state(null);
@@ -13,6 +17,10 @@
   let messages: MessageData | null = $state(null);
   let isOffline = $state(!navigator.onLine);
   let lastFetchedAt = Date.now();
+
+  // Day picker + filter state
+  let selectedDay = $state(getEasternDayName());
+  let activeFilter = $state('all');
 
   async function loadSchedule(): Promise<void> {
     const r = await fetch('./data/latest.json');
@@ -80,6 +88,64 @@
     const today = getEasternNow().toISOString().split('T')[0];
     return data.notices.filter(n => n.date >= today);
   });
+
+  // Derived: is the selected day today?
+  const isSelectedToday = $derived(selectedDay === gymState?.dayName);
+
+  // Derived: the schedule for the selected day
+  const selectedSchedule = $derived.by((): DaySchedule | null => {
+    if (!data) return null;
+    return data.schedule[selectedDay] ?? null;
+  });
+
+  // Derived: does the active filter match anything on the selected day?
+  const filterHasMatches = $derived.by((): boolean => {
+    if (!selectedSchedule || activeFilter === 'all') return true;
+    return filterActivities(selectedSchedule.activities, activeFilter).length > 0;
+  });
+
+  // Derived: filtered schedule — falls back to full schedule when filter has no matches
+  const filteredSchedule = $derived.by((): DaySchedule | null => {
+    if (!selectedSchedule) return null;
+    if (activeFilter === 'all' || !filterHasMatches) return selectedSchedule;
+    return {
+      ...selectedSchedule,
+      activities: filterActivities(selectedSchedule.activities, activeFilter),
+    };
+  });
+
+  const activeFilterLabel = $derived(
+    FILTER_CATEGORIES.find(c => c.id === activeFilter)?.label ?? ''
+  );
+
+  // Derived: available filter chips (stable across all days)
+  const availableFilters = $derived.by(() => {
+    if (!data) return [];
+    return getAvailableFilters(data.schedule);
+  });
+
+  // Fix 7: Auto-advance selectedDay when midnight rolls over (if user was viewing today)
+  let previousToday = $state(getEasternDayName());
+
+  $effect(() => {
+    if (!gymState) return;
+    const newToday = gymState.dayName;
+    if (newToday !== previousToday) {
+      if (selectedDay === previousToday) {
+        selectedDay = newToday;
+      }
+      previousToday = newToday;
+    }
+  });
+
+  // Validate selectedDay exists in schedule after data loads
+  $effect(() => {
+    if (!data) return;
+    if (!data.schedule[selectedDay]) {
+      const next = DISPLAY_DAYS.find(d => data!.schedule[d.full]);
+      if (next) selectedDay = next.full;
+    }
+  });
 </script>
 
 <main>
@@ -118,12 +184,30 @@
 
     <StatusCard {gymState} {messages} />
 
-    {#if gymState.todaySchedule}
-      <Timeline schedule={gymState.todaySchedule} dayName={gymState.dayName} />
-      <UpNext schedule={gymState.todaySchedule} />
+    <SportWeekCard {data} />
+
+    <DayPicker {data} {selectedDay} today={gymState.dayName} onSelectDay={(day) => { selectedDay = day; }} />
+
+    {#if availableFilters.length > 2}
+      <FilterChips
+        filters={availableFilters}
+        {activeFilter}
+        onSelectFilter={(id) => { activeFilter = id; }}
+      />
     {/if}
 
-    <WeeklySchedule {data} />
+    {#if activeFilter !== 'all' && !filterHasMatches}
+      <p class="filter-fallback">
+        No {activeFilterLabel} on {selectedDay} — showing full schedule
+      </p>
+    {/if}
+
+    {#if filteredSchedule}
+      <Timeline schedule={filteredSchedule} dayName={selectedDay} isToday={isSelectedToday} />
+      <UpNext schedule={filteredSchedule} isToday={isSelectedToday} />
+    {/if}
+
+    <WeeklySchedule {data} {activeFilter} today={gymState.dayName} />
 
     <footer class="footer">
       <p class="footer-source">
@@ -200,7 +284,7 @@
     padding: 10px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     text-align: center;
   }
 
@@ -211,7 +295,7 @@
     padding: 10px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     text-align: center;
   }
 
@@ -221,7 +305,18 @@
     padding: 10px 16px;
     border-radius: var(--radius);
     margin-bottom: 16px;
+    font-size: 0.95rem;
+  }
+
+  .filter-fallback {
     font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: 8px 16px;
+    margin-bottom: 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
   }
 
   .loading {
@@ -250,7 +345,7 @@
     gap: 10px;
     text-align: center;
     color: var(--color-text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     padding-top: 16px;
     border-top: 1px solid var(--color-border);
   }
@@ -271,7 +366,7 @@
 
   .footer-notice,
   .footer-meta {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
   }
 
   .footer-notice {

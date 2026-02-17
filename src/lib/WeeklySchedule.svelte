@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { ScheduleData } from './types.js';
-  import { getEasternDayName } from './time.js';
+  import { DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
+  import { filterActivities } from './filters.js';
 
-  let { data }: { data: ScheduleData } = $props();
-
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const today = getEasternDayName();
+  let { data, activeFilter = 'all', today }: {
+    data: ScheduleData;
+    activeFilter?: string;
+    today: string;
+  } = $props();
 
   let isOpen = $state(false);
 </script>
@@ -27,18 +29,21 @@
     </svg>
   </summary>
   <div class="weekly-content">
-    {#each days as day}
-      {#if data.schedule[day]}
-        <div class="day-block" class:is-today={day === today}>
+    {#each DISPLAY_DAYS as day}
+      {#if data.schedule[day.full]}
+        {@const filtered = filterActivities(data.schedule[day.full].activities, activeFilter)}
+        {@const hasMatches = activeFilter === 'all' || filtered.length > 0}
+        {@const activitiesToShow = hasMatches ? filtered : data.schedule[day.full].activities}
+        <div class="day-block" class:is-today={day.full === today}>
           <h3 class="day-name">
-            {day}
-            {#if day === today}
+            {day.full}
+            {#if day.full === today}
               <span class="today-badge">Today</span>
             {/if}
           </h3>
-          <p class="day-hours">{data.schedule[day].open} &mdash; {data.schedule[day].close}</p>
+          <p class="day-hours">{data.schedule[day.full].open} &mdash; {data.schedule[day.full].close}</p>
           <ul class="day-activities">
-            {#each data.schedule[day].activities as act}
+            {#each activitiesToShow as act}
               {@const emoji = activityEmoji(act.name)}
               <li class:open-gym={act.isOpenGym}>
                 <span class="act-time">{act.start} &ndash; {act.end}</span>
@@ -163,7 +168,7 @@
   }
 
   .today-badge {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     background: var(--color-available);
     color: white;
@@ -172,7 +177,7 @@
   }
 
   .day-hours {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: var(--color-text-secondary);
     margin-bottom: 8px;
   }
@@ -187,7 +192,7 @@
   .day-activities li {
     display: flex;
     gap: 8px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     padding: 4px 0;
     border-left: 3px solid var(--color-timeline-scheduled);
     padding-left: 8px;
@@ -200,7 +205,7 @@
   .act-time {
     min-width: 120px;
     color: var(--color-text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
 
   .act-name {

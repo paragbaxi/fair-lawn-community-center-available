@@ -28,6 +28,7 @@ export interface GymState {
   status: GymStatus;
   currentActivity: Activity | null;
   nextOpenGym: Activity | null;
+  nextOpenGymDay: string | null;
   nextOpenDay: string | null;
   nextOpenTime: string | null;
   countdownMs: number;

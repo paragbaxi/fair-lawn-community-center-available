@@ -3,14 +3,19 @@
   import { getEasternNow, parseTime } from './time.js';
   import { activityEmoji } from './emoji.js';
 
-  let { schedule, dayName }: { schedule: DaySchedule; dayName: string } = $props();
+  let { schedule, dayName, isToday = true }: {
+    schedule: DaySchedule;
+    dayName: string;
+    isToday?: boolean;
+  } = $props();
 
   let now = $state(getEasternNow());
 
   $effect(() => {
+    if (!isToday) return;
     const interval = setInterval(() => {
       now = getEasternNow();
-    }, 60000); // Update every minute
+    }, 60000);
     return () => clearInterval(interval);
   });
 
@@ -23,7 +28,7 @@
   }
 
   const nowPct = $derived(pct(now));
-  const isOpen = $derived(now >= openTime && now < closeTime);
+  const isOpen = $derived(isToday && now >= openTime && now < closeTime);
 
   const segments = $derived(
     schedule.activities.map((act) => {
@@ -31,66 +36,72 @@
       const end = parseTime(act.end, now);
       const left = pct(start);
       const width = pct(end) - left;
-      const isPast = end <= now;
-      const isCurrent = start <= now && now < end;
+      const isPast = isToday && end <= now;
+      const isCurrent = isToday && start <= now && now < end;
       return { ...act, left, width, isPast, isCurrent };
     })
   );
+
+  const hasActivities = $derived(schedule.activities.length > 0);
 </script>
 
 <div class="timeline-section">
   <div class="timeline-header">
-    <span class="timeline-day">Today ({dayName})</span>
+    <span class="timeline-day">{isToday ? `Today (${dayName})` : dayName}</span>
     <span class="timeline-range">{schedule.open} &mdash; {schedule.close}</span>
   </div>
 
-  <!-- Desktop: horizontal bar -->
-  <div class="timeline-bar" aria-hidden="true">
-    {#each segments as seg}
-      <div
-        class="segment"
-        class:open-gym={seg.isOpenGym}
-        class:scheduled={!seg.isOpenGym}
-        class:past={seg.isPast}
-        class:current={seg.isCurrent}
-        style="left: {seg.left}%; width: {seg.width}%;"
-        title="{seg.name}: {seg.start} - {seg.end}"
-      >
-        <span class="segment-label">{seg.name}</span>
-      </div>
-    {/each}
-    {#if isOpen}
-      <div class="now-marker" style="left: {nowPct}%;">
-        <div class="now-line"></div>
-        <span class="now-label">NOW</span>
-      </div>
-    {/if}
-  </div>
+  {#if hasActivities}
+    <!-- Desktop: horizontal bar -->
+    <div class="timeline-bar" aria-hidden="true">
+      {#each segments as seg}
+        <div
+          class="segment"
+          class:open-gym={seg.isOpenGym}
+          class:scheduled={!seg.isOpenGym}
+          class:past={seg.isPast}
+          class:current={seg.isCurrent}
+          style="left: {seg.left}%; width: {seg.width}%;"
+          title="{seg.name}: {seg.start} - {seg.end}"
+        >
+          <span class="segment-label">{seg.name}</span>
+        </div>
+      {/each}
+      {#if isOpen}
+        <div class="now-marker" style="left: {nowPct}%;">
+          <div class="now-line"></div>
+          <span class="now-label">NOW</span>
+        </div>
+      {/if}
+    </div>
 
-  <div class="timeline-legend" aria-hidden="true">
-    <span class="legend-item"><span class="legend-swatch open-gym"></span> Available</span>
-    <span class="legend-item"><span class="legend-swatch scheduled"></span> Scheduled</span>
-  </div>
+    <div class="timeline-legend" aria-hidden="true">
+      <span class="legend-item"><span class="legend-swatch open-gym"></span> Available</span>
+      <span class="legend-item"><span class="legend-swatch scheduled"></span> Scheduled</span>
+    </div>
 
-  <!-- Mobile: vertical list -->
-  <div class="timeline-list" role="list" aria-label="Today's schedule">
-    {#each segments as seg}
-      {@const emoji = activityEmoji(seg.name)}
-      <div
-        class="list-item"
-        class:open-gym={seg.isOpenGym}
-        class:past={seg.isPast}
-        class:current={seg.isCurrent}
-        role="listitem"
-      >
-        <span class="list-time">{seg.start}&ndash;{seg.end}</span>
-        <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{seg.name}</span>
-        {#if seg.isCurrent}
-          <span class="list-badge">NOW</span>
-        {/if}
-      </div>
-    {/each}
-  </div>
+    <!-- Mobile: vertical list -->
+    <div class="timeline-list" role="list" aria-label="{isToday ? 'Today' : dayName}'s schedule">
+      {#each segments as seg}
+        {@const emoji = activityEmoji(seg.name)}
+        <div
+          class="list-item"
+          class:open-gym={seg.isOpenGym}
+          class:past={seg.isPast}
+          class:current={seg.isCurrent}
+          role="listitem"
+        >
+          <span class="list-time">{seg.start}&ndash;{seg.end}</span>
+          <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{seg.name}</span>
+          {#if seg.isCurrent}
+            <span class="list-badge">NOW</span>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {:else}
+    <p class="no-activities">No matching activities</p>
+  {/if}
 </div>
 
 <style>
@@ -112,7 +123,17 @@
 
   .timeline-range {
     color: var(--color-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+  }
+
+  .no-activities {
+    color: var(--color-text-secondary);
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 24px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
   }
 
   /* Desktop horizontal bar */
@@ -165,7 +186,7 @@
 
   .segment-label {
     color: white;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     padding: 0 4px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -197,7 +218,7 @@
     top: -18px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--color-text);
   }
@@ -205,7 +226,7 @@
   .timeline-legend {
     display: flex;
     gap: 16px;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     color: var(--color-text-secondary);
     margin-bottom: 16px;
   }
@@ -274,7 +295,7 @@
     }
 
     .list-time {
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       font-weight: 600;
       min-width: 105px;
       white-space: nowrap;
@@ -287,7 +308,7 @@
     }
 
     .list-badge {
-      font-size: 0.7rem;
+      font-size: 0.8rem;
       font-weight: 700;
       background: var(--color-available);
       color: white;

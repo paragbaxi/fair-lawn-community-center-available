@@ -93,8 +93,10 @@
       <span class="live-dot" aria-hidden="true"></span>
       {#if gymState.status === 'available'}
         {formatCountdown(countdownMs)} left
-      {:else if gymState.status === 'in-use' && gymState.nextOpenGym}
+      {:else if gymState.status === 'in-use' && gymState.nextOpenGym && !gymState.nextOpenGymDay}
         Available in {formatCountdown(countdownMs)}
+      {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay}
+        Closes in {formatCountdown(countdownMs)}
       {:else if gymState.status === 'closed'}
         Opens in {formatCountdown(countdownMs)}
       {:else}
@@ -105,12 +107,17 @@
 
   {#if gymState.status === 'available' && gymState.currentActivity}
     <p class="status-subtext">{gymState.countdownLabel}</p>
+  {:else if gymState.status === 'in-use' && gymState.nextOpenGym && gymState.nextOpenGymDay}
+    <p class="status-subtext">Next Open Gym: {gymState.nextOpenGymDay} at {gymState.nextOpenGym.start}</p>
   {:else if gymState.status === 'in-use' && gymState.nextOpenGym}
     <p class="status-subtext">Next: Open Gym at {gymState.nextOpenGym.start}</p>
   {:else if gymState.status === 'in-use' && !gymState.nextOpenGym}
-    <p class="status-subtext">No more open gym today</p>
+    <p class="status-subtext">No more open gym this week</p>
   {:else if gymState.status === 'closed' && gymState.nextOpenDay}
     <p class="status-subtext">{gymState.countdownLabel}</p>
+    {#if gymState.nextOpenGymDay && gymState.nextOpenGym}
+      <p class="status-subtext-secondary">First Open Gym: {gymState.nextOpenGymDay} at {gymState.nextOpenGym.start}</p>
+    {/if}
   {/if}
 
   {#if motivationalMessage}
@@ -233,12 +240,18 @@
 
   .status-subtext {
     color: var(--color-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.95rem;
+  }
+
+  .status-subtext-secondary {
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    margin-top: 4px;
   }
 
   .motivational-message {
     color: var(--color-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-style: italic;
     margin-top: 12px;
     padding-top: 10px;
@@ -249,6 +262,7 @@
   @media (prefers-color-scheme: dark) {
     .status-detail,
     .status-subtext,
+    .status-subtext-secondary,
     .motivational-message {
       color: rgba(255, 255, 255, 0.85);
     }
