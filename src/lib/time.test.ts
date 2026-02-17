@@ -510,4 +510,54 @@ describe('computeGymState cross-day open gym', () => {
     expect(state.nextOpenGymDay).toBe('Tuesday');
     expect(state.nextOpenGym?.name).toBe('Open Gym');
   });
+
+  it('closed after hours: nextOpenGymDay equals nextOpenDay when reopening day has open gym', () => {
+    // Monday 10:30pm; Tuesday (nextOpenDay) has open gym
+    // The reopening day itself has open gym — nextOpenGymDay should be Tuesday
+    vi.setSystemTime(new Date(2026, 1, 16, 22, 30, 0));
+    const state = computeGymState(makeSchedule());
+
+    expect(state.nextOpenDay).toBe('Tuesday');
+    expect(state.nextOpenGymDay).toBe('Tuesday');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+  });
+
+  it('closed after hours: nextOpenGymDay is on/after nextOpenDay (no wrap-around to current day)', () => {
+    // Friday Feb 20 after close; only Friday and Saturday have schedules.
+    // Saturday (nextOpenDay) has no open gym; only Friday has open gym.
+    // Bug (before fix): findNextOpenGymAcrossDays('Friday') wraps at i=7 back to Friday itself
+    //   → nextOpenGymDay='Friday', nextOpenDay='Saturday' — Friday visually before Saturday.
+    // Fix: anchor search from Saturday; finds Friday at i=6 (next Friday, 7 days away from today).
+    //   → nextOpenGymDay='Friday' still, but now via the correct calendar path.
+    const saturdayNoOpenGym: DaySchedule = {
+      open: '9:00 AM',
+      close: '5:00 PM',
+      activities: [
+        { name: 'Basketball', start: '9:00 AM', end: '5:00 PM', isOpenGym: false },
+      ],
+    };
+    const fridayOpenGym: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Open Gym', start: '2:00 PM', end: '6:00 PM', isOpenGym: true },
+      ],
+    };
+
+    // Friday Feb 20, 2026 at 10:30pm (after close); only Fri+Sat have schedules
+    vi.setSystemTime(new Date(2026, 1, 20, 22, 30, 0));
+    const schedule = makeSchedule({ Friday: fridayOpenGym, Saturday: saturdayNoOpenGym });
+    const days = schedule.schedule as Record<string, DaySchedule>;
+    for (const d of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Sunday']) {
+      delete days[d];
+    }
+    const state = computeGymState(schedule);
+
+    expect(state.status).toBe('closed');
+    expect(state.nextOpenDay).toBe('Saturday');
+    // nextOpenGymDay must not be 'Friday' as-if it were TODAY (already past);
+    // with fix it's found as next Friday (via search anchored from Saturday).
+    expect(state.nextOpenGymDay).toBe('Friday');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+  });
 });

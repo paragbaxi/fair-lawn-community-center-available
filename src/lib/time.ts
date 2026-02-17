@@ -282,7 +282,12 @@ function closedState(data: ScheduleData, now: Date, currentDay: string): GymStat
       target.setHours(nextOpenTime.getHours(), nextOpenTime.getMinutes(), 0, 0);
       const countdown = target.getTime() - now.getTime();
 
-      const crossDay = findNextOpenGymAcrossDays(data, currentDay);
+      // Anchor from nextDay (not currentDay) so nextOpenGymDay is always on/after nextOpenDay.
+      // findNextOpenGymAcrossDays starts at i=1 (skips the anchor), so check nextDay itself first.
+      const nextDayOpenGym = nextSchedule.activities.find(a => a.isOpenGym) ?? null;
+      const crossDay = nextDayOpenGym
+        ? { day: nextDay, activity: nextDayOpenGym }
+        : findNextOpenGymAcrossDays(data, nextDay);
       return {
         status: 'closed',
         currentActivity: null,
