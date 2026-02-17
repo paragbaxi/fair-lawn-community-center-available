@@ -106,8 +106,8 @@ Read via `untrack(() => initialDay)` — makes one-shot seed intent explicit. De
 ### P5: Clean up string concat workaround in `url.test.ts`
 `const pb = 'pick' + 'leball'` was written to bypass a pre-commit hook that false-positives on the sport name. Update the hook allowlist for test files, then replace with the plain string.
 
-### P4: Sport chip horizontal scroll on narrow screens
-With 7 sport categories, the chip row wraps to 2 lines. On very narrow screens (<375px) with more categories, consider `overflow-x: auto` with `-webkit-overflow-scrolling: touch` for horizontal scrolling.
+### ~~P4: Sport chip horizontal scroll on narrow screens~~
+Added `@media (max-width: 374px)` with `flex-wrap: nowrap; overflow-x: auto` and hidden scrollbar. Deployed 2026-02-17.
 
 ### ~~P4: `findNextOpenGymAcrossDays` off-by-one audit~~
 Resolved by the P2 closedState fix: Path #6 no longer relies on `i=7` wrap-around behavior, making the i=7 iteration harmless (other call sites have no schedule-present days at i=7 in practice). Closed 2026-02-17.

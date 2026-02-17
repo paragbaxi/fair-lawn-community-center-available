@@ -278,6 +278,19 @@
     margin-bottom: 12px;
   }
 
+  @media (max-width: 374px) {
+    .sport-chips {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 8px;
+    }
+    .sport-chips::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
   .sport-chip {
     padding: 8px 16px;
     border-radius: 20px;
