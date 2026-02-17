@@ -24,9 +24,11 @@
     return getWeekSummary(data.schedule, selectedSport);
   });
 
-  // Date range for subheading
+  // Time tracking for "NOW" badge
+  let now = $state(getEasternNow());
+
+  // Date range for subheading (uses reactive `now`)
   const dateRange = $derived.by(() => {
-    const now = getEasternNow();
     const dayOfWeek = now.getDay(); // 0=Sun
     const monday = new Date(now);
     monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
@@ -36,12 +38,9 @@
     return `${fmt(monday)} – ${fmt(sunday)}`;
   });
 
-  // Time tracking for "NOW" badge
-  let now = $state(getEasternNow());
-
   $effect(() => {
     if (!expanded && !isOpen) { selectedSport = null; return; }
-    if (!selectedSport) return;
+    // Always update now when visible — todayName depends on it for "Today" highlight
     now = getEasternNow();
     const interval = setInterval(() => { now = getEasternNow(); }, 60_000);
     return () => clearInterval(interval);
@@ -167,8 +166,8 @@
                 {@const emoji = activityEmoji(sport.label)}
                 <button
                   class="sport-chip"
-                  aria-pressed="false"
-                  onclick={() => { selectedSport = sport; }}
+                  aria-pressed={selectedSport?.id === sport.id}
+                  onclick={() => { selectedSport = selectedSport?.id === sport.id ? null : sport; }}
                 >
                   {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
                 </button>

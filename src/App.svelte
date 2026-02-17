@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { ScheduleData, GymState, DaySchedule, Notice } from './lib/types.js';
+  import type { ScheduleData, GymState, DaySchedule, Notice, TabId } from './lib/types.js';
   import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS } from './lib/time.js';
+  import { tick } from 'svelte';
   import TabBar from './lib/TabBar.svelte';
   import StatusView from './lib/StatusView.svelte';
   import TodayView from './lib/TodayView.svelte';
@@ -8,7 +9,6 @@
   import ScheduleView from './lib/ScheduleView.svelte';
 
   // --- Tab routing ---
-  type TabId = 'status' | 'today' | 'sports' | 'schedule';
   const VALID_TABS: TabId[] = ['status', 'today', 'sports', 'schedule'];
 
   function getTabFromHash(): TabId {
@@ -18,11 +18,14 @@
 
   let activeTab: TabId = $state(getTabFromHash());
 
-  function setTab(tab: TabId) {
+  async function setTab(tab: TabId, focusPanel = true) {
     activeTab = tab;
     history.replaceState(null, '', `#${tab}`);
     window.scrollTo(0, 0);
-    document.getElementById(`panel-${tab}`)?.focus();
+    if (focusPanel) {
+      await tick();
+      document.getElementById(`panel-${tab}`)?.focus();
+    }
   }
 
   $effect(() => {
@@ -103,7 +106,8 @@
   // Only show notices for today or future dates
   const activeNotices = $derived.by((): Notice[] => {
     if (!data) return [];
-    const today = getEasternNow().toISOString().split('T')[0];
+    const now = getEasternNow();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return data.notices.filter(n => n.date >= today);
   });
 

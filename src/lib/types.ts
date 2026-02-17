@@ -24,6 +24,8 @@ export interface ScheduleData {
 
 export type GymStatus = 'available' | 'in-use' | 'closed';
 
+export type TabId = 'status' | 'today' | 'sports' | 'schedule';
+
 export interface GymState {
   status: GymStatus;
   currentActivity: Activity | null;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ScheduleData, GymState, DaySchedule } from './types.js';
+  import type { ScheduleData, GymState, DaySchedule, TabId } from './types.js';
   import CompactStatus from './CompactStatus.svelte';
   import DayPicker from './DayPicker.svelte';
   import Timeline from './Timeline.svelte';
@@ -11,7 +11,7 @@
     selectedSchedule: DaySchedule | null;
     isSelectedToday: boolean;
     onSelectDay: (day: string) => void;
-    onTabSwitch: (tab: 'status') => void;
+    onTabSwitch: (tab: TabId) => void;
   } = $props();
 </script>
 

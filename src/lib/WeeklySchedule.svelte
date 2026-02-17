@@ -12,13 +12,21 @@
   // Collapsed <details> mode state
   let isOpen = $state(false);
 
-  // Accordion mode: track which days are expanded (today by default on first render only)
+  // Accordion mode: track which days are expanded (today expanded by default)
   let expandedDays = $state(new Set<string>());
-  let initialized = false;
+  let prevToday = $state('');
+
+  // Initialize with today expanded; update when midnight rolls over
   $effect(() => {
-    if (!initialized) {
-      initialized = true;
+    if (prevToday === '') {
       expandedDays = new Set([today]);
+      prevToday = today;
+    } else if (today !== prevToday) {
+      const next = new Set(expandedDays);
+      next.delete(prevToday);
+      next.add(today);
+      expandedDays = next;
+      prevToday = today;
     }
   });
 
@@ -53,7 +61,7 @@
                   <span class="today-badge">Today</span>
                 {/if}
               </span>
-              <span class="accordion-meta">{schedule.open} &mdash; {schedule.close} &middot; {schedule.activities.length} activities</span>
+              <span class="accordion-meta">{schedule.open} &mdash; {schedule.close} &middot; {schedule.activities.length} {schedule.activities.length === 1 ? 'activity' : 'activities'}</span>
             </div>
             <svg
               class="chevron"

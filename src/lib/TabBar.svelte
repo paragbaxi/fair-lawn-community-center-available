@@ -1,9 +1,9 @@
 <script lang="ts">
-  type TabId = 'status' | 'today' | 'sports' | 'schedule';
+  import type { TabId } from './types.js';
 
   let { activeTab, onSelectTab }: {
     activeTab: TabId;
-    onSelectTab: (tab: TabId) => void;
+    onSelectTab: (tab: TabId, focusPanel?: boolean) => void;
   } = $props();
 
   const tabs: { id: TabId; label: string; icon: string }[] = [
@@ -30,32 +30,34 @@
     }
 
     e.preventDefault();
-    onSelectTab(tabs[newIdx].id);
-    // Focus the new tab button
+    onSelectTab(tabs[newIdx].id, false);
+    // Focus the new tab button (roving tabindex — keep focus in tab bar)
     const btn = document.getElementById(`tab-${tabs[newIdx].id}`);
     btn?.focus();
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-<nav class="tab-bar" role="tablist" aria-label="Main navigation" onkeydown={handleKeydown}>
-  {#each tabs as tab}
-    <button
-      id="tab-{tab.id}"
-      class="tab-btn"
-      class:active={activeTab === tab.id}
-      role="tab"
-      aria-selected={activeTab === tab.id}
-      aria-controls="panel-{tab.id}"
-      tabindex={activeTab === tab.id ? 0 : -1}
-      onclick={() => onSelectTab(tab.id)}
-    >
-      <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d={tab.icon} />
-      </svg>
-      <span class="tab-label">{tab.label}</span>
-    </button>
-  {/each}
+<nav class="tab-bar" aria-label="Main navigation">
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
+  <div role="tablist" onkeydown={handleKeydown}>
+    {#each tabs as tab}
+      <button
+        id="tab-{tab.id}"
+        class="tab-btn"
+        class:active={activeTab === tab.id}
+        role="tab"
+        aria-selected={activeTab === tab.id}
+        aria-controls="panel-{tab.id}"
+        tabindex={activeTab === tab.id ? 0 : -1}
+        onclick={() => onSelectTab(tab.id)}
+      >
+        <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d={tab.icon} />
+        </svg>
+        <span class="tab-label">{tab.label}</span>
+      </button>
+    {/each}
+  </div>
 </nav>
 
 <style>
@@ -65,13 +67,17 @@
     left: 0;
     right: 0;
     z-index: 50;
-    display: flex;
-    justify-content: space-around;
-    align-items: stretch;
     height: calc(56px + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--color-bg);
     border-top: 1px solid var(--color-border);
+  }
+
+  .tab-bar [role="tablist"] {
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    height: 56px;
   }
 
   .tab-btn {

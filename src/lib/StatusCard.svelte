@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { GymState } from './types.js';
   import { formatCountdown, getStatusConfig } from './time.js';
   import { activityEmoji } from './emoji.js';
@@ -7,8 +8,19 @@
 
   let countdownMs = $state(0);
 
+  // Sync from gymState when it drifts by more than 3s (avoids resetting on every 10s refresh)
   $effect(() => {
-    countdownMs = gymState.countdownMs;
+    const incoming = gymState.countdownMs;
+    const current = untrack(() => countdownMs);
+    const diff = Math.abs(incoming - current);
+    if (diff > 3000 || current === 0) {
+      countdownMs = incoming;
+    }
+  });
+
+  // Independent 1-second tick (only runs when there's something to count down)
+  $effect(() => {
+    if (countdownMs <= 0) return;
     const interval = setInterval(() => {
       countdownMs = Math.max(0, countdownMs - 1000);
     }, 1000);
@@ -38,14 +50,18 @@
   {/if}
 
   {#if countdownMs > 0}
-    <p class="countdown" aria-label="Time remaining: {formatCountdown(countdownMs)}">
+    <p class="countdown" aria-label="Countdown: {formatCountdown(countdownMs)}">
       <span class="live-dot" aria-hidden="true"></span>
-      {#if gymState.status === 'available'}
+      {#if gymState.status === 'available' && gymState.currentActivity}
         {formatCountdown(countdownMs)} left
+      {:else if gymState.status === 'available'}
+        Starts in {formatCountdown(countdownMs)}
       {:else if gymState.status === 'in-use' && gymState.nextOpenGym && !gymState.nextOpenGymDay}
-        Available in {formatCountdown(countdownMs)}
-      {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay}
+        Next up in {formatCountdown(countdownMs)}
+      {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay && gymState.currentActivity}
         Closes in {formatCountdown(countdownMs)}
+      {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay}
+        Next up in {formatCountdown(countdownMs)}
       {:else if gymState.status === 'closed'}
         Opens in {formatCountdown(countdownMs)}
       {:else}

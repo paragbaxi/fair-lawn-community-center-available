@@ -93,14 +93,21 @@ test('DayPicker renders and responds to clicks on Today tab', async ({ page }) =
   const buttons = page.locator('.day-btn');
   await expect(buttons).toHaveCount(7);
 
-  // Verify a button is selected
-  const selectedBtn = page.locator('.day-btn.selected');
+  // Verify a button is selected (using aria-pressed for reliability)
+  const selectedBtn = page.locator('.day-btn[aria-pressed="true"]');
   await expect(selectedBtn).toHaveCount(1);
 
-  // Click a different day — pick the last button
-  const lastBtn = buttons.last();
-  await lastBtn.click();
-  await expect(lastBtn).toHaveClass(/selected/);
+  // Click a different day — find an enabled button that isn't currently pressed
+  const allBtns = await buttons.all();
+  for (const btn of allBtns) {
+    const isDisabled = await btn.isDisabled();
+    const isPressed = (await btn.getAttribute('aria-pressed')) === 'true';
+    if (!isDisabled && !isPressed) {
+      await btn.click();
+      await expect(btn).toHaveAttribute('aria-pressed', 'true');
+      break;
+    }
+  }
 });
 
 test('Schedule tab accordion shows today expanded', async ({ page }) => {
