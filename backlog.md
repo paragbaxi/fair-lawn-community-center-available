@@ -52,5 +52,11 @@ Cache `~/.cache/ms-playwright` with `actions/cache@v4` keyed on exact Playwright
 ### P4: Service worker test coverage
 The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
 
+### P5: npm CI cache for node_modules
+`actions/setup-node` caches `~/.npm` (download cache), but `npm ci` still reinstalls every run. Cache `node_modules` with `actions/cache@v4` keyed on `hashFiles('package-lock.json')` and skip `npm ci` on hit. Modest savings (~5-10s) but follows the same pattern as the Playwright cache.
+
+### P5: Composite action for Playwright setup
+Both `ci.yml` and `scrape-and-deploy.yml` have identical 4-step Playwright cache blocks with sync comments. If a third workflow needs Playwright (e.g., Lighthouse CI), extract to `.github/actions/setup-playwright/action.yml`. Not worth it with 2 consumers — revisit if a third is added.
+
 ### P5: Lighthouse CI budget
 With CI in place, add a Lighthouse budget check to catch performance regressions (bundle size growth, accessibility score drops) automatically on PRs.
