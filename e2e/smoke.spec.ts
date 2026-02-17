@@ -324,7 +324,11 @@ test('back navigation restores previous tab and filter state', async ({ page }) 
 
   // Click first available chip (data-independent; replaceState updates H1 to #sports?sport=X)
   const sportChips = page.locator('#panel-sports .sport-chip');
-  if (await sportChips.count() === 0) return;
+  const chipCount = await sportChips.count();
+  if (chipCount === 0) {
+    test.skip(true, 'No sport chips available — cannot test back-nav state restore');
+    return;
+  }
   const firstChip = sportChips.first();
   await firstChip.click();
   await expect(page).toHaveURL(/sport=/); // confirm URL was updated
