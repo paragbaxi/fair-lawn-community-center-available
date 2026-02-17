@@ -97,11 +97,11 @@ Extracted to `src/lib/time.ts`. Updated 3 call sites: `StatusView.svelte`, `Sche
 ### P4: DRY — extract shared reactive Eastern clock
 The `$state(getEasternNow())` + 60-second `setInterval(() => now = getEasternNow())` + `$effect` cleanup pattern is independently duplicated in `Timeline.svelte:12-20` and `SportWeekCard.svelte:28-47`. Extract to a shared utility (e.g. `useEasternClock(intervalMs)` returning a getter, or a Svelte 5 rune-compatible store in `src/lib/clock.svelte.ts`).
 
-### P4: `onSelectSport(null)` unnecessary call on mount in collapsed mode
-In `SportWeekCard`, the `$effect` guarding `!expanded && !isOpen` calls `onSelectSport(null)` unconditionally. In collapsed mode (`expanded=false`), this fires at component mount even when `selectedSport` is already `null` — a no-op but semantically incorrect. Change to `if (!expanded && !isOpen && selectedSport) onSelectSport(null)` to avoid spurious callbacks.
+### ~~P4: `onSelectSport(null)` unnecessary call on mount in collapsed mode~~
+Added `if (selectedSport)` guard. Deployed 2026-02-17.
 
-### P4: `untrack()` on `initialDay` in `WeeklySchedule`
-`initialDay` is read inside the init `$effect` in `WeeklySchedule.svelte`, making Svelte 5 track it as a reactive dependency. Since `initialDay` is a one-shot seed (should only be consumed on first render, never re-applied), wrap it in `untrack(() => initialDay)` to make the intent explicit and prevent accidental re-runs if a reactive `initialDay` is ever passed.
+### ~~P4: `untrack()` on `initialDay` in `WeeklySchedule`~~
+Read via `untrack(() => initialDay)` — makes one-shot seed intent explicit. Deployed 2026-02-17.
 
 ### P5: Clean up string concat workaround in `url.test.ts`
 `const pb = 'pick' + 'leball'` was written to bypass a pre-commit hook that false-positives on the sport name. Update the hook allowlist for test files, then replace with the plain string.

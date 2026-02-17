@@ -41,7 +41,7 @@
   });
 
   $effect(() => {
-    if (!expanded && !isOpen) { onSelectSport(null); return; }
+    if (!expanded && !isOpen) { if (selectedSport) onSelectSport(null); return; }
     // Always update now when visible — todayName depends on it for "Today" highlight
     now = getEasternNow();
     const interval = setInterval(() => { now = getEasternNow(); }, 60_000);

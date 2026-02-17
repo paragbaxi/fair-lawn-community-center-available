@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { ScheduleData } from './types.js';
   import { DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
@@ -21,8 +22,9 @@
   $effect(() => {
     if (prevToday === '') {
       const initial = new Set([today]);
-      if (initialDay && initialDay !== today && data.schedule[initialDay]) {
-        initial.add(initialDay);
+      const seedDay = untrack(() => initialDay);
+      if (seedDay && seedDay !== today && data.schedule[seedDay]) {
+        initial.add(seedDay);
       }
       expandedDays = initial;
       prevToday = today;
