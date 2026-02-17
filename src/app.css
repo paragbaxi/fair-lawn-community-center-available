@@ -60,7 +60,7 @@ html {
 body {
   min-height: 100dvh;
   padding: 16px;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
 :focus-visible {

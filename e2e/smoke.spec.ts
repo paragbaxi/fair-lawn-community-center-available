@@ -25,126 +25,129 @@ test('skip link becomes visible on focus', async ({ page }) => {
   await expect(skipLink).toBeInViewport();
 });
 
-test('weekly schedule toggle opens and closes', async ({ page }) => {
+test('tab switching shows correct panels', async ({ page }) => {
   await page.goto('/');
-  const details = page.locator('details.weekly-schedule');
-  const summary = details.locator('summary');
+  // Wait for data to load
+  await expect(page.locator('.status-card')).toBeVisible();
 
-  // Initially closed
-  await expect(details).not.toHaveAttribute('open', '');
+  // Default tab is Status — status panel should be visible
+  const statusPanel = page.locator('#panel-status');
+  await expect(statusPanel).not.toHaveAttribute('hidden', '');
 
-  // Click to open
-  await summary.click();
-  await expect(details).toHaveAttribute('open', '');
+  // Click Today tab
+  await page.locator('#tab-today').click();
+  await expect(page.locator('#panel-today')).not.toHaveAttribute('hidden', '');
+  await expect(statusPanel).toHaveAttribute('hidden', '');
 
-  // Click to close
-  await summary.click();
-  await expect(details).not.toHaveAttribute('open', '');
+  // Click Sports tab
+  await page.locator('#tab-sports').click();
+  await expect(page.locator('#panel-sports')).not.toHaveAttribute('hidden', '');
+  await expect(page.locator('#panel-today')).toHaveAttribute('hidden', '');
+
+  // Click Schedule tab
+  await page.locator('#tab-schedule').click();
+  await expect(page.locator('#panel-schedule')).not.toHaveAttribute('hidden', '');
+  await expect(page.locator('#panel-sports')).toHaveAttribute('hidden', '');
+
+  // Click Status tab to go back
+  await page.locator('#tab-status').click();
+  await expect(statusPanel).not.toHaveAttribute('hidden', '');
 });
 
-test('DayPicker renders and responds to clicks', async ({ page }) => {
+test('compact status bar visible on Today tab only', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('.status-card')).toBeVisible();
+
+  // Status tab — no compact status
+  await expect(page.locator('.compact-status')).not.toBeVisible();
+
+  // Today tab — compact status visible
+  await page.locator('#tab-today').click();
+  await expect(page.locator('.compact-status')).toBeVisible();
+
+  // Sports tab — no compact status
+  await page.locator('#tab-sports').click();
+  await expect(page.locator('.compact-status')).not.toBeVisible();
+
+  // Schedule tab — no compact status
+  await page.locator('#tab-schedule').click();
+  await expect(page.locator('.compact-status')).not.toBeVisible();
+});
+
+test('hash routing navigates to correct tab', async ({ page }) => {
+  await page.goto('/#sports');
+  // Wait for data to load (tab bar appears after load)
+  await expect(page.locator('#tab-sports')).toBeVisible({ timeout: 5000 });
+  // Sports panel should be active
+  await expect(page.locator('#panel-sports')).not.toHaveAttribute('hidden', '');
+  await expect(page.locator('#tab-sports')).toHaveAttribute('aria-selected', 'true');
+});
+
+test('DayPicker renders and responds to clicks on Today tab', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.status-card')).toBeVisible();
+
+  // Navigate to Today tab
+  await page.locator('#tab-today').click();
+
   const buttons = page.locator('.day-btn');
   await expect(buttons).toHaveCount(7);
 
-  // Click a non-selected button
-  const firstBtn = buttons.first();
-  const lastBtn = buttons.last();
-
-  // Find a button that is not currently selected
+  // Verify a button is selected
   const selectedBtn = page.locator('.day-btn.selected');
   await expect(selectedBtn).toHaveCount(1);
 
   // Click a different day — pick the last button
+  const lastBtn = buttons.last();
   await lastBtn.click();
   await expect(lastBtn).toHaveClass(/selected/);
 });
 
-test('FilterChips filter the timeline', async ({ page }) => {
+test('Schedule tab accordion shows today expanded', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('.status-card')).toBeVisible();
 
-  // Wait for chips to appear (may not appear if < 3 filters available)
-  const chipContainer = page.locator('.filter-chips');
-  const hasChips = await chipContainer.isVisible().catch(() => false);
-  if (!hasChips) return; // No filter chips for this schedule data — test passes vacuously
+  // Navigate to Schedule tab
+  await page.locator('#tab-schedule').click();
 
-  const allChip = chipContainer.locator('button', { hasText: 'All' });
-  await expect(allChip).toHaveAttribute('aria-pressed', 'true');
+  // Today's accordion item should be visible with Today badge
+  const todayBadge = page.locator('#panel-schedule .today-badge');
+  await expect(todayBadge.first()).toBeVisible();
 
-  // Find a non-"All" chip and click it
-  const sportChips = chipContainer.locator('button:not(:has-text("All"))');
-  const count = await sportChips.count();
-  if (count === 0) return;
-
-  await sportChips.first().click();
-  await expect(sportChips.first()).toHaveAttribute('aria-pressed', 'true');
-  await expect(allChip).toHaveAttribute('aria-pressed', 'false');
-
-  // Click All to reset
-  await allChip.click();
-  await expect(allChip).toHaveAttribute('aria-pressed', 'true');
+  // Click another accordion header to expand it
+  const headers = page.locator('#panel-schedule .accordion-header');
+  const count = await headers.count();
+  if (count > 1) {
+    // Find a header that doesn't have Today badge (i.e. collapsed)
+    // Click the last header to expand it
+    await headers.last().click();
+    // Verify expanded content exists (last accordion item now has content)
+    const lastItem = page.locator('#panel-schedule .accordion-item').last();
+    await expect(lastItem.locator('.accordion-content')).toBeVisible();
+  }
 });
 
-test('SportWeekCard toggle and sport selection', async ({ page }) => {
+test('Sports tab shows chips and responds to selection', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('.status-card')).toBeVisible();
 
-  const card = page.locator('details.sport-week-card');
-  const hasCard = await card.isVisible().catch(() => false);
-  if (!hasCard) return; // No sports available — test passes vacuously
+  // Navigate to Sports tab
+  await page.locator('#tab-sports').click();
 
-  // Initially closed
-  await expect(card).not.toHaveAttribute('open', '');
-
-  // Open it
-  const summary = card.locator('summary');
-  await summary.click();
-  await expect(card).toHaveAttribute('open', '');
-
-  // Sport chips should appear
-  const sportChips = card.locator('.sport-chip');
+  const sportChips = page.locator('#panel-sports .sport-chip');
   const chipCount = await sportChips.count();
-  if (chipCount === 0) return;
+  if (chipCount === 0) return; // No sports available
+
+  // Hint text should be visible before selection
+  await expect(page.locator('#panel-sports .hint-text')).toBeVisible();
 
   // Click first sport chip
   await sportChips.first().click();
 
-  // Week summary rows should appear
-  const results = card.locator('.result-row');
-  await expect(results.first()).toBeVisible();
-});
-
-test('filter fallback banner (structural, data-independent)', async ({ page }) => {
-  await page.goto('/');
-
-  const chipContainer = page.locator('.filter-chips');
-  const hasChips = await chipContainer.isVisible().catch(() => false);
-  if (!hasChips) return;
-
-  // Activate a sport filter
-  const sportChips = chipContainer.locator('button:not(:has-text("All"))');
-  const count = await sportChips.count();
-  if (count === 0) return;
-
-  await sportChips.first().click();
-
-  // Iterate through day buttons to check if any show the fallback
-  const dayButtons = page.locator('.day-btn:not(:disabled)');
-  const dayCount = await dayButtons.count();
-
-  for (let i = 0; i < dayCount; i++) {
-    await dayButtons.nth(i).click();
-    const fallback = page.locator('.filter-fallback');
-    const hasFallback = await fallback.isVisible().catch(() => false);
-    if (hasFallback) {
-      // Verify the banner text references the day and filter
-      const text = await fallback.textContent();
-      expect(text).toContain('showing full schedule');
-      // Activities should still be visible below the fallback
-      const activities = page.locator('.activity-block, .timeline-item, [class*="activity"]');
-      const actCount = await activities.count();
-      expect(actCount).toBeGreaterThanOrEqual(0); // Structural check — items rendered
-      break;
-    }
-  }
-  // If no fallback triggered on any day, that's fine — data-independent test
+  // Week summary rows should appear (or no-results message)
+  const results = page.locator('#panel-sports .result-row');
+  const noResults = page.locator('#panel-sports .no-results');
+  const hasResults = await results.count() > 0;
+  const hasNoResults = await noResults.isVisible().catch(() => false);
+  expect(hasResults || hasNoResults).toBe(true);
 });

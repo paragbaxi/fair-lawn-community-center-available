@@ -205,6 +205,35 @@ function findNextOpenGymAcrossDays(
   return null;
 }
 
+/** Check if an activity has ended (for fading past items). */
+export function isActivityPast(endTime: string, now: Date, isToday: boolean): boolean {
+  if (!isToday) return false;
+  return parseTime(endTime, now) <= now;
+}
+
+/** Check if an activity is currently happening (for NOW badge). */
+export function isActivityCurrent(startTime: string, endTime: string, now: Date, isToday: boolean): boolean {
+  if (!isToday) return false;
+  return parseTime(startTime, now) <= now && now < parseTime(endTime, now);
+}
+
+/** Convert full day name to 3-char abbreviation. */
+export function shortDayName(full: string): string {
+  return DISPLAY_DAYS.find(d => d.full === full)?.short ?? full.slice(0, 3);
+}
+
+/** Status display configuration for each gym status. */
+export function getStatusConfig(status: 'available' | 'in-use' | 'closed') {
+  switch (status) {
+    case 'available':
+      return { icon: '\u2713', label: 'GYM AVAILABLE', cssClass: 'available', ariaLabel: 'Gym is available for open play' };
+    case 'in-use':
+      return { icon: '\u23F3', label: 'GYM IN USE', cssClass: 'in-use', ariaLabel: 'Gym is currently in use for a scheduled activity' };
+    case 'closed':
+      return { icon: '\u2715', label: 'CLOSED', cssClass: 'closed', ariaLabel: 'Community center is currently closed' };
+  }
+}
+
 function closedState(data: ScheduleData, now: Date, currentDay: string): GymState {
   const todaySchedule = data.schedule[currentDay] ?? null;
   const currentDayIdx = DAYS.indexOf(currentDay);

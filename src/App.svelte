@@ -1,26 +1,50 @@
 <script lang="ts">
   import type { ScheduleData, GymState, DaySchedule, Notice } from './lib/types.js';
-  import type { MessageData } from './lib/motivational.js';
   import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS } from './lib/time.js';
-  import { getAvailableFilters, filterActivities, FILTER_CATEGORIES } from './lib/filters.js';
-  import StatusCard from './lib/StatusCard.svelte';
-  import Timeline from './lib/Timeline.svelte';
-  import UpNext from './lib/UpNext.svelte';
-  import WeeklySchedule from './lib/WeeklySchedule.svelte';
-  import DayPicker from './lib/DayPicker.svelte';
-  import FilterChips from './lib/FilterChips.svelte';
-  import SportWeekCard from './lib/SportWeekCard.svelte';
+  import TabBar from './lib/TabBar.svelte';
+  import StatusView from './lib/StatusView.svelte';
+  import TodayView from './lib/TodayView.svelte';
+  import SportsView from './lib/SportsView.svelte';
+  import ScheduleView from './lib/ScheduleView.svelte';
 
+  // --- Tab routing ---
+  type TabId = 'status' | 'today' | 'sports' | 'schedule';
+  const VALID_TABS: TabId[] = ['status', 'today', 'sports', 'schedule'];
+
+  function getTabFromHash(): TabId {
+    const hash = location.hash.slice(1).toLowerCase();
+    return VALID_TABS.includes(hash as TabId) ? (hash as TabId) : 'status';
+  }
+
+  let activeTab: TabId = $state(getTabFromHash());
+
+  function setTab(tab: TabId) {
+    activeTab = tab;
+    history.replaceState(null, '', `#${tab}`);
+    window.scrollTo(0, 0);
+    document.getElementById(`panel-${tab}`)?.focus();
+  }
+
+  $effect(() => {
+    const onHashChange = () => {
+      const hash = location.hash.slice(1).toLowerCase();
+      if (VALID_TABS.includes(hash as TabId)) {
+        activeTab = hash as TabId;
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  });
+
+  // --- Data state ---
   let data: ScheduleData | null = $state(null);
   let error: string | null = $state(null);
   let gymState: GymState | null = $state(null);
-  let messages: MessageData | null = $state(null);
   let isOffline = $state(!navigator.onLine);
   let lastFetchedAt = Date.now();
 
-  // Day picker + filter state
+  // Day picker state
   let selectedDay = $state(getEasternDayName());
-  let activeFilter = $state('all');
 
   async function loadSchedule(): Promise<void> {
     const r = await fetch('./data/latest.json');
@@ -31,15 +55,9 @@
     lastFetchedAt = Date.now();
   }
 
-  async function loadMessages(): Promise<void> {
-    const r = await fetch('./data/messages.json');
-    if (r.ok) messages = await r.json();
-  }
-
   // Initial load
   $effect(() => {
     loadSchedule().catch((e) => { error = e.message; });
-    loadMessages().catch(() => {});
   });
 
   // Re-compute gym state every 10 seconds
@@ -98,33 +116,7 @@
     return data.schedule[selectedDay] ?? null;
   });
 
-  // Derived: does the active filter match anything on the selected day?
-  const filterHasMatches = $derived.by((): boolean => {
-    if (!selectedSchedule || activeFilter === 'all') return true;
-    return filterActivities(selectedSchedule.activities, activeFilter).length > 0;
-  });
-
-  // Derived: filtered schedule — falls back to full schedule when filter has no matches
-  const filteredSchedule = $derived.by((): DaySchedule | null => {
-    if (!selectedSchedule) return null;
-    if (activeFilter === 'all' || !filterHasMatches) return selectedSchedule;
-    return {
-      ...selectedSchedule,
-      activities: filterActivities(selectedSchedule.activities, activeFilter),
-    };
-  });
-
-  const activeFilterLabel = $derived(
-    FILTER_CATEGORIES.find(c => c.id === activeFilter)?.label ?? ''
-  );
-
-  // Derived: available filter chips (stable across all days)
-  const availableFilters = $derived.by(() => {
-    if (!data) return [];
-    return getAvailableFilters(data.schedule);
-  });
-
-  // Fix 7: Auto-advance selectedDay when midnight rolls over (if user was viewing today)
+  // Auto-advance selectedDay when midnight rolls over (if user was viewing today)
   let previousToday = $state(getEasternDayName());
 
   $effect(() => {
@@ -182,50 +174,32 @@
       </div>
     {/if}
 
-    <StatusCard {gymState} {messages} />
+    <!-- Tab panels using hidden attribute to preserve state -->
+    <div role="tabpanel" id="panel-status" aria-labelledby="tab-status" tabindex="-1" hidden={activeTab !== 'status'}>
+      <StatusView {gymState} {data} />
+    </div>
 
-    <SportWeekCard {data} />
-
-    <DayPicker {data} {selectedDay} today={gymState.dayName} onSelectDay={(day) => { selectedDay = day; }} />
-
-    {#if availableFilters.length > 2}
-      <FilterChips
-        filters={availableFilters}
-        {activeFilter}
-        onSelectFilter={(id) => { activeFilter = id; }}
+    <div role="tabpanel" id="panel-today" aria-labelledby="tab-today" tabindex="-1" hidden={activeTab !== 'today'}>
+      <TodayView
+        {data}
+        {gymState}
+        {selectedDay}
+        {selectedSchedule}
+        {isSelectedToday}
+        onSelectDay={(day) => { selectedDay = day; }}
+        onTabSwitch={(tab) => setTab(tab)}
       />
-    {/if}
+    </div>
 
-    {#if activeFilter !== 'all' && !filterHasMatches}
-      <p class="filter-fallback">
-        No {activeFilterLabel} on {selectedDay} — showing full schedule
-      </p>
-    {/if}
+    <div role="tabpanel" id="panel-sports" aria-labelledby="tab-sports" tabindex="-1" hidden={activeTab !== 'sports'}>
+      <SportsView {data} />
+    </div>
 
-    {#if filteredSchedule}
-      <Timeline schedule={filteredSchedule} dayName={selectedDay} isToday={isSelectedToday} />
-      <UpNext schedule={filteredSchedule} isToday={isSelectedToday} />
-    {/if}
+    <div role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule" tabindex="-1" hidden={activeTab !== 'schedule'}>
+      <ScheduleView {data} today={gymState.dayName} scrapedAt={data.scrapedAt} />
+    </div>
 
-    <WeeklySchedule {data} {activeFilter} today={gymState.dayName} />
-
-    <footer class="footer">
-      <p class="footer-source">
-        <span>Updated {new Date(data.scrapedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })}</span>
-        <span class="footer-sep" aria-hidden="true">&middot;</span>
-        <span>Source: <a href="https://www.fairlawn.org/park-rec" target="_blank" rel="noopener">fairlawn.org</a></span>
-      </p>
-      <p class="footer-notice">
-        Fair Lawn residents only. Schedule may change without notice.
-      </p>
-      <p class="footer-meta">
-        This is an unofficial community project, not affiliated with the
-        <a href="https://www.fairlawn.org/community-center" target="_blank" rel="noopener">Borough of Fair Lawn</a>.
-      </p>
-      <p class="footer-meta">
-        <a href="https://github.com/paragbaxi/fair-lawn-community-center-available/issues" target="_blank" rel="noopener">Feedback &amp; suggestions</a> welcome.
-      </p>
-    </footer>
+    <TabBar {activeTab} onSelectTab={setTab} />
   {/if}
 </main>
 
@@ -308,17 +282,6 @@
     font-size: 0.95rem;
   }
 
-  .filter-fallback {
-    font-size: 0.85rem;
-    color: var(--color-text-secondary);
-    text-align: center;
-    padding: 8px 16px;
-    margin-bottom: 12px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-  }
-
   .loading {
     display: flex;
     justify-content: center;
@@ -336,65 +299,5 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
-  }
-
-  .footer {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    text-align: center;
-    color: var(--color-text-secondary);
-    font-size: 0.85rem;
-    padding-top: 16px;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .footer a {
-    color: var(--color-text-secondary);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .footer-source {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .footer-notice,
-  .footer-meta {
-    font-size: 0.85rem;
-  }
-
-  .footer-notice {
-    display: inline-block;
-    max-width: 100%;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    padding: 2px 10px;
-    border-radius: 8px;
-  }
-
-  .footer-meta + .footer-meta {
-    margin-top: -6px;
-  }
-
-  @media (hover: hover) {
-    .footer a:hover {
-      color: var(--color-text);
-    }
-  }
-
-  @media (max-width: 640px) {
-    .footer-source {
-      flex-direction: column;
-      gap: 2px;
-    }
-    .footer-sep {
-      display: none;
-    }
   }
 </style>

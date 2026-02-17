@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DaySchedule } from './types.js';
-  import { getEasternNow, parseTime } from './time.js';
+  import { getEasternNow, isActivityPast, isActivityCurrent } from './time.js';
   import { activityEmoji } from './emoji.js';
 
   let { schedule, dayName, isToday = true }: {
@@ -19,94 +19,58 @@
     return () => clearInterval(interval);
   });
 
-  const openTime = $derived(parseTime(schedule.open, now));
-  const closeTime = $derived(parseTime(schedule.close, now));
-  const totalMs = $derived(closeTime.getTime() - openTime.getTime());
-
-  function pct(time: Date): number {
-    return Math.max(0, Math.min(100, ((time.getTime() - openTime.getTime()) / totalMs) * 100));
-  }
-
-  const nowPct = $derived(pct(now));
-  const isOpen = $derived(isToday && now >= openTime && now < closeTime);
-
-  const segments = $derived(
-    schedule.activities.map((act) => {
-      const start = parseTime(act.start, now);
-      const end = parseTime(act.end, now);
-      const left = pct(start);
-      const width = pct(end) - left;
-      const isPast = isToday && end <= now;
-      const isCurrent = isToday && start <= now && now < end;
-      return { ...act, left, width, isPast, isCurrent };
-    })
+  const activities = $derived(
+    schedule.activities.map((act) => ({
+      ...act,
+      isPast: isActivityPast(act.end, now, isToday),
+      isCurrent: isActivityCurrent(act.start, act.end, now, isToday),
+    }))
   );
 
   const hasActivities = $derived(schedule.activities.length > 0);
 </script>
 
 <div class="timeline-section">
+  <h2 class="section-title">{isToday ? 'Up Next' : 'Activities'}</h2>
+
   <div class="timeline-header">
     <span class="timeline-day">{isToday ? `Today (${dayName})` : dayName}</span>
     <span class="timeline-range">{schedule.open} &mdash; {schedule.close}</span>
   </div>
 
   {#if hasActivities}
-    <!-- Desktop: horizontal bar -->
-    <div class="timeline-bar" aria-hidden="true">
-      {#each segments as seg}
-        <div
-          class="segment"
-          class:open-gym={seg.isOpenGym}
-          class:scheduled={!seg.isOpenGym}
-          class:past={seg.isPast}
-          class:current={seg.isCurrent}
-          style="left: {seg.left}%; width: {seg.width}%;"
-          title="{seg.name}: {seg.start} - {seg.end}"
-        >
-          <span class="segment-label">{seg.name}</span>
-        </div>
-      {/each}
-      {#if isOpen}
-        <div class="now-marker" style="left: {nowPct}%;">
-          <div class="now-line"></div>
-          <span class="now-label">NOW</span>
-        </div>
-      {/if}
-    </div>
-
-    <div class="timeline-legend" aria-hidden="true">
-      <span class="legend-item"><span class="legend-swatch open-gym"></span> Available</span>
-      <span class="legend-item"><span class="legend-swatch scheduled"></span> Scheduled</span>
-    </div>
-
-    <!-- Mobile: vertical list -->
     <div class="timeline-list" role="list" aria-label="{isToday ? 'Today' : dayName}'s schedule">
-      {#each segments as seg}
-        {@const emoji = activityEmoji(seg.name)}
+      {#each activities as act}
+        {@const emoji = activityEmoji(act.name)}
         <div
           class="list-item"
-          class:open-gym={seg.isOpenGym}
-          class:past={seg.isPast}
-          class:current={seg.isCurrent}
+          class:open-gym={act.isOpenGym}
+          class:past={act.isPast}
+          class:current={act.isCurrent}
           role="listitem"
         >
-          <span class="list-time">{seg.start}&ndash;{seg.end}</span>
-          <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{seg.name}</span>
-          {#if seg.isCurrent}
+          <span class="list-time">{act.start}&ndash;{act.end}</span>
+          <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
+          {#if act.isCurrent}
             <span class="list-badge">NOW</span>
           {/if}
         </div>
       {/each}
     </div>
   {:else}
-    <p class="no-activities">No matching activities</p>
+    <p class="no-activities">No activities scheduled</p>
   {/if}
 </div>
 
 <style>
   .timeline-section {
     margin-bottom: 24px;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
   }
 
   .timeline-header {
@@ -136,189 +100,62 @@
     border-radius: 8px;
   }
 
-  /* Desktop horizontal bar */
-  .timeline-bar {
-    position: relative;
-    height: 48px;
-    background: var(--color-surface);
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-
-  .segment {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    transition: opacity 0.3s;
-  }
-
-  .segment.open-gym {
-    background: var(--color-available);
-    opacity: 0.8;
-  }
-
-  .segment.open-gym.current {
-    opacity: 1;
-  }
-
-  .segment.open-gym.past {
-    opacity: 0.45;
-  }
-
-  .segment.scheduled {
-    background: var(--color-timeline-scheduled);
-    opacity: 0.6;
-  }
-
-  .segment.scheduled.current {
-    opacity: 0.9;
-  }
-
-  .segment.scheduled.past {
-    opacity: 0.4;
-  }
-
-  .segment-label {
-    color: white;
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 0 4px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    line-height: 1.2;
-    max-width: 100%;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-
-  .now-marker {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    transform: translateX(-50%);
-    z-index: 10;
-    pointer-events: none;
-  }
-
-  .now-line {
-    width: 2px;
-    height: 100%;
-    background: var(--color-text);
-  }
-
-  .now-label {
-    position: absolute;
-    top: -18px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--color-text);
-  }
-
-  .timeline-legend {
-    display: flex;
-    gap: 16px;
-    font-size: 0.85rem;
-    color: var(--color-text-secondary);
-    margin-bottom: 16px;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .legend-swatch {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-  }
-
-  .legend-swatch.open-gym {
-    background: var(--color-available);
-  }
-
-  .legend-swatch.scheduled {
-    background: var(--color-timeline-scheduled);
-  }
-
-  /* Mobile: vertical list */
   .timeline-list {
-    display: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
   }
 
-  @media (max-width: 640px) {
-    .timeline-bar,
-    .timeline-legend {
-      display: none;
-    }
+  .list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    min-height: 44px;
+    background: var(--color-surface);
+    border-left: 4px solid var(--color-timeline-scheduled);
+  }
 
-    .timeline-list {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--color-border);
-    }
+  .list-item.open-gym {
+    border-left-color: var(--color-available);
+  }
 
-    .list-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      min-height: 44px;
-      background: var(--color-surface);
-      border-left: 4px solid var(--color-timeline-scheduled);
-    }
+  .list-item.current {
+    background: var(--color-available-bg);
+    border-left-color: var(--color-available);
+  }
 
-    .list-item.open-gym {
-      border-left-color: var(--color-available);
-    }
+  .list-item.past {
+    opacity: 0.5;
+  }
 
-    .list-item.current {
-      background: var(--color-available-bg);
-      border-left-color: var(--color-available);
-    }
+  .list-time {
+    font-size: 0.95rem;
+    font-weight: 600;
+    min-width: 105px;
+    white-space: nowrap;
+    color: var(--color-text-secondary);
+  }
 
-    .list-item.past {
-      opacity: 0.5;
-    }
+  .list-name {
+    flex: 1;
+    font-size: 0.95rem;
+  }
 
-    .list-time {
-      font-size: 0.95rem;
-      font-weight: 600;
-      min-width: 105px;
-      white-space: nowrap;
-      color: var(--color-text-secondary);
-    }
+  .list-badge {
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: var(--color-available);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
 
-    .list-name {
-      flex: 1;
-      font-size: 0.95rem;
-    }
-
-    .list-badge {
-      font-size: 0.8rem;
-      font-weight: 700;
-      background: var(--color-available);
-      color: white;
-      padding: 2px 8px;
-      border-radius: 10px;
-    }
-
-    .activity-emoji {
-      font-size: 1.1em;
-      margin-right: 3px;
-    }
+  .activity-emoji {
+    font-size: 1.1em;
+    margin-right: 3px;
   }
 </style>

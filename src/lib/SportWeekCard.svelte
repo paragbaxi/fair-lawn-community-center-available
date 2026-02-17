@@ -2,27 +2,45 @@
   import type { ScheduleData } from './types.js';
   import type { FilterCategory } from './filters.js';
   import { getAvailableSports, getWeekSummary } from './filters.js';
-  import { getEasternNow } from './time.js';
+  import { getEasternNow, isActivityPast, isActivityCurrent, shortDayName, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
-  import { parseTime } from './time.js';
 
-  let { data }: { data: ScheduleData } = $props();
+  let { data, expanded = false }: { data: ScheduleData; expanded?: boolean } = $props();
 
   let isOpen = $state(false);
   let selectedSport = $state<FilterCategory | null>(null);
 
   const availableSports = $derived(getAvailableSports(data.schedule));
 
+  // Stale sport guard: reset if selected sport no longer available after data refresh
+  $effect(() => {
+    if (selectedSport && !availableSports.some(s => s.id === selectedSport!.id)) {
+      selectedSport = null;
+    }
+  });
+
   const weekSummary = $derived.by(() => {
     if (!selectedSport) return [];
     return getWeekSummary(data.schedule, selectedSport);
   });
 
-  // Time tracking for "NOW" badge — only active when detail is open + sport selected
+  // Date range for subheading
+  const dateRange = $derived.by(() => {
+    const now = getEasternNow();
+    const dayOfWeek = now.getDay(); // 0=Sun
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${fmt(monday)} – ${fmt(sunday)}`;
+  });
+
+  // Time tracking for "NOW" badge
   let now = $state(getEasternNow());
 
   $effect(() => {
-    if (!isOpen) { selectedSport = null; return; }
+    if (!expanded && !isOpen) { selectedSport = null; return; }
     if (!selectedSport) return;
     now = getEasternNow();
     const interval = setInterval(() => { now = getEasternNow(); }, 60_000);
@@ -32,105 +50,161 @@
   const todayName = $derived(
     ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()]
   );
-
-  function isPast(act: { end: string }, day: string): boolean {
-    if (day !== todayName) return false;
-    return parseTime(act.end, now) <= now;
-  }
-
-  function isCurrent(act: { start: string; end: string }, day: string): boolean {
-    if (day !== todayName) return false;
-    return parseTime(act.start, now) <= now && now < parseTime(act.end, now);
-  }
-
-  function clearSport() {
-    selectedSport = null;
-  }
-
-  // Short day names for display
-  const SHORT_DAYS: Record<string, string> = {
-    Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed',
-    Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
-  };
 </script>
 
 {#if availableSports.length > 0}
-  <details class="sport-week-card" bind:open={isOpen}>
-    <summary class="sport-week-summary">
-      <span class="summary-label">When can I play...?</span>
-      <svg
-        class="chevron"
-        class:chevron-open={isOpen}
-        width="20"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </summary>
+  {#if expanded}
+    <!-- Expanded mode: no <details>, persistent chips -->
+    <div class="sport-week-expanded">
+      <h2 class="section-heading">When can I play...?</h2>
+      <p class="date-range">{dateRange}</p>
 
-    {#if isOpen}
-      <div class="sport-week-content">
-        {#if selectedSport}
-          {@const sportEmoji = activityEmoji(selectedSport.label)}
-          <div class="sport-result-header">
-            <button class="back-btn" onclick={clearSport} aria-label="Back to sport selection">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <span class="sport-result-title">
-              {#if sportEmoji}<span class="activity-emoji" aria-hidden="true">{sportEmoji}</span> {/if}{selectedSport.label}
-            </span>
-          </div>
+      <div class="sport-chips" role="group" aria-label="Select sport">
+        {#each availableSports as sport}
+          {@const emoji = activityEmoji(sport.label)}
+          <button
+            class="sport-chip"
+            class:sport-chip-active={selectedSport?.id === sport.id}
+            aria-pressed={selectedSport?.id === sport.id}
+            onclick={() => { selectedSport = selectedSport?.id === sport.id ? null : sport; }}
+          >
+            {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
+          </button>
+        {/each}
+      </div>
 
-          {#if weekSummary.length === 0}
-            <p class="no-results">No {selectedSport.label} scheduled this week</p>
-          {:else}
-            <div class="week-results">
-              {#each weekSummary as entry}
-                {#each entry.activities as act, i}
-                  <div
-                    class="result-row"
-                    class:is-today={entry.day === todayName}
-                    class:is-past={isPast(act, entry.day)}
-                    class:is-current={isCurrent(act, entry.day)}
-                  >
-                    <span class="result-day">{#if i === 0}{SHORT_DAYS[entry.day]}{/if}</span>
-                    <span class="result-time">{act.start} &ndash; {act.end}</span>
-                    <span class="result-name">
-                      {act.name}
-                      {#if isCurrent(act, entry.day)}
-                        <span class="now-badge">NOW</span>
-                      {/if}
-                    </span>
-                  </div>
-                {/each}
-              {/each}
-            </div>
-          {/if}
+      {#if selectedSport}
+        {#if weekSummary.length === 0}
+          <p class="no-results">No {selectedSport.label} scheduled this week</p>
         {:else}
-          <div class="sport-chips" role="group" aria-label="Select sport">
-            {#each availableSports as sport}
-              {@const emoji = activityEmoji(sport.label)}
-              <button
-                class="sport-chip"
-                aria-pressed="false"
-                onclick={() => { selectedSport = sport; }}
-              >
-                {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
-              </button>
+          <div class="week-results">
+            {#each weekSummary as entry}
+              {#each entry.activities as act, i}
+                <div
+                  class="result-row"
+                  class:is-today={entry.day === todayName}
+                  class:is-past={isActivityPast(act.end, now, entry.day === todayName)}
+                  class:is-current={isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                >
+                  <span class="result-day">{#if i === 0}{shortDayName(entry.day)}{/if}</span>
+                  <span class="result-time">{act.start} &ndash; {act.end}</span>
+                  <span class="result-name">
+                    {act.name}
+                    {#if isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                      <span class="now-badge">NOW</span>
+                    {/if}
+                  </span>
+                </div>
+              {/each}
             {/each}
           </div>
         {/if}
-      </div>
-    {/if}
-  </details>
+      {:else}
+        <p class="hint-text">Tap a sport to see this week's times</p>
+      {/if}
+    </div>
+  {:else}
+    <!-- Collapsed mode: original <details> behavior -->
+    <details class="sport-week-card" bind:open={isOpen}>
+      <summary class="sport-week-summary">
+        <span class="summary-label">When can I play...?</span>
+        <svg
+          class="chevron"
+          class:chevron-open={isOpen}
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </summary>
+
+      {#if isOpen}
+        <div class="sport-week-content">
+          {#if selectedSport}
+            {@const sportEmoji = activityEmoji(selectedSport.label)}
+            <div class="sport-result-header">
+              <button class="back-btn" onclick={() => { selectedSport = null; }} aria-label="Back to sport selection">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <span class="sport-result-title">
+                {#if sportEmoji}<span class="activity-emoji" aria-hidden="true">{sportEmoji}</span> {/if}{selectedSport.label}
+              </span>
+            </div>
+
+            {#if weekSummary.length === 0}
+              <p class="no-results">No {selectedSport.label} scheduled this week</p>
+            {:else}
+              <div class="week-results">
+                {#each weekSummary as entry}
+                  {#each entry.activities as act, i}
+                    <div
+                      class="result-row"
+                      class:is-today={entry.day === todayName}
+                      class:is-past={isActivityPast(act.end, now, entry.day === todayName)}
+                      class:is-current={isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                    >
+                      <span class="result-day">{#if i === 0}{shortDayName(entry.day)}{/if}</span>
+                      <span class="result-time">{act.start} &ndash; {act.end}</span>
+                      <span class="result-name">
+                        {act.name}
+                        {#if isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                          <span class="now-badge">NOW</span>
+                        {/if}
+                      </span>
+                    </div>
+                  {/each}
+                {/each}
+              </div>
+            {/if}
+          {:else}
+            <div class="sport-chips" role="group" aria-label="Select sport">
+              {#each availableSports as sport}
+                {@const emoji = activityEmoji(sport.label)}
+                <button
+                  class="sport-chip"
+                  aria-pressed="false"
+                  onclick={() => { selectedSport = sport; }}
+                >
+                  {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </details>
+  {/if}
 {/if}
 
 <style>
+  .sport-week-expanded {
+    margin-bottom: 16px;
+  }
+
+  .section-heading {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .date-range {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .hint-text {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: 16px;
+  }
+
   .sport-week-card {
     margin-bottom: 16px;
   }
@@ -200,6 +274,7 @@
     flex-wrap: wrap;
     gap: 8px;
     padding: 4px 0;
+    margin-bottom: 12px;
   }
 
   .sport-chip {
@@ -216,8 +291,14 @@
     transition: background 0.15s, border-color 0.15s;
   }
 
+  .sport-chip-active {
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
+  }
+
   @media (hover: hover) {
-    .sport-chip:hover {
+    .sport-chip:not(.sport-chip-active):hover {
       background: var(--color-border);
     }
   }

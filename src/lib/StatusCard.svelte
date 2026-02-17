@@ -1,15 +1,11 @@
 <script lang="ts">
   import type { GymState } from './types.js';
-  import { formatCountdown } from './time.js';
-  import { getEasternNow } from './time.js';
+  import { formatCountdown, getStatusConfig } from './time.js';
   import { activityEmoji } from './emoji.js';
-  import { getTimeBucket, buildCandidatePool, pickMessage, type TimeBucket, type MessageData } from './motivational.js';
 
-  let { gymState, messages }: { gymState: GymState; messages: MessageData | null } = $props();
+  let { gymState }: { gymState: GymState } = $props();
 
   let countdownMs = $state(0);
-  let currentBucket = $state<TimeBucket | null>(null);
-  let motivationalMessage = $state('');
 
   $effect(() => {
     countdownMs = gymState.countdownMs;
@@ -19,54 +15,7 @@
     return () => clearInterval(interval);
   });
 
-  const bucket = $derived(
-    gymState.status === 'available' && countdownMs > 60_000
-      ? getTimeBucket(countdownMs)
-      : null
-  );
-
-  $effect(() => {
-    if (bucket === null || !messages) {
-      currentBucket = null;
-      motivationalMessage = '';
-      return;
-    }
-    if (bucket !== currentBucket) {
-      currentBucket = bucket;
-      const now = getEasternNow();
-      const pool = buildCandidatePool(
-        messages, bucket, gymState.dayName,
-        now.getMonth() + 1, now.getDate()
-      );
-      motivationalMessage = pickMessage(pool);
-    }
-  });
-
-  const statusConfig = $derived.by(() => {
-    switch (gymState.status) {
-      case 'available':
-        return {
-          icon: '\u2713',
-          label: 'GYM AVAILABLE',
-          cssClass: 'available',
-          ariaLabel: 'Gym is available for open play',
-        };
-      case 'in-use':
-        return {
-          icon: '\u23F3',
-          label: 'GYM IN USE',
-          cssClass: 'in-use',
-          ariaLabel: 'Gym is currently in use for a scheduled activity',
-        };
-      case 'closed':
-        return {
-          icon: '\u2715',
-          label: 'CLOSED',
-          cssClass: 'closed',
-          ariaLabel: 'Community center is currently closed',
-        };
-    }
-  });
+  const statusConfig = $derived(getStatusConfig(gymState.status));
 </script>
 
 <div
@@ -118,12 +67,6 @@
     {#if gymState.nextOpenGymDay && gymState.nextOpenGym}
       <p class="status-subtext-secondary">First Open Gym: {gymState.nextOpenGymDay} at {gymState.nextOpenGym.start}</p>
     {/if}
-  {/if}
-
-  {#if motivationalMessage}
-    <p class="motivational-message" aria-hidden="true">
-      {motivationalMessage}
-    </p>
   {/if}
 </div>
 
@@ -249,21 +192,10 @@
     margin-top: 4px;
   }
 
-  .motivational-message {
-    color: var(--color-text-secondary);
-    font-size: 0.95rem;
-    font-style: italic;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--color-available-border);
-    line-height: 1.4;
-  }
-
   @media (prefers-color-scheme: dark) {
     .status-detail,
     .status-subtext,
-    .status-subtext-secondary,
-    .motivational-message {
+    .status-subtext-secondary {
       color: rgba(255, 255, 255, 0.85);
     }
   }
