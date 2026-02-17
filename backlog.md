@@ -61,8 +61,8 @@ Restructured the entire app from a single scrolling page into 4 tab-based views:
 
 ## Open
 
-### ⚠️ P2: `closedState` Path #6 — open gym anchor mismatch (user-facing bug)
-`findNextOpenGymAcrossDays(data, currentDay)` anchors from today, but `nextOpenDay` (first day with any schedule) is found independently. If the building is closed for several days and reopens mid-week, StatusCard may display "Next Open Gym: [day]" that is before the building actually reopens — showing users incorrect next-session information. Needs a guard: only surface next open gym if that day is on or after `nextOpenDay`.
+### ~~⚠️ P2: `closedState` Path #6 — open gym anchor mismatch~~
+`findNextOpenGymAcrossDays` used `i=1..7`, which at `i=7` wraps back to `currentDay`. In Path #6 this could surface today's already-past open gym as `nextOpenGymDay` while `nextOpenDay` was a future day — e.g. "Opens Saturday" + "First Open Gym: Friday" (Friday visually before Saturday in the week). Fixed by checking `nextDay` itself for open gym first, then anchoring `findNextOpenGymAcrossDays` from `nextDay` instead of `currentDay`. 2 targeted unit tests added (156 unit + 17 E2E passing). Deployed 2026-02-17.
 
 ### P3: Apply `test.skip()` consistently in E2E tests
 Three tests (`Sports tab shows chips`, `chip deselect clears sport URL param`, `back navigation`) guard on `sportChips.count() === 0` with a bare `return`. The back-nav test was updated to `test.skip()` in code review. Align the other two for consistent CI visibility when sport data is missing.
@@ -106,11 +106,11 @@ In `SportWeekCard`, the `$effect` guarding `!expanded && !isOpen` calls `onSelec
 ### P4: Sport chip horizontal scroll on narrow screens
 With 7 sport categories, the chip row wraps to 2 lines. On very narrow screens (<375px) with more categories, consider `overflow-x: auto` with `-webkit-overflow-scrolling: touch` for horizontal scrolling.
 
-### P4: `findNextOpenGymAcrossDays` off-by-one audit
-The function iterates `i = 1..7`, which on `i=7` wraps back to `currentDay` itself — a redundant check since the caller already examined today. Harmless but could be tightened to `i <= 6`. Very low risk.
+### ~~P4: `findNextOpenGymAcrossDays` off-by-one audit~~
+Resolved by the P2 closedState fix: Path #6 no longer relies on `i=7` wrap-around behavior, making the i=7 iteration harmless (other call sites have no schedule-present days at i=7 in practice). Closed 2026-02-17.
 
-### P4: `closedState` Path #6 — open gym anchor mismatch
-`findNextOpenGymAcrossDays(data, currentDay)` anchors from today, but `nextOpenDay` (first day with any schedule) is found independently. The "Next Open Gym" subtext could show a day that's before the building actually reopens. Low probability with real data but a logic inconsistency.
+### ~~P4: `closedState` Path #6 — open gym anchor mismatch~~
+Superseded by the P2 closedState fix above. Closed 2026-02-17.
 
 ### P4: Midnight auto-advance E2E test
 Auto-advance logic (if viewing "today" and midnight passes, selectedDay advances) is only testable via Playwright clock manipulation (`page.clock`). Low priority since the logic is simple.
