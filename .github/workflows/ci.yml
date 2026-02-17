@@ -45,7 +45,9 @@ jobs:
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
       - uses: ./.github/actions/setup-playwright
-      - run: npm run test:e2e
+      # Visual snapshots use macOS baselines; skip on Linux CI to avoid font-rendering diffs.
+      # Run locally with: npx playwright test --project=visual
+      - run: npm run test:e2e -- --project=chromium
 
   lighthouse:
     runs-on: ubuntu-latest
