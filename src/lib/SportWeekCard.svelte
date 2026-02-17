@@ -22,7 +22,8 @@
   let now = $state(getEasternNow());
 
   $effect(() => {
-    if (!isOpen || !selectedSport) return;
+    if (!isOpen) { selectedSport = null; return; }
+    if (!selectedSport) return;
     now = getEasternNow();
     const interval = setInterval(() => { now = getEasternNow(); }, 60_000);
     return () => clearInterval(interval);
