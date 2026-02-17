@@ -3,22 +3,30 @@
   import { getEasternNow, parseTime } from './time.js';
   import { activityEmoji } from './emoji.js';
 
-  let { schedule }: { schedule: DaySchedule } = $props();
+  let { schedule, isToday = true }: {
+    schedule: DaySchedule;
+    isToday?: boolean;
+  } = $props();
 
-  const upcoming = $derived.by(() => {
-    const now = getEasternNow();
-    return schedule.activities.filter((act) => {
-      const start = parseTime(act.start, now);
-      return start > now;
-    });
+  const items = $derived.by(() => {
+    if (isToday) {
+      // Only show future activities
+      const now = getEasternNow();
+      return schedule.activities.filter((act) => {
+        const start = parseTime(act.start, now);
+        return start > now;
+      });
+    }
+    // For other days, show all activities
+    return schedule.activities;
   });
 </script>
 
-{#if upcoming.length > 0}
+{#if items.length > 0}
   <div class="up-next">
-    <h2 class="section-title">Up Next</h2>
+    <h2 class="section-title">{isToday ? 'Up Next' : 'Activities'}</h2>
     <ul class="activity-list" role="list">
-      {#each upcoming as act}
+      {#each items as act}
         {@const emoji = activityEmoji(act.name)}
         <li class="activity-item" class:open-gym={act.isOpenGym}>
           <span class="activity-time">{act.start}</span>

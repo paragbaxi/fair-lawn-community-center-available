@@ -1,11 +1,14 @@
 <script lang="ts">
-  import type { ScheduleData, GymState, Notice } from './lib/types.js';
+  import type { ScheduleData, GymState, DaySchedule, Notice } from './lib/types.js';
   import type { MessageData } from './lib/motivational.js';
-  import { computeGymState, getEasternNow } from './lib/time.js';
+  import { computeGymState, getEasternNow, getEasternDayName } from './lib/time.js';
+  import { getAvailableFilters, filterActivities } from './lib/filters.js';
   import StatusCard from './lib/StatusCard.svelte';
   import Timeline from './lib/Timeline.svelte';
   import UpNext from './lib/UpNext.svelte';
   import WeeklySchedule from './lib/WeeklySchedule.svelte';
+  import DayPicker from './lib/DayPicker.svelte';
+  import FilterChips from './lib/FilterChips.svelte';
 
   let data: ScheduleData | null = $state(null);
   let error: string | null = $state(null);
@@ -13,6 +16,10 @@
   let messages: MessageData | null = $state(null);
   let isOffline = $state(!navigator.onLine);
   let lastFetchedAt = Date.now();
+
+  // Day picker + filter state
+  let selectedDay = $state(getEasternDayName());
+  let activeFilter = $state('all');
 
   async function loadSchedule(): Promise<void> {
     const r = await fetch('./data/latest.json');
@@ -80,6 +87,30 @@
     const today = getEasternNow().toISOString().split('T')[0];
     return data.notices.filter(n => n.date >= today);
   });
+
+  // Derived: is the selected day today?
+  const isSelectedToday = $derived(selectedDay === getEasternDayName());
+
+  // Derived: the schedule for the selected day
+  const selectedSchedule = $derived.by((): DaySchedule | null => {
+    if (!data) return null;
+    return data.schedule[selectedDay] ?? null;
+  });
+
+  // Derived: filtered schedule for selected day
+  const filteredSchedule = $derived.by((): DaySchedule | null => {
+    if (!selectedSchedule) return null;
+    return {
+      ...selectedSchedule,
+      activities: filterActivities(selectedSchedule.activities, activeFilter),
+    };
+  });
+
+  // Derived: available filter chips (stable across all days)
+  const availableFilters = $derived.by(() => {
+    if (!data) return [];
+    return getAvailableFilters(data.schedule);
+  });
 </script>
 
 <main>
@@ -118,12 +149,22 @@
 
     <StatusCard {gymState} {messages} />
 
-    {#if gymState.todaySchedule}
-      <Timeline schedule={gymState.todaySchedule} dayName={gymState.dayName} />
-      <UpNext schedule={gymState.todaySchedule} />
+    <DayPicker {data} {selectedDay} onSelectDay={(day) => { selectedDay = day; }} />
+
+    {#if availableFilters.length > 2}
+      <FilterChips
+        filters={availableFilters}
+        {activeFilter}
+        onSelectFilter={(id) => { activeFilter = id; }}
+      />
     {/if}
 
-    <WeeklySchedule {data} />
+    {#if filteredSchedule}
+      <Timeline schedule={filteredSchedule} dayName={selectedDay} isToday={isSelectedToday} />
+      <UpNext schedule={filteredSchedule} isToday={isSelectedToday} />
+    {/if}
+
+    <WeeklySchedule {data} {activeFilter} />
 
     <footer class="footer">
       <p class="footer-source">
