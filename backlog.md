@@ -64,12 +64,6 @@ Restructured the entire app from a single scrolling page into 4 tab-based views:
 ### P4: Service worker test coverage
 The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
 
-### P5: npm CI cache for node_modules
-`actions/setup-node` caches `~/.npm` (download cache), but `npm ci` still reinstalls every run. Cache `node_modules` with `actions/cache@v4` keyed on `hashFiles('package-lock.json')` and skip `npm ci` on hit. Modest savings (~5-10s) but follows the same pattern as the Playwright cache.
-
-### P5: Composite action for Playwright setup
-Both `ci.yml` and `scrape-and-deploy.yml` have identical 4-step Playwright cache blocks with sync comments. If a third workflow needs Playwright (e.g., Lighthouse CI), extract to `.github/actions/setup-playwright/action.yml`. Not worth it with 2 consumers — revisit if a third is added.
-
 ### P3: E2E — timeline content verification on day switch
 DayPicker test verifies `aria-pressed` toggles, but doesn't assert that the timeline content actually changes when switching days. Add assertions that clicking a different day shows different activity names.
 
