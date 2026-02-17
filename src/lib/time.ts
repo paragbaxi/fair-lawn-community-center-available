@@ -14,8 +14,18 @@ export const DISPLAY_DAYS: { full: string; short: string }[] = [
 ];
 
 export function getEasternNow(): Date {
-  const str = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
-  return new Date(str);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date());
+  const get = (type: string) => Number(parts.find(p => p.type === type)!.value);
+  return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
 }
 
 export function getEasternDayName(): string {

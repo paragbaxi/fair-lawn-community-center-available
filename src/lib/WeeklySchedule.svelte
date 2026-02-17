@@ -3,10 +3,11 @@
   import { DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
 
-  let { data, today, expanded = false }: {
+  let { data, today, expanded = false, initialDay = null }: {
     data: ScheduleData;
     today: string;
     expanded?: boolean;
+    initialDay?: string | null;
   } = $props();
 
   // Collapsed <details> mode state
@@ -16,10 +17,14 @@
   let expandedDays = $state(new Set<string>());
   let prevToday = $state('');
 
-  // Initialize with today expanded; update when midnight rolls over
+  // Initialize with today expanded (and initialDay if provided); update when midnight rolls over
   $effect(() => {
     if (prevToday === '') {
-      expandedDays = new Set([today]);
+      const initial = new Set([today]);
+      if (initialDay && initialDay !== today && data.schedule[initialDay]) {
+        initial.add(initialDay);
+      }
+      expandedDays = initial;
       prevToday = today;
     } else if (today !== prevToday) {
       const next = new Set(expandedDays);
