@@ -181,6 +181,13 @@ Added `sport status banner renders when a sport chip is selected` test to `e2e/s
 ### ~~P4: "Rest of Week" section — scroll hint on mobile~~
 Added `<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>` in `TodayView.svelte` between the Timeline and the "Rest of Week" heading. CSS-only: `display: none` by default, `display: block` at `max-width: 500px`. Uses `var(--color-text-secondary)`. Deployed 2026-02-17.
 
+### ~~P1: Fix `VAPID_SUBJECT` — not a real email address~~
+Changed from `mailto:paragbaxi@github.io` to `https://paragbaxi.github.io/fair-lawn-community-center-available`. Deployed 2026-02-18.
+
+### ~~P1: Worker deploy broken — missing `account_id` in `wrangler.toml`~~
+`deploy-worker.yml` had been failing with error 9106 since the worker was added. Root cause: without `account_id`, wrangler calls `GET /user/memberships` to discover the account — a user-level endpoint that an account-scoped API token can't access. Added `account_id = "2a173a2cfd2f56ac9d314d3fcfde4ad6"`. Also committed missing `worker/package-lock.json` (required for `npm ci`), and set a valid `CLOUDFLARE_API_TOKEN` GitHub secret. Worker now live at `https://flcc-push.trueto.workers.dev`. Deployed 2026-02-18.
+Added `<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>` in `TodayView.svelte` between the Timeline and the "Rest of Week" heading. CSS-only: `display: none` by default, `display: block` at `max-width: 500px`. Uses `var(--color-text-secondary)`. Deployed 2026-02-17.
+
 ### ~~P1: Per-sport notification alerts + notification UX overhaul~~
 Full notifications system: Cloudflare Worker (`worker/index.ts`) with KV-backed subscriptions, VAPID push, sport-level prefs, daily briefing cron, and `POST /notify` endpoint for both `30min` and `sport-30min` types. Frontend: `notifStore.svelte.ts` module-level $state singleton eliminating triple `onMount` duplication and `localSports` desync; `NotifSheet.svelte` bottom sheet with focus trap, `fly`/`fade` Svelte transitions, iOS-style toggles, error banner, body-scroll lock; bell button in `App.svelte` header with session-scoped pulse dot; `NotificationSettings.svelte` refactored to thin CTA strip; `SportWeekCard.svelte` migrated to notifStore; `check-and-notify.mjs` sends open gym + per-sport 30-min notifications; `push-notify.yml` cron workflow triggers every 30 min; `deploy-worker.yml` auto-deploys worker on `worker/**` push to main. Merged 2026-02-18.
 
@@ -188,11 +195,20 @@ Full notifications system: Cloudflare Worker (`worker/index.ts`) with KV-backed 
 
 ## Open
 
-### 🚨 P1: Verify GitHub Actions secrets for notifications
-Three secrets must be manually set in repo Settings → Secrets before notifications work end-to-end: `CLOUDFLARE_API_TOKEN` (worker deploy), `CLOUDFLARE_WORKER_URL` (push notify script), `NOTIFY_API_KEY` (shared auth between script and worker). The worker `deploy-worker.yml` triggered on the PR #14 merge — if `CLOUDFLARE_API_TOKEN` was missing, the deploy silently failed and no push notifications are sent to anyone. **Check the `deploy-worker.yml` workflow run and confirm it succeeded before assuming notifications are live.**
+### 🚨 P1: Set Cloudflare Worker secrets (VAPID keys + NOTIFY_API_KEY)
+Worker is deployed and the health endpoint responds, but push notifications **cannot be sent** until the three runtime secrets are set via wrangler. Without `VAPID_PRIVATE_KEY` the worker cannot sign push JWTs; without `VAPID_PUBLIC_KEY` it cannot build payloads; without `NOTIFY_API_KEY` the `/notify` endpoint will reject all calls from GitHub Actions. Run from the `worker/` directory:
+```bash
+npx wrangler secret put VAPID_PRIVATE_KEY   # private half of VAPID key pair
+npx wrangler secret put VAPID_PUBLIC_KEY    # same value as VITE_VAPID_PUBLIC_KEY GitHub secret
+npx wrangler secret put NOTIFY_API_KEY      # same value as NOTIFY_API_KEY GitHub secret
+```
+See `SETUP.md` for the full credential map.
 
-### 🚨 P1: Fix `VAPID_SUBJECT` — not a real email address
-`wrangler.toml` has `VAPID_SUBJECT = "mailto:paragbaxi@github.io"`. This is a GitHub Pages hostname, not a deliverable address. The VAPID spec requires a `mailto:` URI with a real contact email or an HTTPS URL. Some push services (notably FCM/Chrome) validate this and may reject subscriptions or silently fail pushes. Change to a real `mailto:your@email.com` or `https://paragbaxi.github.io/fair-lawn-community-center-available`. This requires a new VAPID key rotation: existing subscribers will not receive notifications after the change and must re-subscribe. **Do this before accumulating real subscribers.**
+### 🚨 P1: Verify `CLOUDFLARE_WORKER_URL` secret matches actual worker URL
+The secret was set on 2026-02-18 at 13:20, before the worker was ever successfully deployed. The actual worker URL — discovered from the first successful deploy today — is `https://flcc-push.trueto.workers.dev`. If the stored secret is a placeholder or different URL, `push-notify.yml` will silently POST to nowhere (exits 0) and the frontend will fail to subscribe/unsubscribe. Update if needed:
+```bash
+gh secret set CLOUDFLARE_WORKER_URL --body "https://flcc-push.trueto.workers.dev"
+```
 
 ### 🚨 P2: Scraper failure notification via GitHub issue
 The `scrape-and-deploy.yml` workflow creates/updates a GitHub issue on scraper failure — but `gotoWithRetry` exhaustion (both attempts timeout) still exits 1 and triggers the issue. However, **there is currently no notification if the scraper silently succeeds but parses stale/empty data** (validation passes with partial content). The `scraper-smoke.yml` smoke test catches structural breakage, but a gradual data-quality regression (e.g. Fair Lawn restructures their page so only 3 days parse instead of 7) would pass Rule 3 (≥3 days) and Rule 9 (warning, not error) and deploy silently. **Recommended:** Lower Rule 3 threshold to 5 days (error) and promote Rule 9 to error after the smoke test has run clean for a week.
