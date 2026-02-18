@@ -151,12 +151,12 @@ Merged Today + Schedule into a single "Schedule" tab (ID kept as `'today'` for U
 ### ~~P5: Fix unused CSS selector in `ScheduleView.svelte`~~
 Removed dead `.footer-meta + .footer-meta` adjacent-sibling rule — only one `.footer-meta` element exists in the markup; the second paragraph it targeted was removed in an earlier refactor. Merged 2026-02-17.
 
+### ~~P3: Scraper staleness alerting~~
+Added `.github/workflows/freshness-check.yml` — runs daily at 9 AM UTC (4h after scraper), reads `scrapedAt` from `public/data/latest.json`, creates/comments on a `stale-data` issue if age > 26h, and auto-closes it when fresh again. Concurrency group prevents duplicate issues on concurrent `workflow_dispatch` runs. Pure bash + `jq` — no Node.js, ~15s runtime. Deployed 2026-02-17.
+
 ---
 
 ## Open
-
-### P3: Scraper Rule 9 — validate that scrapedAt is within 48h *(urgent: data freshness)*
-The scraper workflow runs daily, but if it silently fails (site HTML changes, network hiccup) users see stale data with no warning beyond the `isStale` banner (which only appears after 48h). **Recommended:** add a GitHub Actions step that alerts (creates issue) if `latest.json` is not updated within 25h. Pair with a Lighthouse or uptime check. This is the most likely silent failure mode in production.
 
 ### P3: Scraper resilience — handle Fair Lawn site HTML changes
 Rule 5/6/7 in `validate.ts` catch bad data after the fact, but the scraper has no retry logic and no fallback if the page structure changes. **Recommended:** add a `--dry-run` mode that parses without committing, so scraper changes can be tested in CI against live site HTML without risk of pushing bad data.
