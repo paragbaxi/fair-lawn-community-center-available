@@ -101,10 +101,10 @@ async function fanOut(
   type: 'thirtyMin' | 'dailyBriefing',
   idempotencyKeyStr: string,
   sportId?: string,
-): Promise<{ sent: number; skipped: number; cleaned: number }> {
+): Promise<{ sent: number; skipped: number; cleaned: number; failed: number }> {
   // Idempotency check
   const existing = await env.SUBSCRIPTIONS.get(idempotencyKeyStr);
-  if (existing) return { sent: 0, skipped: 0, cleaned: 0 };
+  if (existing) return { sent: 0, skipped: 0, cleaned: 0, failed: 0 };
 
   // Write idempotency key before sending (TTL: 2h)
   await env.SUBSCRIPTIONS.put(idempotencyKeyStr, '1', { expirationTtl: 7200 });
@@ -114,6 +114,7 @@ async function fanOut(
   let sent = 0;
   let skipped = 0;
   let cleaned = 0;
+  let failed = 0;
 
   // Paginate through all subscriptions
   do {
@@ -166,6 +167,7 @@ async function fanOut(
             sent++;
           } else {
             console.error(`Push delivery failed with status ${res.status} for ${k.name}`);
+            failed++;
           }
         } catch (err) {
           console.error(`Failed to send to ${k.name}:`, err);
@@ -175,7 +177,7 @@ async function fanOut(
     await Promise.all(sendPromises);
   } while (cursor);
 
-  return { sent, skipped, cleaned };
+  return { sent, skipped, cleaned, failed };
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -375,7 +377,7 @@ async function handleScheduled(env: Env): Promise<void> {
 
   const idKey = idempotencyKey(isoDate, dayName, 'daily', 'dailyBriefing');
   const result = await fanOut(env, notifData, 'dailyBriefing', idKey);
-  console.log(`Daily briefing sent:`, result);
+  console.log(`Daily briefing sent: sent=${result.sent} skipped=${result.skipped} cleaned=${result.cleaned} failed=${result.failed}`);
 }
 
 // ─── Main fetch handler ──────────────────────────────────────────────────────

@@ -212,17 +212,8 @@ Importing `scraper/index.ts` in vitest caused the top-level `scrape().catch(...)
 
 ## Open
 
-### P3: Worker — fanOut non-2xx push delivery has no test
-We fixed `fanOut` to only count 2xx as `sent` (not 4xx/5xx), but there's no test asserting the new behavior. A 400/500 from the push endpoint should appear in the error log, not increment `sent`. Add a test that returns status 400 from the mock push endpoint and asserts `sent: 0`.
-
-### P4: esbuild dependabot alert — dev-only, can dismiss
-`worker/package-lock.json` has esbuild ≤ 0.24.2 (GHSA-67mh-4wv8-2f99). The vulnerability is in esbuild's dev server (`esbuild --serve`) allowing CORS from any origin. We never use esbuild serve — wrangler handles all builds/dev. Either upgrade `wrangler` (which bundles esbuild) or dismiss the alert with a comment explaining it's not exploitable in this context.
-
-### P4: `getEasternNow()` in check-and-notify.mjs — fragile Date construction
-Extracts Eastern hour/minute/second components then passes them to `new Date(year, month-1, day, ...)` which interprets in the host's local timezone (UTC on GH Actions). Works by coincidence because both sides of the `(start - now) / 60000` comparison use the same skewed epoch. Fragile if the comparison logic ever changes. Fix: use `Intl.DateTimeFormat.formatToParts()` with `hourCycle: 'h23'` (same pattern as `src/lib/time.ts`'s `getEasternNow()`).
-
-### P5: `fanOut` result has no `failed` counter
-Currently returns `{ sent, skipped, cleaned }`. A 400/500 delivery failure is logged but invisible in the response. Adding a `failed` counter lets `check-and-notify.mjs` log delivery failures distinctly from send counts — useful for diagnosing VAPID expiry (all deliveries 401) vs individual bad subscriptions.
+### ~~P3/P4/P5: fanOut failed counter, esbuild alert, getEasternNow doc, non-2xx test~~
+Four items resolved: (1) `fanOut` return type now includes `failed` counter — increments on non-2xx/non-410/non-429 push delivery; idempotency early return includes `failed: 0`; `handleScheduled` log shows all 4 fields; 14 worker tests (added non-2xx regression test asserting `sent: 0, failed: 1` when push endpoint returns 400). (2) esbuild GHSA-67mh-4wv8-2f99 dismissed as `tolerable_risk` — only affects `esbuild --serve`, which this project never uses. (3) `getEasternNow()` in `check-and-notify.mjs` analyzed: arithmetic is genuinely correct because offsets cancel in epoch subtraction; added a detailed comment explaining the "Eastern-as-local" coordinate system, why `parseActivityTime` math is safe, and the fragility caveat for future contributors. (4) No code change needed for getEasternNow — comment is sufficient. 199 unit tests + 14 worker tests. Deployed 2026-02-18.
 
 ---
 

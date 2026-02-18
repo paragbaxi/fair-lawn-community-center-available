@@ -126,7 +126,7 @@ describe('fanOut idempotency', () => {
     expect(res.status).toBe(200);
     expect(data.ok).toBe(true);
     // fanOut finds the existing idempotency key and returns early without sending
-    expect(data.results[0]).toEqual({ sent: 0, skipped: 0, cleaned: 0 });
+    expect(data.results[0]).toEqual({ sent: 0, skipped: 0, cleaned: 0, failed: 0 });
 
     // Confirm push endpoint was never fetched
     const pushCalls = mockFetch.mock.calls.filter(
@@ -362,6 +362,38 @@ describe('410 cleanup', () => {
     // Verify the key was deleted from KV
     const remaining = await kv.get('sub-gone');
     expect(remaining).toBeNull();
+  });
+});
+
+describe('fanOut non-2xx delivery', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('does not count non-2xx push delivery as sent', async () => {
+    const kv = createKVMock({
+      'sub-bad': makeSub({
+        endpoint: 'https://push.example.com/bad',
+        thirtyMin: true,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    // Push endpoint returns 400 Bad Request — not 2xx, not 410/404, not 429
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 400 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: '15:00', end: '16:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number; skipped: number; cleaned: number; failed: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.results[0].sent).toBe(0);
+    expect(data.results[0].failed).toBe(1);
   });
 });
 

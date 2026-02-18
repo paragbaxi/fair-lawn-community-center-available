@@ -59,6 +59,37 @@ if (!WORKER_URL || !API_KEY) {
 
 // ─── Time helpers (verbatim from src/lib/time.ts) ───────────────────────────
 
+/**
+ * Returns a Date whose *local* (host-timezone) components equal the current
+ * Eastern wall-clock time.  On a UTC host (GitHub Actions) this means the
+ * returned Date's epoch is shifted 4–5 hours earlier than the true Eastern
+ * epoch, but `.getHours()` / `.getDay()` / `.getDate()` etc. all return the
+ * correct Eastern values when the host is UTC.
+ *
+ * All downstream helpers (parseActivityTime, getEasternDayName,
+ * getEasternIsoDate) receive this same Date and operate consistently within
+ * this "Eastern-as-local" coordinate system:
+ *
+ *   • parseActivityTime copies `now` then calls d.setHours(...) — on a UTC
+ *     host setHours writes UTC hours — so the resulting start/end Date is in
+ *     the same coordinate system.  The subtraction `(start - now) / 60000`
+ *     therefore yields the correct minute difference (the shared offset
+ *     cancels).
+ *
+ *   • getEasternDayName / getEasternIsoDate pass `now` to Intl.DateTimeFormat
+ *     with timeZone:'America/New_York', which uses the epoch.  Because the
+ *     epoch is shifted early by the UTC offset, the Intl formatter would show
+ *     the *previous* calendar day for Eastern times between midnight and the
+ *     UTC offset (00:00–04:59 ET in summer, 00:00–05:59 ET in winter).
+ *     The gym-hours guard `now.getHours() < 8` exits before any of those
+ *     helpers are called, so in practice this never fires.
+ *
+ * FRAGILITY NOTE: Do not pass `now` to any code that interprets its epoch as
+ * true Eastern time (e.g. comparing against a real-epoch Date, calling
+ * now.toISOString(), or passing to Intl formatters outside the guarded path).
+ * If you need a truly correct epoch, construct `new Date()` directly and
+ * format it with timeZone:'America/New_York'.
+ */
 function getEasternNow() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -71,6 +102,9 @@ function getEasternNow() {
     second: '2-digit',
   }).formatToParts(new Date());
   const get = (type) => Number(parts.find((p) => p.type === type).value);
+  // new Date(y, m, d, h, min, s) interprets args in the host's local timezone.
+  // On a UTC host the resulting epoch equals the Eastern wall-clock time
+  // expressed as if it were UTC — i.e. offset by the Eastern UTC offset.
   return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
 }
 
