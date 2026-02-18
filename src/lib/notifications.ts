@@ -58,20 +58,8 @@ export async function subscribe(prefs: NotifPrefs): Promise<SubscribeResult> {
 
 /** Unsubscribe from push notifications. */
 export async function unsubscribe(): Promise<void> {
-  const endpoint = localStorage.getItem(ENDPOINT_KEY);
-  if (endpoint) {
-    const res = await fetch(`${WORKER_URL}/unsubscribe`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint }),
-    });
-    if (!res.ok) {
-      throw new Error(`Worker /unsubscribe returned ${res.status}`);
-    }
-    localStorage.removeItem(ENDPOINT_KEY);
-    localStorage.removeItem(PREFS_KEY);
-  }
-
+  // Always remove browser-side subscription first — even if server call fails,
+  // the user should stop receiving notifications immediately.
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
@@ -79,6 +67,20 @@ export async function unsubscribe(): Promise<void> {
   } catch (err) {
     console.error('SW unsubscribe failed:', err);
   }
+
+  const endpoint = localStorage.getItem(ENDPOINT_KEY);
+  if (!endpoint) return;
+
+  const res = await fetch(`${WORKER_URL}/unsubscribe`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint }),
+  });
+  if (!res.ok) {
+    throw new Error(`Worker /unsubscribe returned ${res.status}`);
+  }
+  localStorage.removeItem(ENDPOINT_KEY);
+  localStorage.removeItem(PREFS_KEY);
 }
 
 /** Update notification preferences without re-subscribing.

@@ -309,6 +309,35 @@ test('chip deselect clears sport URL param', async ({ page }) => {
   expect(url).not.toContain('sport=');
 });
 
+// --- Sports tab tests ---
+
+test.describe('Sports tab', () => {
+  test('sport notification button renders when a sport chip is selected', async ({ page }) => {
+    // Navigate to sports tab with basketball pre-selected
+    await page.goto('/#sports?sport=basketball');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    // Skip if no sport chips loaded (no data)
+    const chip = page.locator('.sport-chip').first();
+    if (!await chip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No sport chips available — schedule data may be empty');
+      return;
+    }
+
+    // Wait for notifStore to initialize (up to 5s for SW timeout + margin)
+    // getState() has a 3-second SW timeout; allow up to 5.5 seconds total.
+    await page.waitForTimeout(5500);
+
+    // The sport-notif-btn should be visible
+    const notifBtn = page.locator('.sport-notif-btn');
+    await expect(notifBtn).toBeVisible({ timeout: 2000 });
+
+    // Button text should contain the sport name or a notification action
+    const btnText = await notifBtn.textContent();
+    expect(btnText).toMatch(/notify|notifying/i);
+  });
+});
+
 // --- Notification sheet tests ---
 
 test.describe('notification sheet', () => {
