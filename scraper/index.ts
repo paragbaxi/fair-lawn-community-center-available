@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import type { Page } from 'playwright';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,22 @@ const URLS = [
   'https://www.fairlawn.org/park-rec',
 ];
 
+async function gotoWithRetry(page: Page, url: string, retries = 1): Promise<void> {
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      return;
+    } catch (err) {
+      if (attempt <= retries) {
+        console.warn(`[retry ${attempt}/${retries}] Failed to load ${url}, retrying in 5s…`);
+        await new Promise(r => setTimeout(r, 5000));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 async function scrape(): Promise<void> {
   if (DRY_RUN) console.log('[dry-run] Mode active — pipeline will run but public/data/latest.json will NOT be written');
   const browser = await chromium.launch({ headless: true });
@@ -39,7 +56,7 @@ async function scrape(): Promise<void> {
     try {
       const page = await context.newPage();
       console.log(`Navigating to ${url}...`);
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      await gotoWithRetry(page, url);
       await page.waitForTimeout(2000);
 
       // Try to expand all accordion sections for full content
