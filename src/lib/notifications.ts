@@ -38,11 +38,14 @@ export async function subscribe(prefs: NotifPrefs): Promise<SubscribeResult> {
     const endpoint = subJson.endpoint!;
     const keys = subJson.keys as { p256dh: string; auth: string };
 
-    await fetch(`${WORKER_URL}/subscribe`, {
+    const res = await fetch(`${WORKER_URL}/subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint, keys, prefs }),
     });
+    if (!res.ok) {
+      throw new Error(`Worker /subscribe returned ${res.status}`);
+    }
 
     localStorage.setItem(ENDPOINT_KEY, endpoint);
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
@@ -57,16 +60,16 @@ export async function subscribe(prefs: NotifPrefs): Promise<SubscribeResult> {
 export async function unsubscribe(): Promise<void> {
   const endpoint = localStorage.getItem(ENDPOINT_KEY);
   if (endpoint) {
-    try {
-      await fetch(`${WORKER_URL}/unsubscribe`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint }),
-      });
-    } catch (err) {
-      console.error('Push unsubscribe failed:', err);
+    const res = await fetch(`${WORKER_URL}/unsubscribe`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    });
+    if (!res.ok) {
+      throw new Error(`Worker /unsubscribe returned ${res.status}`);
     }
     localStorage.removeItem(ENDPOINT_KEY);
+    localStorage.removeItem(PREFS_KEY);
   }
 
   try {
@@ -76,8 +79,6 @@ export async function unsubscribe(): Promise<void> {
   } catch (err) {
     console.error('SW unsubscribe failed:', err);
   }
-
-  localStorage.removeItem(PREFS_KEY);
 }
 
 /** Update notification preferences without re-subscribing.
@@ -86,13 +87,15 @@ export async function updatePrefs(prefs: NotifPrefs): Promise<void> {
   const endpoint = localStorage.getItem(ENDPOINT_KEY);
   if (!endpoint) return;
 
-  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-
-  await fetch(`${WORKER_URL}/subscription`, {
+  const res = await fetch(`${WORKER_URL}/subscription`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endpoint, prefs }),
   });
+  if (!res.ok) {
+    throw new Error(`Worker /subscription PATCH returned ${res.status}`);
+  }
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 }
 
 /** Get the current notification subscription state. */
@@ -110,8 +113,8 @@ export async function getState(): Promise<NotifState> {
     ]);
     const sub = await reg.pushManager.getSubscription();
     if (sub) return 'subscribed';
-  } catch {
-    // SW timeout or other error — fall through to 'prompt'
+  } catch (err) {
+    console.warn('[notifications] getState SW probe failed, defaulting to prompt:', err);
   }
 
   return 'prompt';
@@ -125,7 +128,9 @@ export function getStoredPrefs(): NotifPrefs | null {
     const parsed = JSON.parse(raw);
     // Spread ensures `sports` always present even if absent in stored JSON (legacy records)
     return { sports: [], ...parsed } as NotifPrefs;
-  } catch {
+  } catch (err) {
+    console.error('[notifications] Failed to parse stored prefs, resetting:', err);
+    localStorage.removeItem(PREFS_KEY);
     return null;
   }
 }

@@ -165,7 +165,11 @@ async function main() {
         body: JSON.stringify({ type: '30min', activities, apiKey: API_KEY }),
       });
       const result = await res.json().catch(() => ({}));
-      console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
+      if (res.ok) {
+        console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
+      } else {
+        console.error(`Worker responded ${res.status} (error):`, JSON.stringify(result));
+      }
     } catch (err) {
       console.error('Failed to call Worker:', err.message);
     }
@@ -205,7 +209,11 @@ async function main() {
         }),
       });
       const result = await res.json().catch(() => ({}));
-      console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
+      if (res.ok) {
+        console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
+      } else {
+        console.error(`Worker responded ${res.status} (error):`, JSON.stringify(result));
+      }
     } catch (err) {
       console.error(`Failed to call Worker for ${label}:`, err.message);
     }

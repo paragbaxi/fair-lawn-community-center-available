@@ -162,8 +162,10 @@ async function fanOut(
           } else if (res.status === 429) {
             // Rate limited — skip, don't delete
             console.warn(`Rate limited for subscription ${k.name}`);
-          } else {
+          } else if (res.status >= 200 && res.status < 300) {
             sent++;
+          } else {
+            console.error(`Push delivery failed with status ${res.status} for ${k.name}`);
           }
         } catch (err) {
           console.error(`Failed to send to ${k.name}:`, err);
@@ -238,21 +240,18 @@ async function handleUnsubscribe(request: Request, env: Env): Promise<Response> 
 }
 
 async function handleNotify(request: Request, env: Env): Promise<Response> {
-  // Auth check
-  const apiKey = request.headers.get('X-Api-Key') ?? '';
-  if (apiKey !== env.NOTIFY_API_KEY) {
-    const body = await request.json().catch(() => ({})) as { apiKey?: string };
-    if ((body as { apiKey?: string }).apiKey !== env.NOTIFY_API_KEY) {
-      return json({ error: 'Unauthorized' }, 401);
-    }
-  }
-
-  const body = await request.json() as {
+  const body = await request.json().catch(() => ({})) as {
+    apiKey?: string;
     type?: string;
     activities?: Array<{ start: string; end: string; dayName: string }>;
     sportId?: string;
     sportLabel?: string;
   };
+
+  const headerKey = request.headers.get('X-Api-Key') ?? '';
+  if (headerKey !== env.NOTIFY_API_KEY && body.apiKey !== env.NOTIFY_API_KEY) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
 
   const isoDate = new Date().toISOString().slice(0, 10);
   const activities = body.activities ?? [];

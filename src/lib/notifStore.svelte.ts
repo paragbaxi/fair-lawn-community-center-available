@@ -52,19 +52,26 @@ export async function handleEnable(): Promise<void> {
 export async function handleDisable(): Promise<void> {
   notifStore.loading = true;
   notifStore.error = null;
-  await notifications.unsubscribe();
-  notifStore.state = 'prompt';
-  notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [] };
-  notifStore.loading = false;
+  try {
+    await notifications.unsubscribe();
+    notifStore.state = 'prompt';
+    notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [] };
+  } catch {
+    notifStore.error = 'Failed to unsubscribe — please try again.';
+  } finally {
+    notifStore.loading = false;
+  }
 }
 
 /** Update a preference (thirtyMin or dailyBriefing). Optimistic update. */
 export async function savePrefs(prefs: NotifPrefs): Promise<void> {
   notifStore.error = null;
-  notifStore.prefs = prefs;
+  const previous = notifStore.prefs;
+  notifStore.prefs = prefs;  // optimistic
   try {
     await notifications.updatePrefs(prefs);
   } catch {
+    notifStore.prefs = previous;  // rollback
     notifStore.error = 'Failed to save preference. Check your connection.';
   }
 }
@@ -98,10 +105,12 @@ export async function toggleSport(sportId: string): Promise<void> {
       ? currentSports.filter(id => id !== sportId)
       : [...currentSports, sportId];
     const updated = { ...current, sports: next };
+    const previous = notifStore.prefs;
     notifStore.prefs = updated;    // optimistic
     try {
       await notifications.updatePrefs(updated);
     } catch {
+      notifStore.prefs = previous;  // rollback
       notifStore.error = 'Failed to save preference. Check your connection.';
     }
   }

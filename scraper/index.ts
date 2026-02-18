@@ -56,6 +56,7 @@ async function gotoWithRetry(page: Page, url: string, retries = 1): Promise<void
         console.warn(`[scraper] error_type=${errorType} url=${url} attempt=${attempt}/${retries + 1} (retrying in 5s…)`);
         await new Promise(r => setTimeout(r, 5000));
       } else {
+        console.warn(`[scraper] error_type=${errorType} url=${url} attempt=${attempt}/${retries + 1} (all retries exhausted)`);
         throw err;
       }
     }
