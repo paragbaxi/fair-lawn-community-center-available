@@ -145,13 +145,30 @@ Created `src/lib/clock.svelte.ts` exporting a singleton `$state` object (`clock.
 
 ---
 
-## Open
-
 ### ~~P4: Merge "Schedule" and "Today" tabs into one~~
 Merged Today + Schedule into a single "Schedule" tab (ID kept as `'today'` for URL compat). Tab bar now shows 3 tabs: Status | Schedule | Sports. The merged tab uses the Timeline + DayPicker from Today as the primary view, with a "Rest of Week" compact accordion below (skipDay filters out the selected day). AboutFaq and footer moved from ScheduleView into TodayView. `#schedule` URLs fall back gracefully to Status tab. `ScheduleView.svelte` deleted. Deployed 2026-02-17.
 
 ### ~~P5: Fix unused CSS selector in `ScheduleView.svelte`~~
 Removed dead `.footer-meta + .footer-meta` adjacent-sibling rule — only one `.footer-meta` element exists in the markup; the second paragraph it targeted was removed in an earlier refactor. Merged 2026-02-17.
+
+---
+
+## Open
+
+### P3: Scraper Rule 9 — validate that scrapedAt is within 48h *(urgent: data freshness)*
+The scraper workflow runs daily, but if it silently fails (site HTML changes, network hiccup) users see stale data with no warning beyond the `isStale` banner (which only appears after 48h). **Recommended:** add a GitHub Actions step that alerts (creates issue) if `latest.json` is not updated within 25h. Pair with a Lighthouse or uptime check. This is the most likely silent failure mode in production.
+
+### P3: Scraper resilience — handle Fair Lawn site HTML changes
+Rule 5/6/7 in `validate.ts` catch bad data after the fact, but the scraper has no retry logic and no fallback if the page structure changes. **Recommended:** add a `--dry-run` mode that parses without committing, so scraper changes can be tested in CI against live site HTML without risk of pushing bad data.
+
+### P4: "Rest of Week" section — collapse accordion by default on mobile
+Currently all 6 "Rest of Week" accordion rows start collapsed (correct), but there's no visual affordance that the section is scrollable. On small phones, the Timeline fills the viewport and the "Rest of Week" heading is below the fold. **Recommended:** add a subtle "↓ Rest of Week" scroll hint or a sticky day-picker that stays in view.
+
+### P4: DayPicker keyboard navigation
+DayPicker buttons respond to click but not arrow-key navigation (roving tabindex pattern). The tab bar has full arrow-key support; the DayPicker should match. Low urgency — primarily a desktop/keyboard accessibility improvement.
+
+### P4: WeeklySchedule `{#if expanded}` wrapper cleanup
+After the tab merge, `WeeklySchedule` is always called with `expanded={true}`. The outer `{#if expanded}` block is now dead guard logic. Could be removed to simplify the template — but only after confirming no other callers pass `expanded={false}`.
 
 ### P2: Fair Lawn Library availability tracker (+ multi-venue coexistence)
 Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:
