@@ -1,0 +1,32 @@
+name: Push Notification Trigger
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        type: boolean
+        default: false
+        description: 'Send notifications regardless of time window'
+
+jobs:
+  thirty-min:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check and send 30-min notifications
+        run: |
+          EXTRA_ARGS=""
+          if [ "$FORCE" = "true" ]; then
+            EXTRA_ARGS="--force"
+          fi
+          node scripts/check-and-notify.mjs --type=30min $EXTRA_ARGS
+        env:
+          CLOUDFLARE_WORKER_URL: ${{ secrets.CLOUDFLARE_WORKER_URL }}
+          NOTIFY_API_KEY: ${{ secrets.NOTIFY_API_KEY }}
+          FORCE: ${{ github.event.inputs.force }}

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'shell-v1';
+const SHELL_CACHE = 'shell-v2';
 const DATA_CACHE = 'data-v1';
 const ASSETS_CACHE = 'assets-v1';
 const KNOWN_CACHES = [SHELL_CACHE, DATA_CACHE, ASSETS_CACHE];
@@ -60,4 +60,38 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Everything else — no respondWith, browser handles normally
+});
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let data;
+  try { data = event.data.json(); }
+  catch { data = { title: 'FL Community Center', body: event.data.text() }; }
+  const { title, body, tag, url } = data;
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: body ?? '',
+      tag: tag ?? 'flcc',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: url ?? '/' },
+      renotify: false,
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(url) : undefined;
+    })
+  );
 });

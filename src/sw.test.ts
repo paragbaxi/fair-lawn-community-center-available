@@ -134,8 +134,8 @@ describe('navigate — network-first (online)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('caches response in shell-v1', () => {
-    expect(mockCaches._store.get('shell-v1')?.has('http://localhost/')).toBe(true);
+  it('caches response in shell-v2', () => {
+    expect(mockCaches._store.get('shell-v2')?.has('http://localhost/')).toBe(true);
   });
 });
 
@@ -145,7 +145,7 @@ describe('navigate — offline fallback', () => {
   const mockFetch = vi.fn();
 
   beforeAll(async () => {
-    const cache = await mockCaches.open('shell-v1');
+    const cache = await mockCaches.open('shell-v2');
     await cache.put('http://localhost/', new Response('<html cached>', { status: 200 }));
     mockFetch.mockRejectedValue(new Error('offline'));
     await loadSW(mockSelf, mockCaches, mockFetch);
@@ -278,6 +278,169 @@ describe('non-matching requests', () => {
   });
 });
 
+// ─── Push event helpers ────────────────────────────────────────────────────
+
+function makePushEvent(data: unknown) {
+  const jsonFn = () => data;
+  const textFn = () => JSON.stringify(data);
+  return {
+    data: { json: jsonFn, text: textFn },
+    waitUntil: vi.fn((p: Promise<unknown>) => p),
+  };
+}
+
+function makePushEventNoData() {
+  return {
+    data: null,
+    waitUntil: vi.fn(),
+  };
+}
+
+function makePushEventBadJson() {
+  return {
+    data: { json: () => { throw new SyntaxError('bad json'); }, text: () => 'raw text' },
+    waitUntil: vi.fn((p: Promise<unknown>) => p),
+  };
+}
+
+function makeNotificationClickEvent(url: string) {
+  return {
+    notification: { close: vi.fn(), data: { url } },
+    waitUntil: vi.fn((p: Promise<unknown>) => p),
+  };
+}
+
+function makeSelfWithPush(origin = 'http://localhost') {
+  const base = makeSelf(origin);
+  const showNotification = vi.fn().mockResolvedValue(undefined);
+  return {
+    ...base,
+    registration: { showNotification },
+    clients: {
+      ...base.clients,
+      matchAll: vi.fn(),
+      openWindow: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+}
+
+// ─── Push handler tests ─────────────────────────────────────────────────────
+
+describe('push event — valid JSON', () => {
+  const mockSelf = makeSelfWithPush();
+  const mockCaches = makeCacheStorage();
+  const mockFetch = vi.fn();
+
+  beforeAll(async () => {
+    await loadSW(mockSelf as unknown as ReturnType<typeof makeSelf>, mockCaches, mockFetch);
+  });
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('calls showNotification with correct title/body/tag', async () => {
+    const event = makePushEvent({ title: 'Test Title', body: 'Test Body', tag: 'flcc-30min', url: '/test' });
+    mockSelf._listeners['push']?.(event);
+    await event.waitUntil.mock.calls[0]?.[0];
+    expect(mockSelf.registration.showNotification).toHaveBeenCalledWith('Test Title', expect.objectContaining({
+      body: 'Test Body',
+      tag: 'flcc-30min',
+    }));
+  });
+});
+
+describe('push event — no data', () => {
+  const mockSelf = makeSelfWithPush();
+  const mockCaches = makeCacheStorage();
+  const mockFetch = vi.fn();
+
+  beforeAll(async () => {
+    await loadSW(mockSelf as unknown as ReturnType<typeof makeSelf>, mockCaches, mockFetch);
+  });
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('does NOT call showNotification when event.data is null', () => {
+    const event = makePushEventNoData();
+    mockSelf._listeners['push']?.(event);
+    expect(mockSelf.registration.showNotification).not.toHaveBeenCalled();
+    expect(event.waitUntil).not.toHaveBeenCalled();
+  });
+});
+
+describe('push event — malformed JSON', () => {
+  const mockSelf = makeSelfWithPush();
+  const mockCaches = makeCacheStorage();
+  const mockFetch = vi.fn();
+
+  beforeAll(async () => {
+    await loadSW(mockSelf as unknown as ReturnType<typeof makeSelf>, mockCaches, mockFetch);
+  });
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('falls back to text body when JSON parsing fails', async () => {
+    const event = makePushEventBadJson();
+    mockSelf._listeners['push']?.(event);
+    await event.waitUntil.mock.calls[0]?.[0];
+    expect(mockSelf.registration.showNotification).toHaveBeenCalledWith(
+      'FL Community Center',
+      expect.objectContaining({ body: 'raw text' }),
+    );
+  });
+});
+
+describe('notificationclick — existing window focused', () => {
+  const mockSelf = makeSelfWithPush();
+  const mockCaches = makeCacheStorage();
+  const mockFetch = vi.fn();
+
+  beforeAll(async () => {
+    await loadSW(mockSelf as unknown as ReturnType<typeof makeSelf>, mockCaches, mockFetch);
+  });
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('closes notification, navigates and focuses existing window', async () => {
+    const mockClient = {
+      url: 'http://localhost/app',
+      focus: vi.fn().mockResolvedValue(undefined),
+      navigate: vi.fn().mockResolvedValue(undefined),
+    };
+    mockSelf.clients.matchAll.mockResolvedValue([mockClient]);
+
+    const event = makeNotificationClickEvent('http://localhost/fair-lawn-community-center-available/#status');
+    mockSelf._listeners['notificationclick']?.(event);
+    await event.waitUntil.mock.calls[0]?.[0];
+
+    expect(event.notification.close).toHaveBeenCalled();
+    expect(mockClient.navigate).toHaveBeenCalledWith('http://localhost/fair-lawn-community-center-available/#status');
+    expect(mockClient.focus).toHaveBeenCalled();
+  });
+});
+
+describe('notificationclick — no existing window', () => {
+  const mockSelf = makeSelfWithPush();
+  const mockCaches = makeCacheStorage();
+  const mockFetch = vi.fn();
+
+  beforeAll(async () => {
+    await loadSW(mockSelf as unknown as ReturnType<typeof makeSelf>, mockCaches, mockFetch);
+  });
+
+  afterAll(() => vi.unstubAllGlobals());
+
+  it('opens a new window when no existing window matches', async () => {
+    mockSelf.clients.matchAll.mockResolvedValue([]);
+
+    const event = makeNotificationClickEvent('/');
+    mockSelf._listeners['notificationclick']?.(event);
+    await event.waitUntil.mock.calls[0]?.[0];
+
+    expect(event.notification.close).toHaveBeenCalled();
+    expect(mockSelf.clients.openWindow).toHaveBeenCalledWith('/');
+  });
+});
+
 describe('activate', () => {
   const mockSelf = makeSelf();
   const mockCaches = makeCacheStorage();
@@ -286,7 +449,7 @@ describe('activate', () => {
   beforeAll(async () => {
     await mockCaches.open('old-cache-1');
     await mockCaches.open('old-cache-2');
-    await mockCaches.open('shell-v1');
+    await mockCaches.open('shell-v2');
     await loadSW(mockSelf, mockCaches, mockFetch);
     await dispatchActivate(mockSelf._listeners);
   });
@@ -299,7 +462,7 @@ describe('activate', () => {
   });
 
   it('retains known caches', () => {
-    expect(mockCaches._store.has('shell-v1')).toBe(true);
+    expect(mockCaches._store.has('shell-v2')).toBe(true);
   });
 
   it('calls clients.claim()', () => {

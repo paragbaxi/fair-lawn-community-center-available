@@ -26,6 +26,11 @@ export type GymStatus = 'available' | 'in-use' | 'closed';
 
 export type TabId = 'status' | 'today' | 'sports';
 
+export interface NotifPrefs {
+  thirtyMin: boolean;
+  dailyBriefing: boolean;
+}
+
 // Keep types.ts pure (no logic imports) to avoid circular dependencies.
 export const VALID_TABS: TabId[] = ['status', 'today', 'sports'];
 

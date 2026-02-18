@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GymState, ScheduleData } from './types.js';
   import StatusCard from './StatusCard.svelte';
+  import NotificationSettings from './NotificationSettings.svelte';
   import { formatEasternDate } from './time.js';
 
   let { gymState, data }: {
@@ -10,6 +11,8 @@
 </script>
 
 <StatusCard {gymState} />
+
+<NotificationSettings />
 
 <footer class="micro-footer">
   <p>
