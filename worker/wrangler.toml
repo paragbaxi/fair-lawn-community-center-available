@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 APP_ORIGIN = "https://paragbaxi.github.io"
-VAPID_SUBJECT = "mailto:paragbaxi@github.io"
+VAPID_SUBJECT = "https://paragbaxi.github.io/fair-lawn-community-center-available"
 PAGES_DATA_URL = "https://paragbaxi.github.io/fair-lawn-community-center-available/data/latest.json"
 
 [[kv_namespaces]]
