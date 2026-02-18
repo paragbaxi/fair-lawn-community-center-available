@@ -37,6 +37,16 @@
 
   const availableSports = $derived(getAvailableSports(data.schedule));
 
+  const sportSessionCounts = $derived.by(() => {
+    const allActivities = Object.values(data.schedule).flatMap((day) => day.activities);
+    const counts = new Map<string, number>();
+    for (const sport of availableSports) {
+      const count = allActivities.filter((act) => sport.match(act.name)).length;
+      if (count > 0) counts.set(sport.id, count);
+    }
+    return counts;
+  });
+
   const weekSummary = $derived.by(() => {
     if (!selectedSport) return [];
     return getWeekSummary(data.schedule, selectedSport);
@@ -77,13 +87,14 @@
       <div class="sport-chips" role="group" aria-label="Select sport">
         {#each availableSports as sport}
           {@const emoji = activityEmoji(sport.label)}
+          {@const count = sportSessionCounts.get(sport.id)}
           <button
             class="sport-chip"
             class:sport-chip-active={selectedSport?.id === sport.id}
             aria-pressed={selectedSport?.id === sport.id}
             onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
           >
-            {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
+            {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}{#if count} <span class="chip-count" aria-hidden="true">· {count}</span><span class="sr-only">, {count} sessions this week</span>{/if}
           </button>
         {/each}
       </div>
@@ -225,12 +236,13 @@
             <div class="sport-chips" role="group" aria-label="Select sport">
               {#each availableSports as sport}
                 {@const emoji = activityEmoji(sport.label)}
+                {@const count = sportSessionCounts.get(sport.id)}
                 <button
                   class="sport-chip"
                   aria-pressed={selectedSport?.id === sport.id}
                   onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
                 >
-                  {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}
+                  {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}{#if count} <span class="chip-count" aria-hidden="true">· {count}</span><span class="sr-only">, {count} sessions this week</span>{/if}
                 </button>
               {/each}
             </div>
@@ -383,6 +395,22 @@
   .activity-emoji {
     font-size: 1.1em;
     margin-right: 2px;
+  }
+
+  .chip-count {
+    opacity: 0.7;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .sport-result-header {

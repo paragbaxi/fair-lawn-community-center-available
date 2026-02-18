@@ -26,14 +26,34 @@ const URLS = [
   'https://www.fairlawn.org/park-rec',
 ];
 
+function classifyError(err: unknown): { msg: string; errorType: string } {
+  const msg = err instanceof Error ? err.message : String(err);
+  const errorType = /ENOTFOUND|ECONNREFUSED|ERR_NAME_NOT_RESOLVED/.test(msg)
+    ? 'dns'
+    : /timeout/i.test(msg)
+      ? 'timeout'
+      : 'unknown';
+  return { msg, errorType };
+}
+
 async function gotoWithRetry(page: Page, url: string, retries = 1): Promise<void> {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      if (response !== null) {
+        const status = response.status();
+        if (status >= 500) {
+          // 5xx is transient — throw so the retry loop engages
+          throw new Error(`HTTP ${status} from ${url}`);
+        } else if (status >= 400) {
+          console.warn(`[scraper] error_type=http_4xx status=${status} url=${url} attempt=${attempt}/${retries + 1}`);
+        }
+      }
       return;
     } catch (err) {
+      const { msg, errorType } = classifyError(err);
       if (attempt <= retries) {
-        console.warn(`[retry ${attempt}/${retries}] Failed to load ${url}, retrying in 5s…`);
+        console.warn(`[scraper] error_type=${errorType} url=${url} attempt=${attempt}/${retries + 1} (retrying in 5s…)`);
         await new Promise(r => setTimeout(r, 5000));
       } else {
         throw err;
@@ -78,7 +98,8 @@ async function scrape(): Promise<void> {
 
       await page.close();
     } catch (err) {
-      console.error(`Failed to load ${url}:`, err);
+      const { msg, errorType } = classifyError(err);
+      console.error(`[scraper] error_type=${errorType} url=${url} message=${msg}`);
     }
   }
 

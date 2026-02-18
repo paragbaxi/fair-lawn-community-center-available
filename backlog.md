@@ -196,18 +196,12 @@ Six parallel agents tackled all open P2/P3/P4 items: (1) `push-notify.yml` Easte
 ### ~~P1: Set Cloudflare Worker secrets + end-to-end push verification~~
 Generated fresh VAPID key pair and hex NOTIFY_API_KEY (`openssl rand -hex 32` — no special chars). Root cause of prior failures: secrets set via `printf "..." | wrangler secret put` had `=`/`/` chars mangled by the zsh pipe; secrets set before the worker existed ("no worker found" warning) didn't persist to the live worker. Fix: all secrets set via heredoc (`<< 'EOF'`) after first successful deploy. Set all three Worker secrets (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `NOTIFY_API_KEY`) and matching GitHub secrets (`VITE_VAPID_PUBLIC_KEY`, `NOTIFY_API_KEY`, `CLOUDFLARE_WORKER_URL`). Frontend redeployed to rebake new VAPID public key into bundle. End-to-end verified via `POST /notify` → `{"sent":1,"skipped":0,"cleaned":0}`. Done 2026-02-18.
 
+### ~~P3/P4: Scraper error classification, sport chip count badge, Lighthouse threshold~~
+Three items shipped together: (1) `gotoWithRetry` now classifies errors as `dns`, `timeout`, `http_4xx`, `http_5xx`, or `unknown` using a shared `classifyError()` helper — eliminates DRY violation; 5xx throws so retry logic engages instead of silently treating server errors as success. (2) Each sport chip now shows session count for the week (`Basketball · 4`) via a `$derived.by()` map computed against `availableSports`; count span is `aria-hidden` with a paired `sr-only` sibling for screen readers; `SPORT_CATEGORIES` import removed since iteration switched to `availableSports`. (3) Lighthouse performance gate bumped from `minScore: 0.8` to `0.85`; CI consistently scores 1.0 with `throttlingMethod: 'provided'`. Deployed 2026-02-18.
+
 ---
 
 ## Open
-
-### P3: Scraper — structured error classification
-`gotoWithRetry` catches all errors identically. Distinguishing (a) DNS failure/connection refused (site down), (b) timeout (slow response), (c) HTTP 4xx/5xx would give the GitHub issue body actionable context rather than a generic `[retry 1/1]` log line.
-
-### P4: Sport chip — count badge
-Each sport chip could show slot count for the week (e.g. "Basketball · 4"). Already computable from `DISPLAY_DAYS` + `data.schedule` without new derived state.
-
-### P4: Lighthouse CI — re-enable performance gate at higher threshold
-Re-enabled at `minScore: 0.8` (conservative). Once a few CI runs confirm stable scores with `throttlingMethod: 'provided'`, bump to 0.85.
 
 ---
 
