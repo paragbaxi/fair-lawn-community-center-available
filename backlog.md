@@ -195,20 +195,11 @@ Full notifications system: Cloudflare Worker (`worker/index.ts`) with KV-backed 
 
 ## Open
 
-### 🚨 P1: Set Cloudflare Worker secrets (VAPID keys + NOTIFY_API_KEY)
-Worker is deployed and the health endpoint responds, but push notifications **cannot be sent** until the three runtime secrets are set via wrangler. Without `VAPID_PRIVATE_KEY` the worker cannot sign push JWTs; without `VAPID_PUBLIC_KEY` it cannot build payloads; without `NOTIFY_API_KEY` the `/notify` endpoint will reject all calls from GitHub Actions. Run from the `worker/` directory:
-```bash
-npx wrangler secret put VAPID_PRIVATE_KEY   # private half of VAPID key pair
-npx wrangler secret put VAPID_PUBLIC_KEY    # same value as VITE_VAPID_PUBLIC_KEY GitHub secret
-npx wrangler secret put NOTIFY_API_KEY      # same value as NOTIFY_API_KEY GitHub secret
-```
-See `SETUP.md` for the full credential map.
+### ~~P1: Set Cloudflare Worker secrets (VAPID keys + NOTIFY_API_KEY)~~
+Generated fresh VAPID key pair and NOTIFY_API_KEY. Set all three Worker secrets via `wrangler secret put`. Updated matching GitHub secrets (`VITE_VAPID_PUBLIC_KEY`, `NOTIFY_API_KEY`, `CLOUDFLARE_WORKER_URL`). Verified `/notify` endpoint authenticates and responds correctly. Frontend redeploy triggered to rebake new `VITE_VAPID_PUBLIC_KEY` into bundle. Done 2026-02-18.
 
-### 🚨 P1: Verify `CLOUDFLARE_WORKER_URL` secret matches actual worker URL
-The secret was set on 2026-02-18 at 13:20, before the worker was ever successfully deployed. The actual worker URL — discovered from the first successful deploy today — is `https://flcc-push.trueto.workers.dev`. If the stored secret is a placeholder or different URL, `push-notify.yml` will silently POST to nowhere (exits 0) and the frontend will fail to subscribe/unsubscribe. Update if needed:
-```bash
-gh secret set CLOUDFLARE_WORKER_URL --body "https://flcc-push.trueto.workers.dev"
-```
+### ~~P1: Verify `CLOUDFLARE_WORKER_URL` secret matches actual worker URL~~
+Worker URL confirmed as `https://flcc-push.trueto.workers.dev`. Secret updated. Done 2026-02-18.
 
 ### 🚨 P2: Scraper failure notification via GitHub issue
 The `scrape-and-deploy.yml` workflow creates/updates a GitHub issue on scraper failure — but `gotoWithRetry` exhaustion (both attempts timeout) still exits 1 and triggers the issue. However, **there is currently no notification if the scraper silently succeeds but parses stale/empty data** (validation passes with partial content). The `scraper-smoke.yml` smoke test catches structural breakage, but a gradual data-quality regression (e.g. Fair Lawn restructures their page so only 3 days parse instead of 7) would pass Rule 3 (≥3 days) and Rule 9 (warning, not error) and deploy silently. **Recommended:** Lower Rule 3 threshold to 5 days (error) and promote Rule 9 to error after the smoke test has run clean for a week.
