@@ -122,7 +122,9 @@ export function getStoredPrefs(): NotifPrefs | null {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as NotifPrefs;
+    const parsed = JSON.parse(raw);
+    // Spread ensures `sports` always present even if absent in stored JSON (legacy records)
+    return { sports: [], ...parsed } as NotifPrefs;
   } catch {
     return null;
   }

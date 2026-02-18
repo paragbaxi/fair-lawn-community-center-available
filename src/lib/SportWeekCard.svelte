@@ -1,10 +1,13 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { ScheduleData, SportStatus } from './types.js';
   import type { FilterCategory } from './filters.js';
   import { getAvailableSports, getWeekSummary } from './filters.js';
   import { isActivityPast, isActivityCurrent, shortDayName, computeSportStatus, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
+  import * as notifications from './notifications.js';
+  import type { NotifState } from './notifications.js';
 
   let {
     data,
@@ -19,6 +22,17 @@
   } = $props();
 
   let isOpen = $state(false);
+
+  // Notification state
+  let notifState: NotifState = $state('prompt');
+  let notifLoading = $state(true);  // disabled until onMount resolves
+  let isIos = $state(false);
+  let isStandalone = $state(false);
+  let localSports: string[] = $state([]);  // mirrors prefs.sports for reactivity
+
+  const sportSubscribed = $derived(
+    notifState === 'subscribed' && localSports.includes(selectedSport?.id ?? '')
+  );
 
   const availableSports = $derived(getAvailableSports(data.schedule));
 
@@ -50,6 +64,40 @@
     if (!selectedSport) return null;
     return computeSportStatus(data.schedule, selectedSport.match, clock.now, todayName);
   });
+
+  onMount(async () => {
+    isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    notifState = await notifications.getState();
+    localSports = notifications.getStoredPrefs()?.sports ?? [];
+    notifLoading = false;
+  });
+
+  async function toggleSportNotif() {
+    if (!selectedSport) return;
+    const sportId = selectedSport.id;
+    notifLoading = true;
+
+    if (notifState !== 'subscribed') {
+      // Fresh subscribe — only adds this sport; doesn't touch thirtyMin/dailyBriefing
+      const result = await notifications.subscribe({
+        thirtyMin: false, dailyBriefing: false, sports: [sportId]
+      });
+      if (result === true) notifState = 'subscribed';
+    } else {
+      // Always read fresh prefs from localStorage immediately before mutating
+      const current = notifications.getStoredPrefs() ?? { thirtyMin: false, dailyBriefing: false, sports: [] };
+      const currentSports = current.sports ?? [];
+      const next = sportSubscribed
+        ? currentSports.filter(id => id !== sportId)
+        : [...currentSports, sportId];
+      await notifications.updatePrefs({ ...current, sports: next });
+    }
+
+    // Sync local state after mutation
+    localSports = notifications.getStoredPrefs()?.sports ?? [];
+    notifLoading = false;
+  }
 </script>
 
 {#if availableSports.length > 0}
@@ -96,6 +144,21 @@
             </span>
           {/if}
         </div>
+      {/if}
+
+      {#if selectedSport && !notifLoading && !(isIos && !isStandalone)}
+        <button
+          class="sport-notif-btn"
+          class:subscribed={sportSubscribed}
+          onclick={toggleSportNotif}
+          disabled={notifLoading}
+        >
+          {sportSubscribed
+            ? `🔔 Notifying you before ${selectedSport.label} ✓`
+            : `🔔 Notify me 30 min before ${selectedSport.label}`}
+        </button>
+      {:else if selectedSport && isIos && !isStandalone}
+        <p class="sport-notif-hint">Add to Home Screen to enable notifications</p>
       {/if}
 
       {#if selectedSport}
@@ -507,5 +570,56 @@
 
   .status-active .sport-status-text strong {
     color: inherit;
+  }
+
+  .sport-notif-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .sport-notif-btn.subscribed {
+    background: var(--color-available-bg);
+    border-color: var(--color-available-border);
+    color: var(--color-available);
+  }
+
+  @media (hover: hover) {
+    .sport-notif-btn:not(.subscribed):hover {
+      background: var(--color-border);
+    }
+    .sport-notif-btn.subscribed:hover {
+      opacity: 0.85;
+    }
+  }
+
+  .sport-notif-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .sport-notif-hint {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: 8px 0 12px;
+    margin: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sport-notif-btn {
+      transition: none;
+    }
   }
 </style>

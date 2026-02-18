@@ -12,7 +12,7 @@
 
 <StatusCard {gymState} />
 
-<NotificationSettings />
+<NotificationSettings {gymState} />
 
 <footer class="micro-footer">
   <p>
