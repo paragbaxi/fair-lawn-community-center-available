@@ -60,6 +60,7 @@ export async function handleDisable(): Promise<void> {
 
 /** Update a preference (thirtyMin or dailyBriefing). Optimistic update. */
 export async function savePrefs(prefs: NotifPrefs): Promise<void> {
+  notifStore.error = null;
   notifStore.prefs = prefs;
   await notifications.updatePrefs(prefs);
 }

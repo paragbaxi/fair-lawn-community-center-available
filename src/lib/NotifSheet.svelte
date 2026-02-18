@@ -32,8 +32,10 @@
     if (!open) return;
     document.body.style.overflow = 'hidden';
 
-    // Move initial focus into dialog after panel renders
+    // Move initial focus into dialog after panel renders.
+    // Guard on `open` in case the sheet closes before the tick resolves.
     tick().then(() => {
+      if (!open) return;
       panelEl?.querySelector<HTMLElement>(focusableSelector)?.focus();
     });
 
