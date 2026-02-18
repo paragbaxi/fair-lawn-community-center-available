@@ -32,6 +32,19 @@ if (type !== '30min') {
   process.exit(0);
 }
 
+// ─── Sport patterns ───────────────────────────────────────────────────────────
+// SYNC: Must match FILTER_CATEGORIES in src/lib/filters.ts
+
+const SPORT_PATTERNS = [
+  { id: 'basketball',   label: 'Basketball',   match: (n) => /basketball/i.test(n) },
+  { id: 'pickleball',   label: 'Pickleball',   match: (n) => /pickleball/i.test(n) },
+  { id: 'table-tennis', label: 'Table Tennis', match: (n) => /table tennis/i.test(n) },
+  { id: 'volleyball',   label: 'Volleyball',   match: (n) => /volleyball/i.test(n) },
+  { id: 'badminton',    label: 'Badminton',    match: (n) => /badminton/i.test(n) },
+  { id: 'tennis',       label: 'Tennis',       match: (n) => /tennis/i.test(n) && !/table tennis/i.test(n) },
+  { id: 'youth',        label: 'Youth',        match: (n) => /youth center/i.test(n) },
+];
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
@@ -120,6 +133,8 @@ async function main() {
     return;
   }
 
+  // ─── Open Gym 30-min notifications ─────────────────────────────────────────
+
   const upcoming = todaySchedule.activities.filter((a) => {
     if (!a.isOpenGym) return false;
     const start = parseActivityTime(a.start, now);
@@ -127,33 +142,66 @@ async function main() {
     return force || (diffMin >= WINDOW_MIN && diffMin <= WINDOW_MAX);
   });
 
-  if (!upcoming.length) {
-    console.log('No upcoming open gym slots in window. Nothing to send.');
-    return;
+  if (upcoming.length) {
+    console.log(`Found ${upcoming.length} upcoming open gym slot(s):`, upcoming.map((a) => a.start).join(', '));
+
+    const activities = upcoming.map((a) => ({
+      start: a.start,
+      end: a.end,
+      dayName,
+    }));
+
+    try {
+      const res = await fetch(`${WORKER_URL}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+        body: JSON.stringify({ type: '30min', activities, apiKey: API_KEY }),
+      });
+      const result = await res.json().catch(() => ({}));
+      console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
+    } catch (err) {
+      console.error('Failed to call Worker:', err.message);
+    }
+  } else {
+    console.log('No upcoming open gym slots in window.');
   }
 
-  console.log(`Found ${upcoming.length} upcoming slot(s):`, upcoming.map((a) => a.start).join(', '));
+  // ─── Sport-specific 30-min notifications ────────────────────────────────────
 
-  const activities = upcoming.map((a) => ({
-    start: a.start,
-    end: a.end,
-    dayName,
-  }));
+  const sportHits = new Map();  // sportId → { label, activity } (first hit per sport)
+  for (const activity of todaySchedule.activities) {
+    if (activity.isOpenGym) continue;
+    const start = parseActivityTime(activity.start, now);
+    const diffMin = (start - now) / 60000;
+    if (!force && (diffMin < WINDOW_MIN || diffMin > WINDOW_MAX)) continue;
+    for (const pattern of SPORT_PATTERNS) {
+      if (pattern.match(activity.name) && !sportHits.has(pattern.id)) {
+        sportHits.set(pattern.id, { label: pattern.label, activity });
+      }
+    }
+  }
 
-  try {
-    const res = await fetch(`${WORKER_URL}/notify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': API_KEY,
-      },
-      body: JSON.stringify({ type: '30min', activities, apiKey: API_KEY }),
-    });
+  if (sportHits.size === 0) {
+    console.log('No upcoming sport slots in window.');
+  }
 
-    const result = await res.json().catch(() => ({}));
-    console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
-  } catch (err) {
-    console.error('Failed to call Worker:', err.message);
+  for (const [sportId, { label, activity }] of sportHits) {
+    console.log(`Sending sport notification for ${label} at ${activity.start}`);
+    try {
+      const res = await fetch(`${WORKER_URL}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+        body: JSON.stringify({
+          type: 'sport-30min', sportId, sportLabel: label,
+          activities: [{ start: activity.start, end: activity.end, dayName }],
+          apiKey: API_KEY,
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
+    } catch (err) {
+      console.error(`Failed to call Worker for ${label}:`, err.message);
+    }
   }
 }
 

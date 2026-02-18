@@ -23,6 +23,7 @@ interface StoredSubscription {
 interface NotifPrefs {
   thirtyMin: boolean;
   dailyBriefing: boolean;
+  sports?: string[];
 }
 
 interface Activity {
@@ -99,6 +100,7 @@ async function fanOut(
   notifData: NotificationData,
   type: 'thirtyMin' | 'dailyBriefing',
   idempotencyKeyStr: string,
+  sportId?: string,
 ): Promise<{ sent: number; skipped: number; cleaned: number }> {
   // Idempotency check
   const existing = await env.SUBSCRIPTIONS.get(idempotencyKeyStr);
@@ -131,7 +133,10 @@ async function fanOut(
           return;
         }
 
-        if (!sub.prefs[type]) {
+        const allowed = sportId
+          ? (sub.prefs.sports ?? []).includes(sportId)
+          : Boolean(sub.prefs[type]);
+        if (!allowed) {
           skipped++;
           return;
         }
@@ -190,6 +195,7 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
     prefs: {
       thirtyMin: body.prefs?.thirtyMin ?? true,
       dailyBriefing: body.prefs?.dailyBriefing ?? true,
+      sports: body.prefs?.sports ?? [],
     },
     subscribedAt: new Date().toISOString(),
   };
@@ -212,6 +218,7 @@ async function handleUpdatePrefs(request: Request, env: Env): Promise<Response> 
   const sub = JSON.parse(raw) as StoredSubscription;
   if (body.prefs?.thirtyMin !== undefined) sub.prefs.thirtyMin = body.prefs.thirtyMin;
   if (body.prefs?.dailyBriefing !== undefined) sub.prefs.dailyBriefing = body.prefs.dailyBriefing;
+  if (body.prefs?.sports !== undefined) sub.prefs.sports = body.prefs.sports;
 
   await env.SUBSCRIPTIONS.put(key, JSON.stringify(sub));
   return json({ ok: true });
@@ -242,19 +249,39 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
   const body = await request.json() as {
     type?: string;
     activities?: Array<{ start: string; end: string; dayName: string }>;
+    sportId?: string;
+    sportLabel?: string;
   };
+
+  const isoDate = new Date().toISOString().slice(0, 10);
+  const activities = body.activities ?? [];
+
+  if (body.type === 'sport-30min') {
+    if (!body.sportId || typeof body.sportId !== 'string') return json({ error: 'Missing sportId' }, 400);
+    if (!activities.length) return json({ ok: true, sent: 0, reason: 'no-activities' });
+    const label = body.sportLabel ?? body.sportId;
+    const act = activities[0];  // one representative activity (deduped by script)
+    const notifData: NotificationData = {
+      title: `${label} in ~30 min`,
+      body: `Starts at ${act.start} — ${act.end}`,
+      tag: `flcc-sport-${body.sportId}`,
+      url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports`,
+    };
+    const idKey = `idempotent:${isoDate}:${act.dayName}:sport-${body.sportId}`;
+    // 'thirtyMin' is unused when sportId is provided — fanOut branches on sportId presence
+    const result = await fanOut(env, notifData, 'thirtyMin', idKey, body.sportId);
+    return json({ ok: true, result });
+  }
 
   if (body.type !== '30min') {
     return json({ error: 'Invalid type' }, 400);
   }
 
-  const activities = body.activities ?? [];
   if (!activities.length) {
     return json({ ok: true, sent: 0, reason: 'no-activities' });
   }
 
   const results = [];
-  const isoDate = new Date().toISOString().slice(0, 10);
 
   for (const act of activities) {
     const notifData: NotificationData = {

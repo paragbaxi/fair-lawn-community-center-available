@@ -33,7 +33,10 @@ export function filterActivities(activities: Activity[], filterId: string): Acti
   return activities.filter((act) => cat.match(act.name));
 }
 
-/** Sport categories = FILTER_CATEGORIES minus 'all' and 'open-gym'. */
+/**
+ * Sport categories = FILTER_CATEGORIES minus 'all' and 'open-gym'.
+ * SYNC: If you add a sport here, also update SPORT_PATTERNS in scripts/check-and-notify.mjs.
+ */
 export const SPORT_CATEGORIES: FilterCategory[] =
   FILTER_CATEGORIES.filter(c => c.id !== 'all' && c.id !== 'open-gym');
 

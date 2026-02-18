@@ -5,20 +5,35 @@
   import { isActivityPast, isActivityCurrent, shortDayName, computeSportStatus, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
+  import { notifStore, toggleSport } from './notifStore.svelte.js';
 
   let {
     data,
     expanded = false,
     selectedSport = null,
     onSelectSport = () => {},
+    onManageAlerts = () => {},
   }: {
     data: ScheduleData;
     expanded?: boolean;
     selectedSport?: FilterCategory | null;
     onSelectSport?: (sport: FilterCategory | null) => void;
+    onManageAlerts?: () => void;
   } = $props();
 
   let isOpen = $state(false);
+
+  const sportSubscribed = $derived(
+    notifStore.state === 'subscribed' &&
+    (notifStore.prefs.sports ?? []).includes(selectedSport?.id ?? '')
+  );
+
+  const showNotifBtn = $derived(
+    notifStore.initialized &&
+    notifStore.state !== 'unsupported' &&
+    !(notifStore.isIos && !notifStore.isStandalone) &&
+    !!selectedSport
+  );
 
   const availableSports = $derived(getAvailableSports(data.schedule));
 
@@ -96,6 +111,24 @@
             </span>
           {/if}
         </div>
+      {/if}
+
+      {#if showNotifBtn}
+        <button
+          class="sport-notif-btn"
+          class:subscribed={sportSubscribed}
+          onclick={() => toggleSport(selectedSport!.id)}
+          disabled={notifStore.loading}
+        >
+          {sportSubscribed
+            ? `✓ Notifying me before ${selectedSport!.label}`
+            : `🔔 Notify me 30 min before ${selectedSport!.label}`}
+        </button>
+        {#if sportSubscribed}
+          <button class="sport-manage-inline" onclick={onManageAlerts}>Manage all alerts →</button>
+        {/if}
+      {:else if notifStore.initialized && notifStore.isIos && !notifStore.isStandalone && selectedSport}
+        <p class="sport-notif-hint">Add to Home Screen to enable notifications</p>
       {/if}
 
       {#if selectedSport}
@@ -507,5 +540,67 @@
 
   .status-active .sport-status-text strong {
     color: inherit;
+  }
+
+  .sport-notif-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .sport-notif-btn.subscribed {
+    background: var(--color-available-bg);
+    border-color: var(--color-available-border);
+    color: var(--color-available);
+  }
+
+  @media (hover: hover) {
+    .sport-notif-btn:not(.subscribed):hover {
+      background: var(--color-border);
+    }
+    .sport-notif-btn.subscribed:hover {
+      opacity: 0.85;
+    }
+  }
+
+  .sport-notif-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .sport-manage-inline {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0 0 12px;
+    text-decoration: underline;
+    display: block;
+  }
+
+  .sport-notif-hint {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: 8px 0 12px;
+    margin: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sport-notif-btn {
+      transition: none;
+    }
   }
 </style>

@@ -4,11 +4,35 @@
   import type { FilterCategory } from './lib/filters.js';
   import { SPORT_CATEGORIES, getAvailableSports } from './lib/filters.js';
   import { parseUrlState, buildUrlHash } from './lib/url.js';
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import TabBar from './lib/TabBar.svelte';
   import StatusView from './lib/StatusView.svelte';
   import TodayView from './lib/TodayView.svelte';
   import SportsView from './lib/SportsView.svelte';
+  import NotifSheet from './lib/NotifSheet.svelte';
+  import { initNotifStore, notifStore } from './lib/notifStore.svelte.js';
+
+  // --- Notification sheet ---
+  let sheetOpen = $state(false);
+  let bellPulsing = $state(false);
+  let bellTriggerEl: HTMLButtonElement | null = $state(null);
+
+  function openMyAlerts() {
+    sheetOpen = true;
+    sessionStorage.setItem('flcc-bell-seen', '1');
+    bellPulsing = false;
+  }
+  function closeMyAlerts() {
+    sheetOpen = false;
+    bellTriggerEl?.focus();
+  }
+
+  onMount(async () => {
+    await initNotifStore();
+    if (!sessionStorage.getItem('flcc-bell-seen')) {
+      bellPulsing = true;
+    }
+  });
 
   // --- Tab routing ---
   // Parse URL once synchronously before any $state declarations
@@ -164,7 +188,25 @@
 
 <main>
   <a href="#main-content" class="skip-link">Skip to content</a>
-  <h1 class="title">Fair Lawn Community Center</h1>
+  <header class="app-header">
+    <h1 class="title">Fair Lawn Community Center</h1>
+    {#if data && gymState && notifStore.initialized && notifStore.state !== 'unsupported'}
+      <button
+        class="bell-btn"
+        bind:this={bellTriggerEl}
+        onclick={openMyAlerts}
+        aria-label="Notification settings"
+        aria-expanded={sheetOpen}
+      >
+        🔔
+        {#if notifStore.state === 'subscribed'}
+          <span class="bell-badge" aria-hidden="true"></span>
+        {:else if bellPulsing}
+          <span class="bell-badge-new" aria-hidden="true"></span>
+        {/if}
+      </button>
+    {/if}
+  </header>
 
   {#if error}
     <div class="error-banner" role="alert">
@@ -198,7 +240,7 @@
 
     <!-- Tab panels using hidden attribute to preserve state -->
     <div role="tabpanel" id="panel-status" aria-labelledby="tab-status" tabindex="-1" hidden={activeTab !== 'status'}>
-      <StatusView {gymState} {data} />
+      <StatusView {gymState} {data} onManageAlerts={openMyAlerts} />
     </div>
 
     <div role="tabpanel" id="panel-today" aria-labelledby="tab-today" tabindex="-1" hidden={activeTab !== 'today'}>
@@ -214,10 +256,11 @@
     </div>
 
     <div role="tabpanel" id="panel-sports" aria-labelledby="tab-sports" tabindex="-1" hidden={activeTab !== 'sports'}>
-      <SportsView {data} {selectedSport} onSelectSport={(s) => { selectedSport = s; }} />
+      <SportsView {data} {selectedSport} onSelectSport={(s) => { selectedSport = s; }} onManageAlerts={openMyAlerts} />
     </div>
 
     <TabBar {activeTab} onSelectTab={setTab} />
+    <NotifSheet open={sheetOpen} {gymState} {data} onClose={closeMyAlerts} />
   {/if}
 </main>
 
@@ -252,11 +295,74 @@
     padding: 8px 0 32px;
   }
 
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
   .title {
     font-size: 1.5rem;
     font-weight: 700;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     text-align: center;
+  }
+
+  .bell-btn {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (hover: hover) {
+    .bell-btn:hover {
+      background: var(--color-border);
+    }
+  }
+
+  .bell-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    background: #48bb78;
+    border-radius: 50%;
+    border: 2px solid var(--color-bg);
+  }
+
+  .bell-badge-new {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    background: #3182ce;
+    border-radius: 50%;
+    border: 2px solid var(--color-bg);
+    animation: bell-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes bell-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.6); opacity: 0.5; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bell-badge-new {
+      animation: none;
+    }
   }
 
   .error-banner {

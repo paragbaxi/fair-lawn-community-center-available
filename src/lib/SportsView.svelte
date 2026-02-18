@@ -7,11 +7,13 @@
     data,
     selectedSport = null,
     onSelectSport = () => {},
+    onManageAlerts = () => {},
   }: {
     data: ScheduleData;
     selectedSport?: FilterCategory | null;
     onSelectSport?: (sport: FilterCategory | null) => void;
+    onManageAlerts?: () => void;
   } = $props();
 </script>
 
-<SportWeekCard {data} expanded={true} {selectedSport} {onSelectSport} />
+<SportWeekCard {data} expanded={true} {selectedSport} {onSelectSport} {onManageAlerts} />

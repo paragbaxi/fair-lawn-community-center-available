@@ -29,6 +29,7 @@ export type TabId = 'status' | 'today' | 'sports';
 export interface NotifPrefs {
   thirtyMin: boolean;
   dailyBriefing: boolean;
+  sports?: string[];   // optional; defaults to [] on read; e.g. ['basketball']
 }
 
 // Keep types.ts pure (no logic imports) to avoid circular dependencies.
