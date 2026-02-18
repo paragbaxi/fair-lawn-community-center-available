@@ -101,6 +101,12 @@ describe('parseUrlState', () => {
     const s = parseUrlState();
     expect(s.tab).toBe('status');
   });
+
+  it('#schedule → tab=status (graceful fallback after tab removal)', () => {
+    window.location.hash = '#schedule';
+    const s = parseUrlState();
+    expect(s.tab).toBe('status');
+  });
 });
 
 describe('buildUrlHash', () => {
@@ -122,10 +128,6 @@ describe('buildUrlHash', () => {
 
   it('sports with no sport → #sports', () => {
     expect(buildUrlHash('sports', null, null)).toBe('#sports');
-  });
-
-  it('schedule with day → #schedule?day=Friday', () => {
-    expect(buildUrlHash('schedule', 'Friday', null)).toBe('#schedule?day=Friday');
   });
 
   it('sports tab ignores day param', () => {

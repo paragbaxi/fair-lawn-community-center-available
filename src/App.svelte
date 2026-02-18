@@ -9,7 +9,6 @@
   import StatusView from './lib/StatusView.svelte';
   import TodayView from './lib/TodayView.svelte';
   import SportsView from './lib/SportsView.svelte';
-  import ScheduleView from './lib/ScheduleView.svelte';
 
   // --- Tab routing ---
   // Parse URL once synchronously before any $state declarations
@@ -20,9 +19,6 @@
   let selectedSport = $state<FilterCategory | null>(
     _initialUrl.sport ? (SPORT_CATEGORIES.find(c => c.id === _initialUrl.sport) ?? null) : null
   );
-  // Only seed initialDay for WeeklySchedule when the URL starts on the schedule tab
-  const scheduleInitialDay = _initialUrl.tab === 'schedule' ? _initialUrl.day : null;
-
   async function setTab(tab: TabId, focusPanel = true) {
     activeTab = tab;
     window.scrollTo(0, 0);
@@ -219,10 +215,6 @@
 
     <div role="tabpanel" id="panel-sports" aria-labelledby="tab-sports" tabindex="-1" hidden={activeTab !== 'sports'}>
       <SportsView {data} {selectedSport} onSelectSport={(s) => { selectedSport = s; }} />
-    </div>
-
-    <div role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule" tabindex="-1" hidden={activeTab !== 'schedule'}>
-      <ScheduleView {data} today={gymState.dayName} scrapedAt={data.scrapedAt} initialDay={scheduleInitialDay} />
     </div>
 
     <TabBar {activeTab} onSelectTab={setTab} />

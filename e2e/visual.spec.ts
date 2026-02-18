@@ -31,9 +31,4 @@ test.describe('dark mode visual regression', () => {
     await expect(page).toHaveScreenshot('sports-dark.png', { maxDiffPixelRatio: 0.02 });
   });
 
-  test('Schedule tab', async ({ page }) => {
-    await page.locator('#tab-schedule').click();
-    await expect(page.locator('#panel-schedule')).not.toHaveAttribute('hidden', '');
-    await expect(page).toHaveScreenshot('schedule-dark.png', { maxDiffPixelRatio: 0.02 });
-  });
 });

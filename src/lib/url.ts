@@ -38,7 +38,7 @@ export function buildUrlHash(
   sport: string | null,
 ): string {
   const params = new URLSearchParams();
-  if ((tab === 'today' || tab === 'schedule') && day) params.set('day', day);
+  if (tab === 'today' && day) params.set('day', day);
   if (tab === 'sports' && sport) params.set('sport', sport);
   const qs = params.toString();
   return qs ? `#${tab}?${qs}` : `#${tab}`;
