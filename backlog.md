@@ -163,37 +163,27 @@ Compact status banner between sport chips and the week list in the Sports tab. T
 ### ~~P3: Scraper resilience — handle Fair Lawn site HTML changes (dry-run subitem)~~
 Covered by P2 above. Merged 2026-02-17.
 
----
+### ~~P4: WeeklySchedule `{#if expanded}` wrapper cleanup~~
+After the tab merge, `WeeklySchedule` is always called with `expanded={true}`. Removed the `expanded` prop entirely and unwrapped the `{#if expanded}` block. 180 unit tests, 19 E2E tests pass. Deployed 2026-02-17.
 
-## Open
+### ~~P3: Scraper retry logic~~
+Added `gotoWithRetry(page, url, retries=1)` above `scrape()` in `scraper/index.ts`. Each URL gets 1 retry with a 5s wait. The outer per-URL try/catch preserves the "use longest result" strategy. Deployed 2026-02-17.
 
-### P4: "Rest of Week" section — collapse accordion by default on mobile
-Currently all 6 "Rest of Week" accordion rows start collapsed (correct), but there's no visual affordance that the section is scrollable. On small phones, the Timeline fills the viewport and the "Rest of Week" heading is below the fold. **Recommended:** add a subtle "↓ Rest of Week" scroll hint or a sticky day-picker that stays in view.
+### ~~P3: Run `scrape:dry` in CI (scheduled parser smoke test)~~
+Added `.github/workflows/scraper-smoke.yml` — runs `npm run scrape:dry` daily at 4 AM UTC (1h before the real scrape at 5 AM UTC) and on `workflow_dispatch`. Reuses both composite actions (`setup-node-deps`, `setup-playwright`). `timeout-minutes: 8`. Deployed 2026-02-17.
 
-### P4: DayPicker keyboard navigation
-DayPicker buttons respond to click but not arrow-key navigation (roving tabindex pattern). The tab bar has full arrow-key support; the DayPicker should match. Low urgency — primarily a desktop/keyboard accessibility improvement.
+### ~~P4: DayPicker keyboard navigation~~
+Added roving tabindex (ArrowRight/ArrowLeft) with disabled-day skip and `Math.max(0, ...)` fallback for transient -1 focusedIdx. Changed `role="group"` to `role="toolbar"`. Fixed `$state` array to plain `let` for DOM refs. 19 E2E tests pass (including keyboard nav visible in DayPicker test). Deployed 2026-02-17.
 
-### P4: WeeklySchedule `{#if expanded}` wrapper cleanup
-After the tab merge, `WeeklySchedule` is always called with `expanded={true}`. The outer `{#if expanded}` block is now dead guard logic. Could be removed to simplify the template — but only after confirming no other callers pass `expanded={false}`.
+### ~~P3: E2E test — sport status banner renders correctly~~
+Added `sport status banner renders when a sport chip is selected` test to `e2e/smoke.spec.ts`. Navigates to `#sports?sport=basketball`, asserts `.sport-status-banner` is visible and contains "Basketball", with `.sport-status-dot` visible. `test.skip` guard for no-data case. 19 E2E tests pass. Deployed 2026-02-17.
 
-### P3: E2E test — sport status banner renders correctly
-Unit tests cover `computeSportStatus` logic, but there's no browser-level test verifying the banner actually appears between the chips and the week list when a sport is active or upcoming. **Recommended:** add a test that sets a mocked clock time (via `page.clock.install()`) to a known basketball slot, navigates to `#sports?sport=basketball`, and asserts `.sport-status-banner` is visible with the expected text. Pairs well with the existing sport chip E2E tests.
-
-### P3: Sport status banner — collapsed mode (deferred)
-The banner was intentionally skipped for the collapsed `<details>` branch of `SportWeekCard` (no active consumer in the app). If the collapsed mode is ever re-enabled, the banner markup and `sportStatus` derived state are already wired up — just duplicate the `{#if sportStatus ...}` block into the collapsed branch. No code changes needed until then.
-
-### P4: WeeklySchedule `{#if expanded}` wrapper cleanup
-After the tab merge, `WeeklySchedule` is always called with `expanded={true}`. The outer `{#if expanded}` block is now dead guard logic. Could be removed to simplify the template — but only after confirming no other callers pass `expanded={false}`.
+### ~~P4: "Rest of Week" section — scroll hint on mobile~~
+Added `<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>` in `TodayView.svelte` between the Timeline and the "Rest of Week" heading. CSS-only: `display: none` by default, `display: block` at `max-width: 500px`. Uses `var(--color-text-secondary)`. Deployed 2026-02-17.
 
 ---
 
 ## Deferred / Future
-
-### P3: Run `scrape:dry` in CI (scheduled parser smoke test)
-`--dry-run` mode exists but is not wired into any CI workflow. A cron job (e.g. daily at 8 AM, 1 hour before the real scrape) running `npm run scrape:dry` would catch Fair Lawn HTML structure changes before a bad commit lands in production. Minimal effort: add a new workflow (or extend `freshness-check.yml`) that runs `scrape:dry` and fails loudly if validation errors appear. This is the most impactful remaining scraper reliability gap.
-
-### P3: Scraper retry logic
-If `page.goto()` times out (network blip), the scraper immediately exits 1 with no retry. A simple 1-retry loop with a 5-second wait would make deploys more resilient to transient Fair Lawn server hiccups. Low complexity; has caused at least one manual re-run in the past.
 
 ### P5: Fair Lawn Public Library availability app
 Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:

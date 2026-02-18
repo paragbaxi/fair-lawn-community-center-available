@@ -26,9 +26,11 @@
   <Timeline schedule={selectedSchedule} dayName={selectedDay} isToday={isSelectedToday} />
 {/if}
 
+<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>
+
 {#if Object.keys(data.schedule).some(d => d !== selectedDay)}
   <h2 class="rest-of-week-heading">Rest of Week</h2>
-  <WeeklySchedule {data} today={gymState.dayName} expanded={true} skipDay={selectedDay} />
+  <WeeklySchedule {data} today={gymState.dayName} skipDay={selectedDay} />
 {/if}
 
 <AboutFaq />
@@ -50,6 +52,21 @@
     font-size: 1rem;
     font-weight: 600;
     margin: 16px 0 8px;
+  }
+
+  .scroll-hint {
+    display: none;
+  }
+
+  @media (max-width: 500px) {
+    .scroll-hint {
+      display: block;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      margin: 4px 0 0;
+      padding: 0;
+    }
   }
 
   .footer {

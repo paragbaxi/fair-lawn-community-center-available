@@ -222,6 +222,22 @@ test('deep link #sports?sport=basketball pre-selects a sport chip', async ({ pag
   await expect(pressedChip).toBeVisible();
 });
 
+test('sport status banner renders when a sport chip is selected', async ({ page }) => {
+  await page.goto('/#sports?sport=basketball');
+  await expect(page.locator('#tab-sports')).toBeVisible({ timeout: 5000 });
+
+  const pressedChip = page.locator('#panel-sports .sport-chip[aria-pressed="true"]').first();
+  if (!(await pressedChip.isVisible({ timeout: 2000 }).catch(() => false))) {
+    test.skip(true, 'No basketball chip selected — schedule has no basketball activities');
+    return;
+  }
+
+  const banner = page.locator('#panel-sports .sport-status-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText(/Basketball/i);
+  await expect(banner.locator('.sport-status-dot')).toBeVisible();
+});
+
 test('URL updates reactively when user changes day on Today tab', async ({ page }) => {
   await page.goto('/#today');
   // Wait for data to load (tab bar appears after load)

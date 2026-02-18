@@ -1,0 +1,21 @@
+name: Scraper Smoke Test (dry-run)
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 4 AM UTC — 1h before the real scrape at 5 AM UTC
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-node-deps
+
+      - uses: ./.github/actions/setup-playwright
+
+      - name: Run scraper dry-run
+        run: npm run scrape:dry

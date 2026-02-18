@@ -8,16 +8,42 @@
     today: string;
     onSelectDay: (day: string) => void;
   } = $props();
+
+  // Plain let — refs are used imperatively only; no reactive template reads
+  let buttonEls: (HTMLButtonElement | null)[] = [];
+
+  // Math.max(0, ...) fallback prevents -1 tabindex blackout on transient out-of-range selectedDay
+  const focusedIdx = $derived(
+    Math.max(0, DISPLAY_DAYS.findIndex(d => d.full === selectedDay))
+  );
+
+  function handleKeyDown(e: KeyboardEvent, idx: number) {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    let nextIdx = idx;
+    // Skip disabled days (no schedule data); loop guard prevents infinite cycle
+    for (let step = 0; step < DISPLAY_DAYS.length; step++) {
+      nextIdx = (nextIdx + dir + DISPLAY_DAYS.length) % DISPLAY_DAYS.length;
+      if (data.schedule[DISPLAY_DAYS[nextIdx].full]) break;
+    }
+    if (nextIdx === idx) return; // all other days disabled — no-op
+    onSelectDay(DISPLAY_DAYS[nextIdx].full);
+    buttonEls[nextIdx]?.focus();
+  }
 </script>
 
-<div class="day-picker" role="group" aria-label="Select day">
-  {#each DISPLAY_DAYS as day}
+<div class="day-picker" role="toolbar" aria-label="Select day">
+  {#each DISPLAY_DAYS as day, i}
     <button
+      bind:this={buttonEls[i]}
       class="day-btn"
       class:selected={selectedDay === day.full}
       class:is-today={today === day.full}
+      tabindex={i === focusedIdx ? 0 : -1}
       aria-pressed={selectedDay === day.full}
       onclick={() => onSelectDay(day.full)}
+      onkeydown={(e) => handleKeyDown(e, i)}
       disabled={!data.schedule[day.full]}
     >
       <span class="day-label">{day.short}</span>

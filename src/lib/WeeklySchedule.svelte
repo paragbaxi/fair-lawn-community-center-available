@@ -3,10 +3,9 @@
   import { DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
 
-  let { data, today, expanded = false, skipDay = null }: {
+  let { data, today, skipDay = null }: {
     data: ScheduleData;
     today: string;
-    expanded?: boolean;
     skipDay?: string | null;
   } = $props();
 
@@ -39,58 +38,56 @@
   }
 </script>
 
-{#if expanded}
-  <!-- Accordion mode: per-day collapsible sections -->
-  <div class="schedule-accordion">
-    {#each DISPLAY_DAYS as day}
-      {#if data.schedule[day.full] && day.full !== skipDay}
-        {@const schedule = data.schedule[day.full]}
-        {@const dayExpanded = expandedDays.has(day.full)}
-        <div class="accordion-item" class:is-today={day.full === today}>
-          <button
-            class="accordion-header"
-            aria-expanded={dayExpanded}
-            onclick={() => toggleDay(day.full)}
+<!-- Accordion mode: per-day collapsible sections -->
+<div class="schedule-accordion">
+  {#each DISPLAY_DAYS as day}
+    {#if data.schedule[day.full] && day.full !== skipDay}
+      {@const schedule = data.schedule[day.full]}
+      {@const dayExpanded = expandedDays.has(day.full)}
+      <div class="accordion-item" class:is-today={day.full === today}>
+        <button
+          class="accordion-header"
+          aria-expanded={dayExpanded}
+          onclick={() => toggleDay(day.full)}
+        >
+          <div class="accordion-header-left">
+            <span class="accordion-day">
+              {day.full}
+              {#if day.full === today}
+                <span class="today-badge">Today</span>
+              {/if}
+            </span>
+            <span class="accordion-meta">{schedule.open} &mdash; {schedule.close} &middot; {schedule.activities.length} {schedule.activities.length === 1 ? 'activity' : 'activities'}</span>
+          </div>
+          <svg
+            class="chevron"
+            class:chevron-open={dayExpanded}
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden="true"
           >
-            <div class="accordion-header-left">
-              <span class="accordion-day">
-                {day.full}
-                {#if day.full === today}
-                  <span class="today-badge">Today</span>
-                {/if}
-              </span>
-              <span class="accordion-meta">{schedule.open} &mdash; {schedule.close} &middot; {schedule.activities.length} {schedule.activities.length === 1 ? 'activity' : 'activities'}</span>
-            </div>
-            <svg
-              class="chevron"
-              class:chevron-open={dayExpanded}
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          {#if dayExpanded}
-            <div class="accordion-content">
-              <ul class="day-activities">
-                {#each schedule.activities as act}
-                  {@const emoji = activityEmoji(act.name)}
-                  <li class:open-gym={act.isOpenGym}>
-                    <span class="act-time">{act.start} &ndash; {act.end}</span>
-                    <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
-                  </li>
-                {/each}
-              </ul>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    {/each}
-  </div>
-{/if}
+            <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        {#if dayExpanded}
+          <div class="accordion-content">
+            <ul class="day-activities">
+              {#each schedule.activities as act}
+                {@const emoji = activityEmoji(act.name)}
+                <li class:open-gym={act.isOpenGym}>
+                  <span class="act-time">{act.start} &ndash; {act.end}</span>
+                  <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  {/each}
+</div>
 
 <style>
   /* Accordion mode */
