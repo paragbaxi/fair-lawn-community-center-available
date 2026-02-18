@@ -4,6 +4,7 @@ import { DAYS, parseTimeMinutes, isValidTime } from './parse.js';
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
+  stats: { daysWithActivities: number; totalActivities: number };
 }
 
 export function validateSchedule(data: ScheduleData): ValidationResult {
@@ -82,5 +83,5 @@ export function validateSchedule(data: ScheduleData): ValidationResult {
     errors.push(`Only ${daysWithActivities}/7 days have activities; next week's schedule may not be published yet`);
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, stats: { daysWithActivities, totalActivities } };
 }

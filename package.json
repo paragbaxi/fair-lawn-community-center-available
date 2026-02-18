@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "scrape": "npx tsx scraper/index.ts",
+    "scrape:dry": "npx tsx scraper/index.ts --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"

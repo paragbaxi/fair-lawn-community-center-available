@@ -43,6 +43,8 @@ describe('validateSchedule', () => {
     const result = validateSchedule(makeValidData());
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
+    expect(result.stats.daysWithActivities).toBe(5);
+    expect(result.stats.totalActivities).toBe(15);
   });
 
   it('passes when 5 days have activities and 2 are empty', () => {
@@ -94,6 +96,7 @@ describe('validateSchedule', () => {
     const result = validateSchedule(data);
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('day(s) have activities'))).toBe(true);
+    expect(result.stats.daysWithActivities).toBe(2);
   });
 
   it('fails when total activities are fewer than 10', () => {

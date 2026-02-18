@@ -9,6 +9,16 @@ import type { ScheduleData } from '../src/lib/types.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, '..', 'public', 'data');
 
+const DRY_RUN = process.argv.includes('--dry-run');
+
+// Fail loudly on typos (e.g. --dryrun) rather than silently running in live mode.
+const knownFlags = ['--dry-run'];
+const unknownFlags = process.argv.slice(2).filter(a => a.startsWith('-') && !knownFlags.includes(a));
+if (unknownFlags.length > 0) {
+  console.error(`Unknown flag(s): ${unknownFlags.join(', ')}. Supported flags: --dry-run`);
+  process.exit(1);
+}
+
 const URLS = [
   'https://www.fairlawn.org/index.asp?SEC=AB4BD866-5BC6-4394-9CD8-C08771922C86&DE=39A74192-1BC3-4690-ADB6-9457340D7A21',
   'https://www.fairlawn.org/community-center',
@@ -16,6 +26,7 @@ const URLS = [
 ];
 
 async function scrape(): Promise<void> {
+  if (DRY_RUN) console.log('[dry-run] Mode active — pipeline will run but public/data/latest.json will NOT be written');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -79,6 +90,22 @@ async function scrape(): Promise<void> {
   };
 
   const validation = validateSchedule(data);
+
+  if (DRY_RUN) {
+    const { daysWithActivities, totalActivities } = validation.stats;
+    if (!validation.valid) {
+      console.error('[dry-run] Validation FAILED:');
+      for (const err of validation.errors) console.error(`  - ${err}`);
+    } else {
+      console.log('[dry-run] Validation PASSED');
+    }
+    console.log(`[dry-run] Days: ${Object.keys(data.schedule).length} parsed, ${daysWithActivities} with activities`);
+    console.log(`[dry-run] Total activities: ${totalActivities}`);
+    if (!validation.valid) process.exit(1);
+    console.log('[dry-run] Skipping write to public/data/latest.json');
+    return;
+  }
+
   if (!validation.valid) {
     console.error('Schedule validation failed:');
     for (const err of validation.errors) console.error(`  - ${err}`);
@@ -91,7 +118,6 @@ async function scrape(): Promise<void> {
 
   fs.writeFileSync(path.join(OUTPUT_DIR, 'latest.json'), JSON.stringify(data, null, 2));
   console.log('Wrote public/data/latest.json');
-  console.log(JSON.stringify(data, null, 2));
 }
 
 scrape().catch((err) => {
