@@ -46,6 +46,25 @@ export function getAvailableSports(schedule: Record<string, DaySchedule>): Filte
   return SPORT_CATEGORIES.filter(cat => allActivities.some(act => cat.match(act.name)));
 }
 
+/**
+ * Count sessions per sport across the full week.
+ * Only sports with at least one session are included in the map.
+ * Uses the same match predicates as getAvailableSports, so counts are
+ * always consistent with which chips are shown.
+ */
+export function getWeeklySessionCounts(
+  schedule: Record<string, DaySchedule>,
+  sports: FilterCategory[],
+): Map<string, number> {
+  const allActivities = Object.values(schedule).flatMap((d) => d.activities);
+  const counts = new Map<string, number>();
+  for (const sport of sports) {
+    const count = allActivities.filter((act) => sport.match(act.name)).length;
+    if (count > 0) counts.set(sport.id, count);
+  }
+  return counts;
+}
+
 /** Get weekly summary for a sport, grouped by day (Mon-Sun order). */
 export function getWeekSummary(
   schedule: Record<string, DaySchedule>,

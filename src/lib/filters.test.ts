@@ -6,6 +6,7 @@ import {
   SPORT_CATEGORIES,
   getAvailableSports,
   getWeekSummary,
+  getWeeklySessionCounts,
 } from './filters.js';
 import type { Activity, DaySchedule } from './types.js';
 
@@ -231,5 +232,58 @@ describe('getWeekSummary', () => {
   it('returns empty result for non-matching sport', () => {
     const tennis = SPORT_CATEGORIES.find(c => c.id === 'tennis')!;
     expect(getWeekSummary(schedule, tennis)).toHaveLength(0);
+  });
+});
+
+// --- getWeeklySessionCounts ---
+
+describe('getWeeklySessionCounts', () => {
+  const basketball = SPORT_CATEGORIES.find(c => c.id === 'basketball')!;
+  const volleyball = SPORT_CATEGORIES.find(c => c.id === 'volleyball')!;
+
+  const schedule: Record<string, DaySchedule> = {
+    Monday: {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [
+        { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+        { name: 'Basketball', start: '12:00 PM', end: '2:00 PM', isOpenGym: false },
+        { name: 'Basketball', start: '5:00 PM', end: '7:00 PM', isOpenGym: false },
+      ],
+    },
+    Tuesday: {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '1:00 PM', end: '3:00 PM', isOpenGym: false },
+        { name: 'Volleyball', start: '6:00 PM', end: '8:00 PM', isOpenGym: false },
+      ],
+    },
+  };
+
+  it('counts sessions per sport across all days', () => {
+    const sports = [basketball, volleyball];
+    const counts = getWeeklySessionCounts(schedule, sports);
+    expect(counts.get('basketball')).toBe(3);
+    expect(counts.get('volleyball')).toBe(1);
+  });
+
+  it('omits sports with zero sessions from the map', () => {
+    const tennis = SPORT_CATEGORIES.find(c => c.id === 'tennis')!;
+    const counts = getWeeklySessionCounts(schedule, [basketball, tennis]);
+    expect(counts.has('tennis')).toBe(false);
+    expect(counts.get('basketball')).toBe(3);
+  });
+
+  it('open gym activities are not counted for sports', () => {
+    const counts = getWeeklySessionCounts(schedule, [basketball]);
+    // Monday has 2 basketball + 1 open gym; open gym must not inflate the count
+    expect(counts.get('basketball')).toBe(3);
+  });
+
+  it('returns empty map for empty schedule', () => {
+    expect(getWeeklySessionCounts({}, [basketball])).toEqual(new Map());
+  });
+
+  it('returns empty map when sports array is empty', () => {
+    expect(getWeeklySessionCounts(schedule, [])).toEqual(new Map());
   });
 });

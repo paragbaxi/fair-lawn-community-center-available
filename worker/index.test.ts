@@ -65,6 +65,29 @@ function notifyRequest(body: unknown, apiKey = 'test-key') {
   });
 }
 
+// ─── Paginated KV Mock Factory ────────────────────────────────────────────────
+
+function createPaginatedKVMock(initial: Record<string, string>, pageSize: number) {
+  const store = new Map(Object.entries(initial));
+  return {
+    get: async (key: string) => store.get(key) ?? null,
+    put: async (key: string, value: string, _opts?: unknown) => { store.set(key, value); },
+    delete: async (key: string) => { store.delete(key); },
+    list: async ({ cursor }: { cursor?: string } = {}) => {
+      const allKeys = [...store.keys()];
+      const offset = cursor ? parseInt(cursor, 10) : 0;
+      const page = allKeys.slice(offset, offset + pageSize);
+      const nextOffset = offset + pageSize;
+      const list_complete = nextOffset >= allKeys.length;
+      return {
+        keys: page.map(name => ({ name })),
+        cursor: list_complete ? undefined : String(nextOffset),
+        list_complete,
+      };
+    },
+  };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('fanOut idempotency', () => {
@@ -430,5 +453,70 @@ describe('/stats counting', () => {
     const data = await res.json() as { ok: boolean; subscribers: number; idempotencyKeys: number };
     expect(data.subscribers).toBe(0);
     expect(data.idempotencyKeys).toBe(1);
+  });
+});
+
+describe('cursor pagination', () => {
+  it('handleStats counts all subscribers across multiple pages', async () => {
+    const kv = createPaginatedKVMock(
+      {
+        'sub-1': makeSub({ endpoint: 'https://push.example.com/1' }),
+        'sub-2': makeSub({ endpoint: 'https://push.example.com/2' }),
+        'sub-3': makeSub({ endpoint: 'https://push.example.com/3' }),
+        'sub-4': makeSub({ endpoint: 'https://push.example.com/4' }),
+        'sub-5': makeSub({ endpoint: 'https://push.example.com/5' }),
+        'idempotent:2026-02-18:Wednesday:09:00:30min': '1',
+        'idempotent:2026-02-18:Wednesday:sport-basketball': '1',
+      },
+      2,
+    );
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', {
+      method: 'GET',
+      headers: { 'X-Api-Key': 'test-key' },
+    });
+
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { ok: boolean; subscribers: number; idempotencyKeys: number };
+    expect(data.ok).toBe(true);
+    expect(data.subscribers).toBe(5);
+    expect(data.idempotencyKeys).toBe(2);
+  });
+});
+
+describe('sport filtering', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('skips subscriber with empty sports array for sport-30min', async () => {
+    const kv = createKVMock({
+      'sub-nosports': makeSub({
+        endpoint: 'https://push.example.com/nosports',
+        sports: [],
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'sport-30min',
+      sportId: 'basketball',
+      sportLabel: 'Basketball',
+      activities: [{ start: '10:00', end: '11:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number; cleaned: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(1);
   });
 });

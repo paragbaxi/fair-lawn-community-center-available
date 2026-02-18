@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ScheduleData, SportStatus } from './types.js';
   import type { FilterCategory } from './filters.js';
-  import { getAvailableSports, getWeekSummary } from './filters.js';
+  import { getAvailableSports, getWeekSummary, getWeeklySessionCounts } from './filters.js';
   import { isActivityPast, isActivityCurrent, shortDayName, computeSportStatus, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
@@ -37,15 +37,7 @@
 
   const availableSports = $derived(getAvailableSports(data.schedule));
 
-  const sportSessionCounts = $derived.by(() => {
-    const allActivities = Object.values(data.schedule).flatMap((day) => day.activities);
-    const counts = new Map<string, number>();
-    for (const sport of availableSports) {
-      const count = allActivities.filter((act) => sport.match(act.name)).length;
-      if (count > 0) counts.set(sport.id, count);
-    }
-    return counts;
-  });
+  const sportSessionCounts = $derived(getWeeklySessionCounts(data.schedule, availableSports));
 
   const weekSummary = $derived.by(() => {
     if (!selectedSport) return [];

@@ -26,7 +26,7 @@ const URLS = [
   'https://www.fairlawn.org/park-rec',
 ];
 
-function classifyError(err: unknown): { msg: string; errorType: string } {
+export function classifyError(err: unknown): { msg: string; errorType: string } {
   const msg = err instanceof Error ? err.message : String(err);
   const errorType = /ENOTFOUND|ECONNREFUSED|ERR_NAME_NOT_RESOLVED/.test(msg)
     ? 'dns'

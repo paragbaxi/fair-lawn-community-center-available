@@ -202,6 +202,9 @@ Three parallel review agents (code quality, silent failures, test coverage) iden
 ### ~~P3/P4: Scraper error classification, sport chip count badge, Lighthouse threshold~~
 Three items shipped together: (1) `gotoWithRetry` now classifies errors as `dns`, `timeout`, `http_4xx`, `http_5xx`, or `unknown` using a shared `classifyError()` helper — eliminates DRY violation; 5xx throws so retry logic engages instead of silently treating server errors as success. (2) Each sport chip now shows session count for the week (`Basketball · 4`) via a `$derived.by()` map computed against `availableSports`; count span is `aria-hidden` with a paired `sr-only` sibling for screen readers; `SPORT_CATEGORIES` import removed since iteration switched to `availableSports`. (3) Lighthouse performance gate bumped from `minScore: 0.8` to `0.85`; CI consistently scores 1.0 with `throttlingMethod: 'provided'`. Deployed 2026-02-18.
 
+### ~~P3: Test coverage gaps — classifyError, KV pagination, sportSessionCounts~~
+Three test gaps from coverage review: (1) `classifyError()` exported from `scraper/index.ts`; 9 unit tests in `scraper/classifyError.test.ts` covering dns/timeout/unknown/non-Error values. (2) `getWeeklySessionCounts` extracted from `SportWeekCard.svelte` into `filters.ts` (pure, independently testable); 5 unit tests in `filters.test.ts`; `SportWeekCard` reduced to a single `$derived` call. (3) Worker `createPaginatedKVMock` added to `worker/index.test.ts` with pageSize parameter; `handleStats` pagination regression test (5 subs + 2 idempotency keys across 3 pages); `sport-30min` skips subscriber with `sports: []` (default empty state). 199 unit tests + 13 worker tests. Deployed 2026-02-18.
+
 ---
 
 ## Open
