@@ -72,10 +72,6 @@
     border-radius: 8px;
   }
 
-  .footer-meta + .footer-meta {
-    margin-top: -6px;
-  }
-
   @media (hover: hover) {
     .footer a:hover {
       color: var(--color-text);

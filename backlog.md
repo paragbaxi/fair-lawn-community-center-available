@@ -150,5 +150,5 @@ Created `src/lib/clock.svelte.ts` exporting a singleton `$state` object (`clock.
 ### P4: Merge "Schedule" and "Today" tabs into one
 The "Schedule" tab (full weekly accordion) and "Today" tab (timeline + day picker) feel like the same view split arbitrarily. A single "Schedule" tab that opens on today's day and lets users swipe/pick across days could remove one tab from the nav bar and reduce confusion. **Consult design agent before implementation** — the interaction model (horizontal scroll vs. accordion vs. day picker) affects layout significantly.
 
-### P5: Fix unused CSS selector in `ScheduleView.svelte`
-Build produces a warning: `Unused CSS selector ".footer-meta + .footer-meta"` at `ScheduleView.svelte:75`. Either the adjacent-sibling rule is dead (the second `.footer-meta` never renders) or the markup structure changed. Investigate and remove the rule or restore the intended sibling element. Non-urgent — cosmetic only, no functional impact.
+### ~~P5: Fix unused CSS selector in `ScheduleView.svelte`~~
+Removed dead `.footer-meta + .footer-meta` adjacent-sibling rule — only one `.footer-meta` element exists in the markup; the second paragraph it targeted was removed in an earlier refactor. Merged 2026-02-17.
