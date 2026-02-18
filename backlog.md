@@ -157,15 +157,15 @@ Added `.github/workflows/freshness-check.yml` — runs daily at 9 AM UTC (4h aft
 ### ~~P2: Sport status banner ("Is it on now — and if not, when's next?")~~
 Compact status banner between sport chips and the week list in the Sports tab. Three states: **active** (green, mirrors gym StatusCard) — "Basketball is on now — ends at 2:00 PM"; **upcoming-today** (neutral) — "Next Basketball at 5:30 PM today"; **upcoming-week** (neutral) — "Next Basketball: Thu at 5:00 PM". `SportStatus` discriminated union in `types.ts` enables TypeScript narrowing. `computeSportStatus()` accepts `matchFn` callback to avoid circular import with `filters.ts`. 8 unit tests (180 total). Deployed 2026-02-18.
 
+### ~~P2: Scraper `--dry-run` mode~~
+`--dry-run` flag runs the full fetch→parse→validate pipeline without writing `public/data/latest.json`. Unknown-flag guard (`--dryrun` etc. exits 1). `ValidationResult` now exposes `stats` (daysWithActivities, totalActivities). `npm run scrape:dry` script added. Verified against live site: 7/7 days, 27 activities, file untouched. Merged 2026-02-17.
+
+### ~~P3: Scraper resilience — handle Fair Lawn site HTML changes (dry-run subitem)~~
+Covered by P2 above. Merged 2026-02-17.
+
 ---
 
 ## Open
-
-### ⚠️ P2: Scraper — no retry or dry-run mode (fragile on HTML changes)
-`scraper/validate.ts` catches bad data _after_ parsing, but the scraper has no retry logic and no way to test against live HTML without risking a bad commit. If the Fair Lawn site changes its table structure, the next scheduled scrape will silently produce empty or malformed data. **Recommended:** add a `--dry-run` flag that runs the full parse+validate pipeline but exits before `git commit`. This lets CI or a developer test the scraper against the live site HTML safely. Priority elevated from P3 because a bad scrape currently requires a manual revert + re-deploy.
-
-### P3: Scraper resilience — handle Fair Lawn site HTML changes
-Rule 5/6/7 in `validate.ts` catch bad data after the fact, but the scraper has no retry logic and no fallback if the page structure changes. **Recommended:** add a `--dry-run` mode that parses without committing, so scraper changes can be tested in CI against live site HTML without risk of pushing bad data.
 
 ### P4: "Rest of Week" section — collapse accordion by default on mobile
 Currently all 6 "Rest of Week" accordion rows start collapsed (correct), but there's no visual affordance that the section is scrollable. On small phones, the Timeline fills the viewport and the "Rest of Week" heading is below the fold. **Recommended:** add a subtle "↓ Rest of Week" scroll hint or a sticky day-picker that stays in view.
@@ -183,6 +183,19 @@ Unit tests cover `computeSportStatus` logic, but there's no browser-level test v
 The banner was intentionally skipped for the collapsed `<details>` branch of `SportWeekCard` (no active consumer in the app). If the collapsed mode is ever re-enabled, the banner markup and `sportStatus` derived state are already wired up — just duplicate the `{#if sportStatus ...}` block into the collapsed branch. No code changes needed until then.
 
 ### P4: WeeklySchedule `{#if expanded}` wrapper cleanup
+After the tab merge, `WeeklySchedule` is always called with `expanded={true}`. The outer `{#if expanded}` block is now dead guard logic. Could be removed to simplify the template — but only after confirming no other callers pass `expanded={false}`.
+
+---
+
+## Deferred / Future
+
+### P3: Run `scrape:dry` in CI (scheduled parser smoke test)
+`--dry-run` mode exists but is not wired into any CI workflow. A cron job (e.g. daily at 8 AM, 1 hour before the real scrape) running `npm run scrape:dry` would catch Fair Lawn HTML structure changes before a bad commit lands in production. Minimal effort: add a new workflow (or extend `freshness-check.yml`) that runs `scrape:dry` and fails loudly if validation errors appear. This is the most impactful remaining scraper reliability gap.
+
+### P3: Scraper retry logic
+If `page.goto()` times out (network blip), the scraper immediately exits 1 with no retry. A simple 1-retry loop with a 5-second wait would make deploys more resilient to transient Fair Lawn server hiccups. Low complexity; has caused at least one manual re-run in the past.
+
+### P5: Fair Lawn Public Library availability app
 Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:
 - **Coexistence model**: same repo (monorepo with shared `src/lib/`) vs. separate repo? Shared repo avoids duplicating the Svelte app scaffold and CI workflows, but complicates routing and deployment (two GitHub Pages sites vs. one multi-venue app).
 - **Multi-venue app option**: a single app at a shared URL that lets the user toggle between Community Center and Library — may be a better long-term UX than two separate bookmarks.
