@@ -1,4 +1,4 @@
-import type { Activity, DaySchedule, GymState, ScheduleData } from './types.js';
+import type { Activity, DaySchedule, GymState, ScheduleData, SportStatus } from './types.js';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -251,6 +251,45 @@ export function getStatusConfig(status: 'available' | 'in-use' | 'closed') {
     case 'closed':
       return { icon: '\u2715', label: 'CLOSED', cssClass: 'closed', ariaLabel: 'Community center is currently closed' };
   }
+}
+
+export function computeSportStatus(
+  schedule: Record<string, DaySchedule>,
+  matchFn: (name: string) => boolean,
+  now: Date,
+  todayName: string,
+): SportStatus {
+  // Check today first: active or upcoming-today
+  const todaySchedule = schedule[todayName];
+  if (todaySchedule) {
+    for (const act of todaySchedule.activities) {
+      if (!matchFn(act.name)) continue;
+      if (isActivityCurrent(act.start, act.end, now, true)) {
+        return { kind: 'active', activity: act, day: null, time: act.end };
+      }
+      if (!isActivityPast(act.end, now, true)) {
+        return { kind: 'upcoming-today', activity: act, day: null, time: act.start };
+      }
+    }
+  }
+
+  // Scan future days in DISPLAY_DAYS order, starting from the day after today
+  const todayIdx = DISPLAY_DAYS.findIndex(d => d.full === todayName);
+  const orderedDays = [
+    ...DISPLAY_DAYS.slice(todayIdx + 1),
+    ...DISPLAY_DAYS.slice(0, todayIdx),
+  ];
+  for (const d of orderedDays) {
+    const daySchedule = schedule[d.full];
+    if (!daySchedule) continue;
+    for (const act of daySchedule.activities) {
+      if (matchFn(act.name)) {
+        return { kind: 'upcoming-week', activity: act, day: d.full, time: act.start };
+      }
+    }
+  }
+
+  return { kind: 'none', activity: null, day: null, time: null };
 }
 
 function closedState(data: ScheduleData, now: Date, currentDay: string): GymState {

@@ -41,3 +41,9 @@ export interface GymState {
   todaySchedule: DaySchedule | null;
   dayName: string;
 }
+
+export type SportStatus =
+  | { kind: 'active';         activity: Activity; day: null;   time: string }
+  | { kind: 'upcoming-today'; activity: Activity; day: null;   time: string }
+  | { kind: 'upcoming-week';  activity: Activity; day: string; time: string }
+  | { kind: 'none';           activity: null;     day: null;   time: null   };

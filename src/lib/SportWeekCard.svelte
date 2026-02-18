@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ScheduleData } from './types.js';
+  import type { ScheduleData, SportStatus } from './types.js';
   import type { FilterCategory } from './filters.js';
   import { getAvailableSports, getWeekSummary } from './filters.js';
-  import { isActivityPast, isActivityCurrent, shortDayName, DISPLAY_DAYS } from './time.js';
+  import { isActivityPast, isActivityCurrent, shortDayName, computeSportStatus, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
 
@@ -45,6 +45,11 @@
   const todayName = $derived(
     ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][clock.now.getDay()]
   );
+
+  const sportStatus = $derived.by((): SportStatus | null => {
+    if (!selectedSport) return null;
+    return computeSportStatus(data.schedule, selectedSport.match, clock.now, todayName);
+  });
 </script>
 
 {#if availableSports.length > 0}
@@ -67,6 +72,31 @@
           </button>
         {/each}
       </div>
+
+      {#if sportStatus && sportStatus.kind !== 'none'}
+        <div
+          class="sport-status-banner"
+          class:status-active={sportStatus.kind === 'active'}
+          class:status-upcoming={sportStatus.kind !== 'active'}
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sport-status-dot" aria-hidden="true"></span>
+          {#if sportStatus.kind === 'active'}
+            <span class="sport-status-text">
+              <strong>{selectedSport?.label}</strong> is on now &mdash; ends at {sportStatus.time}
+            </span>
+          {:else if sportStatus.kind === 'upcoming-today'}
+            <span class="sport-status-text">
+              Next <strong>{selectedSport?.label}</strong> at {sportStatus.time} today
+            </span>
+          {:else}
+            <span class="sport-status-text">
+              Next <strong>{selectedSport?.label}</strong>: {shortDayName(sportStatus.day)} at {sportStatus.time}
+            </span>
+          {/if}
+        </div>
+      {/if}
 
       {#if selectedSport}
         {#if weekSummary.length === 0}
@@ -438,5 +468,44 @@
     .sport-chip {
       transition: none;
     }
+  }
+
+  .sport-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    margin-bottom: 12px;
+  }
+
+  .sport-status-banner.status-active {
+    background: var(--color-available-bg);
+    color: var(--color-available);
+    border: 1px solid var(--color-available-border);
+  }
+
+  .sport-status-banner.status-upcoming {
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+  }
+
+  .sport-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  .sport-status-text strong {
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .status-active .sport-status-text strong {
+    color: inherit;
   }
 </style>

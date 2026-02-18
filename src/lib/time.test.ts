@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseTime, formatCountdown, computeGymState, getEasternNow, DISPLAY_DAYS } from './time.js';
+import { parseTime, formatCountdown, computeGymState, computeSportStatus, getEasternNow, DISPLAY_DAYS } from './time.js';
 import type { ScheduleData, DaySchedule, Activity } from './types.js';
 
 // --- parseTime ---
@@ -312,6 +312,147 @@ describe('DISPLAY_DAYS', () => {
       expect(day.short).toHaveLength(3);
       expect(day.full.startsWith(day.short)).toBe(true);
     }
+  });
+});
+
+// --- computeSportStatus ---
+
+describe('computeSportStatus', () => {
+  // No vi.useFakeTimers() needed — function accepts `now: Date` directly.
+
+  function makeSchedule(overrides: Partial<Record<string, DaySchedule>> = {}): Record<string, DaySchedule> {
+    const defaultDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+        { name: 'Basketball', start: '12:00 PM', end: '2:00 PM', isOpenGym: false },
+        { name: 'Volleyball', start: '6:00 PM', end: '8:00 PM', isOpenGym: false },
+      ],
+    };
+    return {
+      Monday: defaultDay,
+      Tuesday: defaultDay,
+      Wednesday: defaultDay,
+      Thursday: defaultDay,
+      Friday: defaultDay,
+      Saturday: defaultDay,
+      Sunday: defaultDay,
+      ...overrides,
+    };
+  }
+
+  const basketball = (name: string) => name === 'Basketball';
+
+  it('returns active when sport is currently running', () => {
+    // Monday at 1:00 PM — during Basketball 12pm-2pm
+    const now = new Date(2026, 1, 16, 13, 0, 0);
+    const result = computeSportStatus(makeSchedule(), basketball, now, 'Monday');
+
+    expect(result.kind).toBe('active');
+    expect(result.activity?.name).toBe('Basketball');
+    expect(result.time).toBe('2:00 PM'); // ends at
+  });
+
+  it('returns upcoming-today for a session later today', () => {
+    // Monday at 10:00 AM — Basketball not until 12pm
+    const now = new Date(2026, 1, 16, 10, 0, 0);
+    const result = computeSportStatus(makeSchedule(), basketball, now, 'Monday');
+
+    expect(result.kind).toBe('upcoming-today');
+    expect(result.time).toBe('12:00 PM');
+    expect(result.day).toBeNull();
+  });
+
+  it('skips past sessions and returns the upcoming one', () => {
+    // Monday at 1:30 PM — Basketball 12-2pm is current (active); skip that, Volleyball at 6pm is next
+    // But with match = volleyball only, Basketball at 12pm is past by 2pm
+    const volleyball = (name: string) => name === 'Volleyball';
+    const now = new Date(2026, 1, 16, 14, 30, 0); // 2:30pm — Basketball ended at 2pm
+
+    const result = computeSportStatus(makeSchedule(), volleyball, now, 'Monday');
+
+    expect(result.kind).toBe('upcoming-today');
+    expect(result.time).toBe('6:00 PM');
+  });
+
+  it('returns upcoming-week when no sessions remain today but future day has one', () => {
+    // Monday at 9:00 PM — Basketball ended at 2pm, Volleyball ended at 8pm
+    const now = new Date(2026, 1, 16, 21, 0, 0);
+    const result = computeSportStatus(makeSchedule(), basketball, now, 'Monday');
+
+    expect(result.kind).toBe('upcoming-week');
+    expect(result.day).toBe('Tuesday');
+    expect(result.time).toBe('12:00 PM');
+  });
+
+  it('upcoming-week picks the earliest future day in DISPLAY_DAYS wrap order', () => {
+    // Thursday at 9pm, only Saturday has Basketball
+    const thursdayOnly: DaySchedule = {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [{ name: 'Open Gym', start: '8:00 AM', end: '10:00 PM', isOpenGym: true }],
+    };
+    const withBasketball: DaySchedule = {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [{ name: 'Basketball', start: '10:00 AM', end: '12:00 PM', isOpenGym: false }],
+    };
+    const schedule: Record<string, DaySchedule> = {
+      Monday: thursdayOnly,
+      Tuesday: thursdayOnly,
+      Wednesday: thursdayOnly,
+      Thursday: thursdayOnly,
+      Friday: thursdayOnly,
+      Saturday: withBasketball,
+      Sunday: thursdayOnly,
+    };
+
+    const now = new Date(2026, 1, 19, 21, 0, 0); // Thursday Feb 19 9pm
+    const result = computeSportStatus(schedule, basketball, now, 'Thursday');
+
+    expect(result.kind).toBe('upcoming-week');
+    expect(result.day).toBe('Saturday');
+  });
+
+  it('returns none when no sessions for sport anywhere this week', () => {
+    const noBasketball: DaySchedule = {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [{ name: 'Open Gym', start: '8:00 AM', end: '10:00 PM', isOpenGym: true }],
+    };
+    const allNoBasketball: Record<string, DaySchedule> = {};
+    for (const d of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
+      allNoBasketball[d] = noBasketball;
+    }
+
+    const now = new Date(2026, 1, 16, 10, 0, 0);
+    const result = computeSportStatus(allNoBasketball, basketball, now, 'Monday');
+
+    expect(result.kind).toBe('none');
+    expect(result.activity).toBeNull();
+    expect(result.day).toBeNull();
+    expect(result.time).toBeNull();
+  });
+
+  it('handles missing today entry gracefully — falls through to upcoming-week', () => {
+    const schedule = makeSchedule();
+    delete (schedule as Record<string, DaySchedule>)['Monday'];
+
+    const now = new Date(2026, 1, 16, 10, 0, 0); // Monday, but no Monday schedule
+    const result = computeSportStatus(schedule, basketball, now, 'Monday');
+
+    expect(result.kind).toBe('upcoming-week');
+    expect(result.day).toBe('Tuesday');
+  });
+
+  it('treats activity ending exactly at now as past (boundary: end <= now)', () => {
+    // Monday at exactly 2:00 PM — Basketball ends at 2:00 PM
+    const now = new Date(2026, 1, 16, 14, 0, 0);
+    const result = computeSportStatus(makeSchedule(), basketball, now, 'Monday');
+
+    // 2pm is the end; isActivityCurrent requires now < end, so 2pm is NOT current
+    // isActivityPast requires end <= now, so 2pm IS past — skip it
+    // No more Basketball today → upcoming-week Tuesday
+    expect(result.kind).toBe('upcoming-week');
+    expect(result.day).toBe('Tuesday');
   });
 });
 
