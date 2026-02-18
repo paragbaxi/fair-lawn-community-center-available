@@ -181,12 +181,27 @@ Added `sport status banner renders when a sport chip is selected` test to `e2e/s
 ### ~~P4: "Rest of Week" section — scroll hint on mobile~~
 Added `<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>` in `TodayView.svelte` between the Timeline and the "Rest of Week" heading. CSS-only: `display: none` by default, `display: block` at `max-width: 500px`. Uses `var(--color-text-secondary)`. Deployed 2026-02-17.
 
+### ~~P1: Per-sport notification alerts + notification UX overhaul~~
+Full notifications system: Cloudflare Worker (`worker/index.ts`) with KV-backed subscriptions, VAPID push, sport-level prefs, daily briefing cron, and `POST /notify` endpoint for both `30min` and `sport-30min` types. Frontend: `notifStore.svelte.ts` module-level $state singleton eliminating triple `onMount` duplication and `localSports` desync; `NotifSheet.svelte` bottom sheet with focus trap, `fly`/`fade` Svelte transitions, iOS-style toggles, error banner, body-scroll lock; bell button in `App.svelte` header with session-scoped pulse dot; `NotificationSettings.svelte` refactored to thin CTA strip; `SportWeekCard.svelte` migrated to notifStore; `check-and-notify.mjs` sends open gym + per-sport 30-min notifications; `push-notify.yml` cron workflow triggers every 30 min; `deploy-worker.yml` auto-deploys worker on `worker/**` push to main. Merged 2026-02-18.
+
 ---
 
 ## Open
 
+### 🚨 P1: Verify GitHub Actions secrets for notifications
+Three secrets must be manually set in repo Settings → Secrets before notifications work end-to-end: `CLOUDFLARE_API_TOKEN` (worker deploy), `CLOUDFLARE_WORKER_URL` (push notify script), `NOTIFY_API_KEY` (shared auth between script and worker). The worker `deploy-worker.yml` triggered on the PR #14 merge — if `CLOUDFLARE_API_TOKEN` was missing, the deploy silently failed and no push notifications are sent to anyone. **Check the `deploy-worker.yml` workflow run and confirm it succeeded before assuming notifications are live.**
+
+### 🚨 P1: Fix `VAPID_SUBJECT` — not a real email address
+`wrangler.toml` has `VAPID_SUBJECT = "mailto:paragbaxi@github.io"`. This is a GitHub Pages hostname, not a deliverable address. The VAPID spec requires a `mailto:` URI with a real contact email or an HTTPS URL. Some push services (notably FCM/Chrome) validate this and may reject subscriptions or silently fail pushes. Change to a real `mailto:your@email.com` or `https://paragbaxi.github.io/fair-lawn-community-center-available`. This requires a new VAPID key rotation: existing subscribers will not receive notifications after the change and must re-subscribe. **Do this before accumulating real subscribers.**
+
 ### 🚨 P2: Scraper failure notification via GitHub issue
 The `scrape-and-deploy.yml` workflow creates/updates a GitHub issue on scraper failure — but `gotoWithRetry` exhaustion (both attempts timeout) still exits 1 and triggers the issue. However, **there is currently no notification if the scraper silently succeeds but parses stale/empty data** (validation passes with partial content). The `scraper-smoke.yml` smoke test catches structural breakage, but a gradual data-quality regression (e.g. Fair Lawn restructures their page so only 3 days parse instead of 7) would pass Rule 3 (≥3 days) and Rule 9 (warning, not error) and deploy silently. **Recommended:** Lower Rule 3 threshold to 5 days (error) and promote Rule 9 to error after the smoke test has run clean for a week.
+
+### P2: `savePrefs` swallows `updatePrefs` network errors
+In `NotifSheet.svelte`, `onclick={() => savePrefs(...)}` fires the async function without `await` or `.catch()`. If `notifications.updatePrefs()` throws (worker down, network failure), the rejection is unhandled, the optimistic UI update persists, and the user's prefs are silently lost on server. Fix: wrap `updatePrefs` in `savePrefs` with try/catch and set `notifStore.error` on failure (same pattern as `toggleSport`).
+
+### P2: E2E tests for NotifSheet
+The main deliverable from the notification overhaul has zero Playwright coverage. Minimum test cases: (1) bell visible after data loads; (2) bell tap opens sheet; (3) Escape closes sheet; (4) "Turn on notifications" shows browser permission prompt; (5) subscribed state shows toggles. Use `page.addInitScript` to mock `Notification.permission` and service worker APIs.
 
 ### P2: DayPicker keyboard nav — E2E test coverage
 The keyboard navigation added in this sweep is tested only by TypeScript compilation. There's no E2E test that programmatically presses ArrowRight/ArrowLeft and asserts focus moves. **Recommended:** add a `DayPicker keyboard navigation` test using `page.keyboard.press('ArrowRight')` after focusing a day button, asserting the next enabled day gets `aria-pressed="true"`.
@@ -197,11 +212,23 @@ The keyboard navigation added in this sweep is tested only by TypeScript compila
 ### P3: Scraper — structured error classification
 `gotoWithRetry` catches all errors the same way. It would be useful to distinguish: (a) DNS failure / connection refused (Fair Lawn site down), (b) timeout (slow response), (c) HTTP 4xx/5xx. Each has a different remediation. Currently all produce the same `[retry 1/1]` log line. Log the error type so the GitHub issue body has actionable context.
 
+### P3: `push-notify.yml` cron runs 24/7 — add gym-hours time window
+The cron `*/30 * * * *` fires 48×/day regardless of whether the gym is open. The script already handles finding zero activities gracefully (exits 0 with a log line), but 30+ of those runs are guaranteed no-ops (midnight–9 AM, after 10 PM). Narrow the cron to gym hours, e.g. `*/30 9-21 * * *` (9 AM–9:30 PM UTC = 4 AM–4:30 PM ET), or add an Eastern-time gate at the top of the script. Reduces Actions minutes by ~60%.
+
+### P3: `SPORT_PATTERNS` in `check-and-notify.mjs` can drift from `filters.ts`
+The `SYNC:` comment is the only guard preventing the two lists from diverging when a sport is added to `FILTER_CATEGORIES`. Adding a sport to `filters.ts` but forgetting `check-and-notify.mjs` silently skips sport-specific notifications. Fix: either import `FILTER_CATEGORIES` directly (requires ESM-compatible build step) or add a small CI test that reads both files and asserts their sport IDs match.
+
 ### P4: Timeline — "no activities today" empty state
 When `selectedSchedule` is `null` (day has no schedule entry), `TodayView` renders nothing between the DayPicker and "Rest of Week". A brief empty state ("No schedule data for [day]") would make the blank space intentional rather than looking like a load failure.
 
 ### P4: Sport chip — show count badge
 Each sport chip could show how many slots this week it has (e.g. "Basketball · 4"). This is already computable from `DISPLAY_DAYS` + `data.schedule` without new derived state — just count activities matching the sport filter across days.
+
+### P4: Worker unit tests
+`worker/index.ts` has zero test coverage. The fan-out logic, idempotency check, sport-filter branch, and error cleanup (410 handling) are all untested. Add `worker/index.test.ts` using `vitest` + Cloudflare's `@cloudflare/vitest-pool-workers` (or mock the KV namespace with a simple Map). Minimum coverage: `fanOut` idempotency, sport filtering, subscription cleanup on 410, `handleNotify` routing.
+
+### P4: `push-notify.yml` missing node_modules caching
+All other workflows use the `setup-node-deps` composite action for caching `node_modules`. `push-notify.yml` uses bare `actions/setup-node@v4` with no cache. Since it runs 48×/day, it re-downloads dependencies each time. Replace the two-step node setup + `npm ci` with `uses: ./.github/actions/setup-node-deps`.
 
 ### P4: Lighthouse CI — re-enable performance gate
 The performance assertion was removed because shared GitHub runners produce unreliable scores (~0.44) with CPU throttling. Now that `throttlingMethod: 'provided'` is set, scores should be stable. Re-run Lighthouse a few times locally to confirm the score, then re-add `"minScore": 0.85` (or whatever the baseline is).
