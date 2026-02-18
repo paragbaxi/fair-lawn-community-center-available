@@ -186,7 +186,8 @@ async function main() {
   if (upcoming.length) {
     console.log(`Found ${upcoming.length} upcoming open gym slot(s):`, upcoming.map((a) => a.start).join(', '));
 
-    const activities = upcoming.map((a) => ({
+    // Send only the earliest upcoming open gym slot to avoid duplicate notifications
+    const activities = [upcoming[0]].map((a) => ({
       start: a.start,
       end: a.end,
       dayName,
@@ -198,10 +199,14 @@ async function main() {
         headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
         body: JSON.stringify({ type: '30min', activities, apiKey: API_KEY }),
       });
-      const result = await res.json().catch(() => ({}));
       if (res.ok) {
+        const result = await res.json().catch(() => ({}));
+        if (result?.results?.some?.((r) => r.failed > 0)) {
+          console.error(`[notify] ${result.results.reduce((s, r) => s + (r.failed ?? 0), 0)} push delivery failure(s) — check VAPID keys`);
+        }
         console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
       } else {
+        const result = await res.json().catch(() => ({}));
         console.error(`Worker responded ${res.status} (error):`, JSON.stringify(result));
       }
     } catch (err) {
@@ -242,10 +247,14 @@ async function main() {
           apiKey: API_KEY,
         }),
       });
-      const result = await res.json().catch(() => ({}));
       if (res.ok) {
+        const result = await res.json().catch(() => ({}));
+        if (result?.result?.failed > 0) {
+          console.error(`[notify] ${result.result.failed} push delivery failure(s) — check VAPID keys`);
+        }
         console.log(`Worker responded ${res.status}:`, JSON.stringify(result));
       } else {
+        const result = await res.json().catch(() => ({}));
         console.error(`Worker responded ${res.status} (error):`, JSON.stringify(result));
       }
     } catch (err) {
