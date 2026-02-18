@@ -2,8 +2,9 @@
   import type { ScheduleData } from './types.js';
   import type { FilterCategory } from './filters.js';
   import { getAvailableSports, getWeekSummary } from './filters.js';
-  import { getEasternNow, isActivityPast, isActivityCurrent, shortDayName, DISPLAY_DAYS } from './time.js';
+  import { isActivityPast, isActivityCurrent, shortDayName, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
+  import { clock } from './clock.svelte.js';
 
   let {
     data,
@@ -26,14 +27,11 @@
     return getWeekSummary(data.schedule, selectedSport);
   });
 
-  // Time tracking for "NOW" badge
-  let now = $state(getEasternNow());
-
-  // Date range for subheading (uses reactive `now`)
+  // Date range for subheading (uses reactive `clock.now`)
   const dateRange = $derived.by(() => {
-    const dayOfWeek = now.getDay(); // 0=Sun
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+    const dayOfWeek = clock.now.getDay(); // 0=Sun
+    const monday = new Date(clock.now);
+    monday.setDate(clock.now.getDate() - ((dayOfWeek + 6) % 7));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -41,15 +39,11 @@
   });
 
   $effect(() => {
-    if (!expanded && !isOpen) { if (selectedSport) onSelectSport(null); return; }
-    // Always update now when visible — todayName depends on it for "Today" highlight
-    now = getEasternNow();
-    const interval = setInterval(() => { now = getEasternNow(); }, 60_000);
-    return () => clearInterval(interval);
+    if (!expanded && !isOpen) { if (selectedSport) onSelectSport(null); }
   });
 
   const todayName = $derived(
-    ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()]
+    ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][clock.now.getDay()]
   );
 </script>
 
@@ -84,14 +78,14 @@
                 <div
                   class="result-row"
                   class:is-today={entry.day === todayName}
-                  class:is-past={isActivityPast(act.end, now, entry.day === todayName)}
-                  class:is-current={isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                  class:is-past={isActivityPast(act.end, clock.now, entry.day === todayName)}
+                  class:is-current={isActivityCurrent(act.start, act.end, clock.now, entry.day === todayName)}
                 >
                   <span class="result-day">{#if i === 0}{shortDayName(entry.day)}{/if}</span>
                   <span class="result-time">{act.start} &ndash; {act.end}</span>
                   <span class="result-name">
                     {act.name}
-                    {#if isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                    {#if isActivityCurrent(act.start, act.end, clock.now, entry.day === todayName)}
                       <span class="now-badge">NOW</span>
                     {/if}
                   </span>
@@ -146,14 +140,14 @@
                     <div
                       class="result-row"
                       class:is-today={entry.day === todayName}
-                      class:is-past={isActivityPast(act.end, now, entry.day === todayName)}
-                      class:is-current={isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                      class:is-past={isActivityPast(act.end, clock.now, entry.day === todayName)}
+                      class:is-current={isActivityCurrent(act.start, act.end, clock.now, entry.day === todayName)}
                     >
                       <span class="result-day">{#if i === 0}{shortDayName(entry.day)}{/if}</span>
                       <span class="result-time">{act.start} &ndash; {act.end}</span>
                       <span class="result-name">
                         {act.name}
-                        {#if isActivityCurrent(act.start, act.end, now, entry.day === todayName)}
+                        {#if isActivityCurrent(act.start, act.end, clock.now, entry.day === todayName)}
                           <span class="now-badge">NOW</span>
                         {/if}
                       </span>

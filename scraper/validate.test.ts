@@ -156,6 +156,22 @@ describe('validateSchedule', () => {
     expect(result.errors.some(e => e.includes('Backwards') && e.includes('not before end'))).toBe(true);
   });
 
+  it('fails Rule 9 when only 3 days have activities', () => {
+    const data = makeValidData();
+    data.schedule['Thursday'].activities = [];
+    data.schedule['Friday'].activities = [];
+    const result = validateSchedule(data);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("next week's schedule may not be published yet"))).toBe(true);
+  });
+
+  it('passes Rule 9 when exactly 5 days have activities', () => {
+    const data = makeValidData(); // 5 weekdays with activities, Sat/Sun empty
+    const result = validateSchedule(data);
+    expect(result.valid).toBe(true);
+    expect(result.errors.some(e => e.includes("next week's schedule"))).toBe(false);
+  });
+
   it('collects multiple errors from different rules', () => {
     const data = makeValidData();
     data.scrapedAt = '';

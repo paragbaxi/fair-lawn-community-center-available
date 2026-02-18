@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { DaySchedule } from './types.js';
-  import { getEasternNow, isActivityPast, isActivityCurrent } from './time.js';
+  import { isActivityPast, isActivityCurrent } from './time.js';
   import { activityEmoji } from './emoji.js';
+  import { clock } from './clock.svelte.js';
 
   let { schedule, dayName, isToday = true }: {
     schedule: DaySchedule;
@@ -9,21 +10,11 @@
     isToday?: boolean;
   } = $props();
 
-  let now = $state(getEasternNow());
-
-  $effect(() => {
-    if (!isToday) return;
-    const interval = setInterval(() => {
-      now = getEasternNow();
-    }, 60000);
-    return () => clearInterval(interval);
-  });
-
   const activities = $derived(
     schedule.activities.map((act) => ({
       ...act,
-      isPast: isActivityPast(act.end, now, isToday),
-      isCurrent: isActivityCurrent(act.start, act.end, now, isToday),
+      isPast: isActivityPast(act.end, clock.now, isToday),
+      isCurrent: isActivityCurrent(act.start, act.end, clock.now, isToday),
     }))
   );
 

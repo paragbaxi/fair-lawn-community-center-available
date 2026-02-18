@@ -1,0 +1,23 @@
+name: Setup Node.js and node_modules cache
+description: Install Node 22, restore cached node_modules, and run npm ci on cache miss
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+
+    - name: Cache node_modules
+      id: node-modules-cache
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Install dependencies
+      if: steps.node-modules-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci

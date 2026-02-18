@@ -59,19 +59,17 @@ When all today's open gym slots are past, StatusCard now shows "Next Open Gym: [
 ### ~~P1: Tab-based navigation with 4 dedicated persona views~~
 Restructured the entire app from a single scrolling page into 4 tab-based views: Status ("Is it open?"), Today ("What's the schedule?"), Sports ("When can I play X?"), Schedule ("Show me everything"). Bottom tab bar with roving tabindex, hash routing, CompactStatus strip, accordion schedule, persistent sport chips. Deleted FilterChips, UpNext, motivational.ts. 7 code review iterations fixed: ARIA tablist nesting, tick() focus timing, untrack() countdown sync, countdown label accuracy for between-activity states, Eastern timezone notice filtering, reactive dateRange, WeeklySchedule grammar. 132 unit tests, 9 E2E tests. Deployed 2026-02-17.
 
-## Open
-
-### ~~⚠️ P2: `closedState` Path #6 — open gym anchor mismatch~~
+### ~~P2: `closedState` Path #6 — open gym anchor mismatch~~
 `findNextOpenGymAcrossDays` used `i=1..7`, which at `i=7` wraps back to `currentDay`. In Path #6 this could surface today's already-past open gym as `nextOpenGymDay` while `nextOpenDay` was a future day — e.g. "Opens Saturday" + "First Open Gym: Friday" (Friday visually before Saturday in the week). Fixed by checking `nextDay` itself for open gym first, then anchoring `findNextOpenGymAcrossDays` from `nextDay` instead of `currentDay`. 2 targeted unit tests added (156 unit + 17 E2E passing). Deployed 2026-02-17.
 
 ### ~~P3: Apply `test.skip()` consistently in E2E tests~~
-All three sport-chip guards (`Sports tab shows chips`, `chip deselect clears sport URL param`, `back navigation`) now use `test.skip()` with an explanatory message instead of bare `return`. Deployed 2026-02-17.
+All three sport-chip guards now use `test.skip()` with an explanatory message instead of bare `return`. Deployed 2026-02-17.
 
 ### ~~P4: StatusCard — redundant "First Open Gym" line when same day as reopening~~
 When `nextOpenGymDay === nextOpenDay`, combined into one line: "Tuesday at 9:00 AM · Open Gym at 2:00 PM". When they differ, the two-line layout is unchanged. Deployed 2026-02-17.
 
-### P4: Service worker test coverage
-The service worker has meaningful logic (network-first vs cache-first strategy, offline detection, auto-reload on update) but no tests. Add vitest tests to verify the caching strategy selection logic.
+### ~~P4: Service worker test coverage~~
+14 tests covering network-first vs cache-first strategy selection, offline detection, and SW update reload logic. Merged 2026-02-17.
 
 ### ~~P3: E2E — timeline content verification on day switch~~
 After clicking a different day, assert `.timeline-day` header text changes (with null guard) and at least one `.list-item` is visible when activities exist. Deployed 2026-02-17.
@@ -89,13 +87,10 @@ Added `let staleClock = $state(Date.now())` with hourly `setInterval` in `$effec
 `#today?day=Wednesday`, `#sports?sport=basketball`, `#schedule?day=Friday` pre-select state on direct navigation. URL updates reactively via a single `$effect` in `App.svelte`. `src/lib/url.ts` owns all encode/decode logic. `selectedSport` lifted from `SportWeekCard` to `App.svelte` (controlled component). 22 unit tests + 7 E2E deep-link tests. Deployed 2026-02-17.
 
 ### ~~P3: E2E — back/forward navigation restores URL state~~
-Added `back navigation restores previous tab and filter state` test in `e2e/smoke.spec.ts`. Uses two `page.goto()` calls to manufacture genuine history entries (required because all in-app nav uses `replaceState`). `test.skip()` guards the data-dependent chip path. Code review confirmed: `replaceState` for all tab/filter navigation is correct UX — tab switches are view modes, not destinations. 17 E2E tests passing. Deployed 2026-02-17.
+Added `back navigation restores previous tab and filter state` test in `e2e/smoke.spec.ts`. Uses two `page.goto()` calls to manufacture genuine history entries (required because all in-app nav uses `replaceState`). `test.skip()` guards the data-dependent chip path. Code review confirmed: `replaceState` for all tab/filter navigation is correct UX. 17 E2E tests passing. Deployed 2026-02-17.
 
 ### ~~P4: DRY — extract `formatEasternDate()` helper~~
 Extracted to `src/lib/time.ts`. Updated 3 call sites: `StatusView.svelte`, `ScheduleView.svelte`, `App.svelte`. Deployed 2026-02-17.
-
-### P4: DRY — extract shared reactive Eastern clock
-The `$state(getEasternNow())` + 60-second `setInterval(() => now = getEasternNow())` + `$effect` cleanup pattern is independently duplicated in `Timeline.svelte:12-20` and `SportWeekCard.svelte:28-47`. Extract to a shared utility (e.g. `useEasternClock(intervalMs)` returning a getter, or a Svelte 5 rune-compatible store in `src/lib/clock.svelte.ts`).
 
 ### ~~P4: `onSelectSport(null)` unnecessary call on mount in collapsed mode~~
 Added `if (selectedSport)` guard. Deployed 2026-02-17.
@@ -103,29 +98,57 @@ Added `if (selectedSport)` guard. Deployed 2026-02-17.
 ### ~~P4: `untrack()` on `initialDay` in `WeeklySchedule`~~
 Read via `untrack(() => initialDay)` — makes one-shot seed intent explicit. Deployed 2026-02-17.
 
-### P5: Clean up string concat workaround in `url.test.ts`
-`const pb = 'pick' + 'leball'` was written to bypass a pre-commit hook that false-positives on the sport name. Update the hook allowlist for test files, then replace with the plain string.
-
 ### ~~P4: Sport chip horizontal scroll on narrow screens~~
 Added `@media (max-width: 374px)` with `flex-wrap: nowrap; overflow-x: auto` and hidden scrollbar. Deployed 2026-02-17.
 
 ### ~~P4: `findNextOpenGymAcrossDays` off-by-one audit~~
-Resolved by the P2 closedState fix: Path #6 no longer relies on `i=7` wrap-around behavior, making the i=7 iteration harmless (other call sites have no schedule-present days at i=7 in practice). Closed 2026-02-17.
+Resolved by the P2 closedState fix. Closed 2026-02-17.
 
 ### ~~P4: `closedState` Path #6 — open gym anchor mismatch~~
 Superseded by the P2 closedState fix above. Closed 2026-02-17.
 
-### P4: Midnight auto-advance E2E test
-Auto-advance logic (if viewing "today" and midnight passes, selectedDay advances) is only testable via Playwright clock manipulation (`page.clock`). Low priority since the logic is simple.
+### ~~P5: Midnight auto-advance E2E test~~
+`page.clock.install()` + `page.clock.fastForward()` to simulate crossing midnight while viewing Today tab. Asserts selected day advances and URL param updates. Merged 2026-02-17.
 
-### P5: npm CI cache for node_modules
-`actions/setup-node` caches `~/.npm` (download cache), but `npm ci` still reinstalls every run. Cache `node_modules` with `actions/cache@v4` keyed on `hashFiles('package-lock.json')` and skip `npm ci` on hit. Modest savings (~5-10s) but follows the same pattern as the Playwright cache.
+### ~~P5: npm CI cache for node_modules~~
+`actions/cache@v4` keyed on `hashFiles('package-lock.json')`, skipping `npm ci` on hit. Applied to all 3 CI jobs (test, e2e, lighthouse). Merged 2026-02-17.
 
-### P5: Composite action for Playwright setup
-Both `ci.yml` and `scrape-and-deploy.yml` have identical 4-step Playwright cache blocks with sync comments. If a third workflow needs Playwright (e.g., Lighthouse CI), extract to `.github/actions/setup-playwright/action.yml`. Not worth it with 2 consumers — revisit if a third is added.
+### ~~P5: Composite action for Playwright setup~~
+Extracted 4-step Playwright cache block to `.github/actions/setup-playwright/action.yml`. Both `ci.yml` and `scrape-and-deploy.yml` now use it. Merged 2026-02-17.
 
-### P5: Lighthouse CI budget
-With CI in place, add a Lighthouse budget check to catch performance regressions (bundle size growth, accessibility score drops) automatically on PRs.
+### ~~P5: Lighthouse CI budget~~
+Added `lhci` job to CI with assertions: performance ≥ 0.8, accessibility ≥ 0.9, best-practices ≥ 0.9, JS bundle ≤ 150 KB, CSS ≤ 50 KB. Uses `throttlingMethod: 'provided'` to avoid 4x CPU simulation on shared runners. Merged 2026-02-17.
 
-### P5: Dark mode E2E visual regression tests
-All 4 tabs were visually verified in dark mode during development but have no automated checks. Add Playwright screenshot comparison tests with `prefers-color-scheme: dark` emulation.
+### ~~P5: Dark mode E2E visual regression tests~~
+`prefers-color-scheme: dark` Playwright project; screenshot baselines for all 4 tabs. Skipped on Linux CI (font rendering differs). Merged 2026-02-17.
+
+### ~~P5: Clean up string concat workaround in `url.test.ts`~~
+`const pb = 'pick' + 'leball'` replaced with plain string after hook allowlist updated. Merged 2026-02-17.
+
+### ~~P3: Lighthouse CI performance score reliability~~
+Removed the `performance` assertion from `.lighthouserc.cjs`. Four stable gates remain: accessibility ≥ 0.9, best-practices ≥ 0.9, JS ≤ 150 KB, CSS ≤ 50 KB. Performance scores are still visible in uploaded Lighthouse report artifacts. Deployed 2026-02-17.
+
+### ~~P5: App icon — sport-neutral favicon~~
+Replaced 🏀 with 🏟️ (stadium emoji) in the inline SVG data-URI on `<link rel="icon">`. Deployed 2026-02-17.
+
+### ~~P4: OpenGraph / social sharing meta tags~~
+Added 11 OG/Twitter meta tags to `index.html` (og:title, og:description, og:type, og:url, og:image, og:site_name, twitter:card, twitter:title, twitter:description, twitter:image). Uses absolute URLs for og:image (OG scrapers are server-side). Deployed 2026-02-17.
+
+### ~~P5: Scraper — forward schedule completeness check~~
+Added Rule 9 to `scraper/validate.ts`: fires when fewer than 5 of 7 days have activities ("next week's schedule may not be published yet"). Rule 3 (catastrophic: < 3 days) still fires independently. 2 new unit tests (172 total). Deployed 2026-02-17.
+
+### ~~P5: CI — extract node_modules cache into composite action~~
+Created `.github/actions/setup-node-deps/action.yml`. Updated 4 call sites: `ci.yml` (test, e2e, lighthouse jobs) and `scrape-and-deploy.yml` (scrape-build-deploy job). Each replaced a 6-line block with a single `uses:` line. Deployed 2026-02-17.
+
+### ~~P4: DRY — extract shared reactive Eastern clock~~
+Created `src/lib/clock.svelte.ts` exporting a singleton `$state` object (`clock.now`). Removed independent 60-second clocks from `Timeline.svelte` (−9 lines) and `SportWeekCard.svelte` (−7 lines). Note: Svelte 5 forbids exporting reassignable `$state` bindings (`state_invalid_export`) — the fix is to export an object and mutate its property. `App.svelte` `staleClock` left unchanged (different purpose: data-freshness detection). Deployed 2026-02-17.
+
+---
+
+## Open
+
+### P4: Merge "Schedule" and "Today" tabs into one
+The "Schedule" tab (full weekly accordion) and "Today" tab (timeline + day picker) feel like the same view split arbitrarily. A single "Schedule" tab that opens on today's day and lets users swipe/pick across days could remove one tab from the nav bar and reduce confusion. **Consult design agent before implementation** — the interaction model (horizontal scroll vs. accordion vs. day picker) affects layout significantly.
+
+### P5: Fix unused CSS selector in `ScheduleView.svelte`
+Build produces a warning: `Unused CSS selector ".footer-meta + .footer-meta"` at `ScheduleView.svelte:75`. Either the adjacent-sibling rule is dead (the second `.footer-meta` never renders) or the markup structure changed. Investigate and remove the rule or restore the intended sibling element. Non-urgent — cosmetic only, no functional impact.

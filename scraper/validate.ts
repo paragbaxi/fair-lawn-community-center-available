@@ -77,5 +77,10 @@ export function validateSchedule(data: ScheduleData): ValidationResult {
     errors.push(`Only ${totalActivities} total activities (minimum 10)`);
   }
 
+  // Rule 9: at least 5 of 7 days have ≥1 activity (forward schedule completeness)
+  if (daysWithActivities < 5) {
+    errors.push(`Only ${daysWithActivities}/7 days have activities; next week's schedule may not be published yet`);
+  }
+
   return { valid: errors.length === 0, errors };
 }
