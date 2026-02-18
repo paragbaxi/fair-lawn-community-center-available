@@ -1,37 +1,38 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import type { ScheduleData, SportStatus } from './types.js';
   import type { FilterCategory } from './filters.js';
   import { getAvailableSports, getWeekSummary } from './filters.js';
   import { isActivityPast, isActivityCurrent, shortDayName, computeSportStatus, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
-  import * as notifications from './notifications.js';
-  import type { NotifState } from './notifications.js';
+  import { notifStore, toggleSport } from './notifStore.svelte.js';
 
   let {
     data,
     expanded = false,
     selectedSport = null,
     onSelectSport = () => {},
+    onManageAlerts = () => {},
   }: {
     data: ScheduleData;
     expanded?: boolean;
     selectedSport?: FilterCategory | null;
     onSelectSport?: (sport: FilterCategory | null) => void;
+    onManageAlerts?: () => void;
   } = $props();
 
   let isOpen = $state(false);
 
-  // Notification state
-  let notifState: NotifState = $state('prompt');
-  let notifLoading = $state(true);  // disabled until onMount resolves
-  let isIos = $state(false);
-  let isStandalone = $state(false);
-  let localSports: string[] = $state([]);  // mirrors prefs.sports for reactivity
-
   const sportSubscribed = $derived(
-    notifState === 'subscribed' && localSports.includes(selectedSport?.id ?? '')
+    notifStore.state === 'subscribed' &&
+    (notifStore.prefs.sports ?? []).includes(selectedSport?.id ?? '')
+  );
+
+  const showNotifBtn = $derived(
+    notifStore.initialized &&
+    notifStore.state !== 'unsupported' &&
+    !(notifStore.isIos && !notifStore.isStandalone) &&
+    !!selectedSport
   );
 
   const availableSports = $derived(getAvailableSports(data.schedule));
@@ -65,39 +66,7 @@
     return computeSportStatus(data.schedule, selectedSport.match, clock.now, todayName);
   });
 
-  onMount(async () => {
-    isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    notifState = await notifications.getState();
-    localSports = notifications.getStoredPrefs()?.sports ?? [];
-    notifLoading = false;
-  });
 
-  async function toggleSportNotif() {
-    if (!selectedSport) return;
-    const sportId = selectedSport.id;
-    notifLoading = true;
-
-    if (notifState !== 'subscribed') {
-      // Fresh subscribe — only adds this sport; doesn't touch thirtyMin/dailyBriefing
-      const result = await notifications.subscribe({
-        thirtyMin: false, dailyBriefing: false, sports: [sportId]
-      });
-      if (result === true) notifState = 'subscribed';
-    } else {
-      // Always read fresh prefs from localStorage immediately before mutating
-      const current = notifications.getStoredPrefs() ?? { thirtyMin: false, dailyBriefing: false, sports: [] };
-      const currentSports = current.sports ?? [];
-      const next = sportSubscribed
-        ? currentSports.filter(id => id !== sportId)
-        : [...currentSports, sportId];
-      await notifications.updatePrefs({ ...current, sports: next });
-    }
-
-    // Sync local state after mutation
-    localSports = notifications.getStoredPrefs()?.sports ?? [];
-    notifLoading = false;
-  }
 </script>
 
 {#if availableSports.length > 0}
@@ -146,18 +115,21 @@
         </div>
       {/if}
 
-      {#if selectedSport && !notifLoading && !(isIos && !isStandalone)}
+      {#if showNotifBtn}
         <button
           class="sport-notif-btn"
           class:subscribed={sportSubscribed}
-          onclick={toggleSportNotif}
-          disabled={notifLoading}
+          onclick={() => toggleSport(selectedSport!.id)}
+          disabled={notifStore.loading}
         >
           {sportSubscribed
-            ? `🔔 Notifying you before ${selectedSport.label} ✓`
-            : `🔔 Notify me 30 min before ${selectedSport.label}`}
+            ? `✓ Notifying me before ${selectedSport!.label}`
+            : `🔔 Notify me 30 min before ${selectedSport!.label}`}
         </button>
-      {:else if selectedSport && isIos && !isStandalone}
+        {#if sportSubscribed}
+          <button class="sport-manage-inline" onclick={onManageAlerts}>Manage all alerts →</button>
+        {/if}
+      {:else if notifStore.initialized && notifStore.isIos && !notifStore.isStandalone && selectedSport}
         <p class="sport-notif-hint">Add to Home Screen to enable notifications</p>
       {/if}
 
@@ -607,6 +579,17 @@
   .sport-notif-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .sport-manage-inline {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0 0 12px;
+    text-decoration: underline;
+    display: block;
   }
 
   .sport-notif-hint {

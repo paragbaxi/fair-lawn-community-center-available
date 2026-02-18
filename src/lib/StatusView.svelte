@@ -4,15 +4,16 @@
   import NotificationSettings from './NotificationSettings.svelte';
   import { formatEasternDate } from './time.js';
 
-  let { gymState, data }: {
+  let { gymState, data, onManageAlerts = () => {} }: {
     gymState: GymState;
     data: ScheduleData;
+    onManageAlerts?: () => void;
   } = $props();
 </script>
 
 <StatusCard {gymState} />
 
-<NotificationSettings {gymState} />
+<NotificationSettings {gymState} {onManageAlerts} />
 
 <footer class="micro-footer">
   <p>

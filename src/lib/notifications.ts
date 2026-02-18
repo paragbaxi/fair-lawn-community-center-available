@@ -107,11 +107,14 @@ export async function getState(): Promise<NotifState> {
   if (Notification.permission === 'denied') return 'denied';
 
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('SW timeout')), 3000)),
+    ]);
     const sub = await reg.pushManager.getSubscription();
     if (sub) return 'subscribed';
   } catch {
-    // ignore
+    // SW timeout or other error — fall through to 'prompt'
   }
 
   return 'prompt';
