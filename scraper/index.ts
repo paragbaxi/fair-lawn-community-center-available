@@ -159,7 +159,10 @@ async function scrape(): Promise<void> {
   console.log('Wrote public/data/latest.json');
 }
 
-scrape().catch((err) => {
-  console.error('Scraper failed:', err);
-  process.exit(1);
-});
+// Only execute when run directly — not when imported by tests
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  scrape().catch((err) => {
+    console.error('Scraper failed:', err);
+    process.exit(1);
+  });
+}

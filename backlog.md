@@ -205,9 +205,24 @@ Three items shipped together: (1) `gotoWithRetry` now classifies errors as `dns`
 ### ~~P3: Test coverage gaps — classifyError, KV pagination, sportSessionCounts~~
 Three test gaps from coverage review: (1) `classifyError()` exported from `scraper/index.ts`; 9 unit tests in `scraper/classifyError.test.ts` covering dns/timeout/unknown/non-Error values. (2) `getWeeklySessionCounts` extracted from `SportWeekCard.svelte` into `filters.ts` (pure, independently testable); 5 unit tests in `filters.test.ts`; `SportWeekCard` reduced to a single `$derived` call. (3) Worker `createPaginatedKVMock` added to `worker/index.test.ts` with pageSize parameter; `handleStats` pagination regression test (5 subs + 2 idempotency keys across 3 pages); `sport-30min` skips subscriber with `sports: []` (default empty state). 199 unit tests + 13 worker tests. Deployed 2026-02-18.
 
+### ~~P1: CI broken — classifyError.test.ts imports scraper/index.ts triggering Playwright launch~~
+Importing `scraper/index.ts` in vitest caused the top-level `scrape().catch(...)` to execute, launching Chromium which isn't installed in the `test` CI job (only `e2e` has it). Fixed by wrapping the call in a main-module guard: `if (process.argv[1] === fileURLToPath(import.meta.url))` — Node.js ESM equivalent of Python's `if __name__ == "__main__"`. 199/199 unit tests pass. Deployed 2026-02-18.
+
 ---
 
 ## Open
+
+### P3: Worker — fanOut non-2xx push delivery has no test
+We fixed `fanOut` to only count 2xx as `sent` (not 4xx/5xx), but there's no test asserting the new behavior. A 400/500 from the push endpoint should appear in the error log, not increment `sent`. Add a test that returns status 400 from the mock push endpoint and asserts `sent: 0`.
+
+### P4: esbuild dependabot alert — dev-only, can dismiss
+`worker/package-lock.json` has esbuild ≤ 0.24.2 (GHSA-67mh-4wv8-2f99). The vulnerability is in esbuild's dev server (`esbuild --serve`) allowing CORS from any origin. We never use esbuild serve — wrangler handles all builds/dev. Either upgrade `wrangler` (which bundles esbuild) or dismiss the alert with a comment explaining it's not exploitable in this context.
+
+### P4: `getEasternNow()` in check-and-notify.mjs — fragile Date construction
+Extracts Eastern hour/minute/second components then passes them to `new Date(year, month-1, day, ...)` which interprets in the host's local timezone (UTC on GH Actions). Works by coincidence because both sides of the `(start - now) / 60000` comparison use the same skewed epoch. Fragile if the comparison logic ever changes. Fix: use `Intl.DateTimeFormat.formatToParts()` with `hourCycle: 'h23'` (same pattern as `src/lib/time.ts`'s `getEasternNow()`).
+
+### P5: `fanOut` result has no `failed` counter
+Currently returns `{ sent, skipped, cleaned }`. A 400/500 delivery failure is logged but invisible in the response. Adding a `failed` counter lets `check-and-notify.mjs` log delivery failures distinctly from send counts — useful for diagnosing VAPID expiry (all deliveries 401) vs individual bad subscriptions.
 
 ---
 
