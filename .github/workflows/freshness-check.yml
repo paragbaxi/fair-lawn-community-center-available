@@ -2,7 +2,7 @@ name: Data Freshness Check
 
 on:
   schedule:
-    # 9 AM UTC daily — 4 hours after the scraper (5 AM UTC), buffer for cron delays
+    # 9 AM UTC daily - 4 hours after the scraper (5 AM UTC), buffer for cron delays
     - cron: '0 9 * * *'
   workflow_dispatch:
 
@@ -56,15 +56,15 @@ jobs:
           gh label create stale-data --description "Automated: schedule data not refreshed in 26+ hours" --color e4e669 2>/dev/null || true
 
           if [ "$AGE_HOURS" -gt 26 ]; then
-            echo "STALE: data is ${AGE_HOURS}h old — exceeds 26h threshold"
+            echo "STALE: data is ${AGE_HOURS}h old - exceeds 26h threshold"
 
             existing=$(gh issue list --label "stale-data" --state open --limit 1 --json number --jq '.[0].number')
 
             if [ -n "$existing" ]; then
               gh issue comment "$existing" --body "Schedule data still stale as of **$(date -u +%Y-%m-%d)** (${AGE_HOURS}h old).
 
-- **scrapedAt**: \`$SCRAPED_AT\`
-- **[Freshness check run](https://github.com/$REPO/actions/runs/$RUN_ID)**"
+          - **scrapedAt**: \`$SCRAPED_AT\`
+          - **[Freshness check run](https://github.com/$REPO/actions/runs/$RUN_ID)**"
               echo "Commented on existing issue #$existing"
             else
               gh issue create \
@@ -72,35 +72,35 @@ jobs:
                 --label "stale-data" \
                 --body "The schedule data in \`public/data/latest.json\` has not been refreshed in **${AGE_HOURS} hours** (last updated: \`$SCRAPED_AT\`).
 
-The daily scraper runs at **5:00 AM UTC**. Data this old suggests the scraper workflow was skipped, disabled, or the git push step failed silently.
+          The daily scraper runs at **5:00 AM UTC**. Data this old suggests the scraper workflow was skipped, disabled, or the git push step failed silently.
 
-### Debugging checklist
-1. Check recent **[Scrape & Deploy runs](https://github.com/$REPO/actions/workflows/scrape-and-deploy.yml)** — did the workflow run at all? GitHub skips cron jobs on repos with no recent activity.
-2. Check **[latest.json in the repo](https://github.com/$REPO/blob/main/public/data/latest.json)** — is \`scrapedAt\` outdated there too?
-3. Check whether the Scrape & Deploy workflow is enabled under **Actions → Workflows**.
-4. If the scraper step itself crashed, there may also be an open \`scraper-failure\` issue.
+          ### Debugging checklist
+          1. Check recent **[Scrape & Deploy runs](https://github.com/$REPO/actions/workflows/scrape-and-deploy.yml)** -- did the workflow run at all? GitHub skips cron jobs on repos with no recent activity.
+          2. Check **[latest.json in the repo](https://github.com/$REPO/blob/main/public/data/latest.json)** -- is \`scrapedAt\` outdated there too?
+          3. Check whether the Scrape & Deploy workflow is enabled under **Actions -> Workflows**.
+          4. If the scraper step itself crashed, there may also be an open \`scraper-failure\` issue.
 
-### User impact
-The in-app stale banner appears after **48 hours**. Until then, users see stale data with no warning.
+          ### User impact
+          The in-app stale banner appears after **48 hours**. Until then, users see stale data with no warning.
 
-**[View this freshness check run](https://github.com/$REPO/actions/runs/$RUN_ID)**
+          **[View this freshness check run](https://github.com/$REPO/actions/runs/$RUN_ID)**
 
-Close this issue once \`scrapedAt\` is within 26 hours."
+          Close this issue once \`scrapedAt\` is within 26 hours."
               echo "Created new stale-data issue"
             fi
 
           else
-            echo "FRESH: data is ${AGE_HOURS}h old — within 26h threshold"
+            echo "FRESH: data is ${AGE_HOURS}h old - within 26h threshold"
 
             # Auto-close all open stale-data issues (loop handles edge case of >1 open)
             while IFS= read -r issue_number; do
               [ -z "$issue_number" ] && continue
-              gh issue comment "$issue_number" --body "Schedule data is fresh again as of **$(date -u +%Y-%m-%d)** (${AGE_HOURS}h old — within 26h threshold).
+              gh issue comment "$issue_number" --body "Schedule data is fresh again as of **$(date -u +%Y-%m-%d)** (${AGE_HOURS}h old - within 26h threshold).
 
-- **scrapedAt**: \`$SCRAPED_AT\`
-- **[Freshness check run](https://github.com/$REPO/actions/runs/$RUN_ID)**
+          - **scrapedAt**: \`$SCRAPED_AT\`
+          - **[Freshness check run](https://github.com/$REPO/actions/runs/$RUN_ID)**
 
-Closing automatically."
+          Closing automatically."
               gh issue close "$issue_number"
               echo "Closed stale-data issue #$issue_number"
             done < <(gh issue list --label "stale-data" --state open --limit 5 --json number --jq '.[].number')
