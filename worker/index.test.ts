@@ -1,0 +1,434 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import worker from './index.js';
+
+// ─── Mock @block65/webcrypto-web-push ─────────────────────────────────────────
+
+vi.mock('@block65/webcrypto-web-push', () => ({
+  buildPushPayload: vi.fn().mockResolvedValue({ method: 'POST', headers: {}, body: '' }),
+}));
+
+// ─── KV Mock Factory ──────────────────────────────────────────────────────────
+
+function createKVMock(initial: Record<string, string> = {}) {
+  const store = new Map(Object.entries(initial));
+  return {
+    get: async (key: string) => store.get(key) ?? null,
+    put: async (key: string, value: string, _opts?: unknown) => { store.set(key, value); },
+    delete: async (key: string) => { store.delete(key); },
+    list: async ({ cursor }: { cursor?: string } = {}) => ({
+      keys: [...store.keys()].map(name => ({ name })),
+      cursor: undefined,
+      list_complete: true,
+    }),
+  };
+}
+
+// ─── Env Factory ─────────────────────────────────────────────────────────────
+
+function makeEnv(kvMock: ReturnType<typeof createKVMock>) {
+  return {
+    SUBSCRIPTIONS: kvMock,
+    VAPID_PUBLIC_KEY: 'pk',
+    VAPID_PRIVATE_KEY: 'sk',
+    VAPID_SUBJECT: 'https://example.com',
+    NOTIFY_API_KEY: 'test-key',
+    APP_ORIGIN: 'https://example.com',
+    PAGES_DATA_URL: 'https://example.com/data.json',
+  };
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeSub(overrides: {
+  endpoint?: string;
+  thirtyMin?: boolean;
+  dailyBriefing?: boolean;
+  sports?: string[];
+} = {}) {
+  return JSON.stringify({
+    endpoint: overrides.endpoint ?? 'https://push.example.com/sub1',
+    keys: { p256dh: 'dGVzdA==', auth: 'dGVzdA==' },
+    prefs: {
+      thirtyMin: overrides.thirtyMin ?? true,
+      dailyBriefing: overrides.dailyBriefing ?? true,
+      sports: overrides.sports ?? [],
+    },
+    subscribedAt: '2026-01-01T00:00:00.000Z',
+  });
+}
+
+function notifyRequest(body: unknown, apiKey = 'test-key') {
+  return new Request('https://example.com/notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+    body: JSON.stringify(body),
+  });
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('fanOut idempotency', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns {sent:0, skipped:0, cleaned:0} immediately when idempotency key exists', async () => {
+    // Compute the key exactly as the worker will — using today's actual date.
+    // idempotencyKey(isoDate, dayName, actStart, '30min')
+    // = `idempotent:${isoDate}:${dayName}:${actStart}:30min`
+    const isoDate = new Date().toISOString().slice(0, 10);
+    const actStart = '09:00';
+    const dayName = 'Wednesday';
+    const idKey = `idempotent:${isoDate}:${dayName}:${actStart}:30min`;
+
+    const kv = createKVMock({
+      // Pre-existing idempotency key matching what fanOut will compute
+      [idKey]: '1',
+      // A subscriber that would otherwise receive a push
+      'sub-abc': makeSub({ endpoint: 'https://push.example.com/sub-abc' }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: actStart, end: '10:00', dayName }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number; skipped: number; cleaned: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    // fanOut finds the existing idempotency key and returns early without sending
+    expect(data.results[0]).toEqual({ sent: 0, skipped: 0, cleaned: 0 });
+
+    // Confirm push endpoint was never fetched
+    const pushCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/sub-abc',
+    );
+    expect(pushCalls.length).toBe(0);
+  });
+});
+
+describe('sport filtering', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('sends to basketball subscriber but skips volleyball subscriber when sportId=basketball', async () => {
+    const kv = createKVMock({
+      'sub-bball': makeSub({
+        endpoint: 'https://push.example.com/bball',
+        sports: ['basketball'],
+      }),
+      'sub-vball': makeSub({
+        endpoint: 'https://push.example.com/vball',
+        sports: ['volleyball'],
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'sport-30min',
+      sportId: 'basketball',
+      sportLabel: 'Basketball',
+      activities: [{ start: '10:00', end: '11:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number; cleaned: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.result.sent).toBe(1);
+    expect(data.result.skipped).toBe(1);
+    expect(data.result.cleaned).toBe(0);
+
+    // The basketball endpoint was called
+    const bballCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/bball',
+    );
+    expect(bballCalls.length).toBe(1);
+
+    // The volleyball endpoint was NOT called
+    const vballCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/vball',
+    );
+    expect(vballCalls.length).toBe(0);
+  });
+
+  it('skips basketball subscriber when sportId=volleyball', async () => {
+    const kv = createKVMock({
+      'sub-bball': makeSub({
+        endpoint: 'https://push.example.com/bball',
+        sports: ['basketball'],
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'sport-30min',
+      sportId: 'volleyball',
+      sportLabel: 'Volleyball',
+      activities: [{ start: '10:00', end: '11:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number; cleaned: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(1);
+  });
+});
+
+describe('thirtyMin filtering', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('skips subscriber with prefs.thirtyMin=false for type=30min', async () => {
+    const kv = createKVMock({
+      'sub-no30': makeSub({
+        endpoint: 'https://push.example.com/no30',
+        thirtyMin: false,
+      }),
+      'sub-yes30': makeSub({
+        endpoint: 'https://push.example.com/yes30',
+        thirtyMin: true,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: '11:00', end: '12:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number; skipped: number; cleaned: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.results[0].sent).toBe(1);
+    expect(data.results[0].skipped).toBe(1);
+
+    // Only the yes30 endpoint was called
+    const no30Calls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/no30',
+    );
+    expect(no30Calls.length).toBe(0);
+
+    const yes30Calls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/yes30',
+    );
+    expect(yes30Calls.length).toBe(1);
+  });
+});
+
+describe('dailyBriefing filtering', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('skips subscriber with prefs.dailyBriefing=false for dailyBriefing fanOut', async () => {
+    const kv = createKVMock({
+      'sub-nodaily': makeSub({
+        endpoint: 'https://push.example.com/nodaily',
+        dailyBriefing: false,
+      }),
+      'sub-yesdaily': makeSub({
+        endpoint: 'https://push.example.com/yesdaily',
+        dailyBriefing: true,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    // Mock fetch: first call is for PAGES_DATA_URL, subsequent calls are push endpoints
+    const scheduleData = {
+      scrapedAt: '2026-02-18T00:00:00.000Z',
+      schedule: {
+        Wednesday: {
+          open: '09:00',
+          close: '21:00',
+          activities: [
+            { name: 'Open Gym', start: '09:00', end: '10:00', isOpenGym: true },
+          ],
+        },
+      },
+      notices: [],
+    };
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(scheduleData),
+        });
+      }
+      // Push endpoint calls
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    // Trigger the scheduled handler
+    // waitUntil captures the promise; we store it so we can await completion.
+    let scheduledPromise: Promise<unknown> = Promise.resolve();
+    const ctx = {
+      waitUntil: (p: Promise<unknown>) => { scheduledPromise = p; },
+    } as unknown as ExecutionContext;
+    await worker.scheduled({} as ScheduledEvent, env as never, ctx);
+    await scheduledPromise;
+
+    // sub-nodaily should be skipped
+    const nodailyCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/nodaily',
+    );
+    expect(nodailyCalls.length).toBe(0);
+
+    // sub-yesdaily should receive a push
+    const yesdailyCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/yesdaily',
+    );
+    expect(yesdailyCalls.length).toBe(1);
+  });
+});
+
+describe('410 cleanup', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('deletes subscription from KV when push endpoint returns 410', async () => {
+    const kv = createKVMock({
+      'sub-gone': makeSub({
+        endpoint: 'https://push.example.com/gone',
+        thirtyMin: true,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    // The push endpoint returns 410 — subscription has expired
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 410 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: '14:00', end: '15:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number; skipped: number; cleaned: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.results[0].cleaned).toBe(1);
+    expect(data.results[0].sent).toBe(0);
+
+    // Verify the key was deleted from KV
+    const remaining = await kv.get('sub-gone');
+    expect(remaining).toBeNull();
+  });
+});
+
+describe('/stats auth', () => {
+  it('returns 401 when X-Api-Key is wrong', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', {
+      method: 'GET',
+      headers: { 'X-Api-Key': 'wrong-key' },
+    });
+
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(401);
+
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('Unauthorized');
+  });
+
+  it('returns 401 when X-Api-Key header is missing', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', {
+      method: 'GET',
+    });
+
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('/stats counting', () => {
+  it('returns correct subscriber and idempotency key counts', async () => {
+    const kv = createKVMock({
+      'sub-aaa': makeSub({ endpoint: 'https://push.example.com/aaa' }),
+      'sub-bbb': makeSub({ endpoint: 'https://push.example.com/bbb' }),
+      'sub-ccc': makeSub({ endpoint: 'https://push.example.com/ccc' }),
+      'idempotent:2026-02-18:Wednesday:09:00:30min': '1',
+      'idempotent:2026-02-18:Wednesday:sport-basketball': '1',
+    });
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', {
+      method: 'GET',
+      headers: { 'X-Api-Key': 'test-key' },
+    });
+
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { ok: boolean; subscribers: number; idempotencyKeys: number };
+    expect(data.ok).toBe(true);
+    expect(data.subscribers).toBe(3);
+    expect(data.idempotencyKeys).toBe(2);
+  });
+
+  it('returns zeros when KV is empty', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', {
+      method: 'GET',
+      headers: { 'X-Api-Key': 'test-key' },
+    });
+
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { ok: boolean; subscribers: number; idempotencyKeys: number };
+    expect(data.ok).toBe(true);
+    expect(data.subscribers).toBe(0);
+    expect(data.idempotencyKeys).toBe(0);
+  });
+
+  it('counts only idempotency keys when all keys are idempotent', async () => {
+    const kv = createKVMock({
+      'idempotent:2026-02-18:Wednesday:daily:dailyBriefing': '1',
+    });
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', {
+      method: 'GET',
+      headers: { 'X-Api-Key': 'test-key' },
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; subscribers: number; idempotencyKeys: number };
+    expect(data.subscribers).toBe(0);
+    expect(data.idempotencyKeys).toBe(1);
+  });
+});

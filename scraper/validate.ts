@@ -68,9 +68,13 @@ export function validateSchedule(data: ScheduleData): ValidationResult {
     }
   }
 
-  // Rule 3: at least 3 of 7 days have ≥1 activity
-  if (daysWithActivities < 3) {
-    errors.push(`Only ${daysWithActivities} day(s) have activities (minimum 3)`);
+  // Thresholds for activity-day coverage checks
+  const RULE3_MIN_DAYS = 5; // hard error: partial parse or site structural change
+  const RULE9_MIN_DAYS = 6; // stricter tier: forward schedule may not be published yet
+
+  // Rule 3: at least 5 of 7 days have ≥1 activity (hard error — partial parse or structural change)
+  if (daysWithActivities < RULE3_MIN_DAYS) {
+    errors.push(`Only ${daysWithActivities} day(s) have activities (minimum ${RULE3_MIN_DAYS})`);
   }
 
   // Rule 4: total activity count ≥ 10
@@ -78,8 +82,8 @@ export function validateSchedule(data: ScheduleData): ValidationResult {
     errors.push(`Only ${totalActivities} total activities (minimum 10)`);
   }
 
-  // Rule 9: at least 5 of 7 days have ≥1 activity (forward schedule completeness)
-  if (daysWithActivities < 5) {
+  // Rule 9: at least 6 of 7 days have ≥1 activity (error — forward schedule may not be published yet)
+  if (daysWithActivities < RULE9_MIN_DAYS) {
     errors.push(`Only ${daysWithActivities}/7 days have activities; next week's schedule may not be published yet`);
   }
 

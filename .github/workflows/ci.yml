@@ -12,6 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node-deps
+      - name: Check sport ID sync between filters.ts and check-and-notify.mjs
+        run: node scripts/check-sport-sync.mjs
       - run: npm run test
       - run: npm run build
   e2e:

@@ -62,7 +62,11 @@ export async function handleDisable(): Promise<void> {
 export async function savePrefs(prefs: NotifPrefs): Promise<void> {
   notifStore.error = null;
   notifStore.prefs = prefs;
-  await notifications.updatePrefs(prefs);
+  try {
+    await notifications.updatePrefs(prefs);
+  } catch {
+    notifStore.error = 'Failed to save preference. Check your connection.';
+  }
 }
 
 /**
@@ -95,7 +99,11 @@ export async function toggleSport(sportId: string): Promise<void> {
       : [...currentSports, sportId];
     const updated = { ...current, sports: next };
     notifStore.prefs = updated;    // optimistic
-    await notifications.updatePrefs(updated);
+    try {
+      await notifications.updatePrefs(updated);
+    } catch {
+      notifStore.error = 'Failed to save preference. Check your connection.';
+    }
   }
   notifStore.loading = false;
 }

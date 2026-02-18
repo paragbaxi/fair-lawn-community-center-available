@@ -100,3 +100,42 @@ gh secret set VITE_VAPID_PUBLIC_KEY    # same value as step 1 public key
 gh secret set CLOUDFLARE_WORKER_URL    # URL from step 3
 gh secret set NOTIFY_API_KEY           # same value as step 2
 ```
+
+---
+
+## Key Rotation
+
+If `VAPID_PRIVATE_KEY` is ever compromised, **all existing browser subscriptions become invalid** (they are cryptographically tied to the public key). Full rotation procedure:
+
+1. **Clear all KV subscriptions** (they'll be invalid after key change):
+   ```bash
+   # List all subscription keys
+   cd worker && npx wrangler kv key list --binding=SUBSCRIPTIONS
+   # Delete each non-idempotent key, or clear the entire namespace via Cloudflare dashboard
+   ```
+
+2. **Generate a new VAPID key pair**:
+   ```bash
+   cd worker && npx web-push generate-vapid-keys
+   ```
+
+3. **Set new Worker secrets** (use heredoc to avoid shell mangling of `=`/`/` chars):
+   ```bash
+   CLOUDFLARE_API_TOKEN="..." npx wrangler secret put VAPID_PUBLIC_KEY << 'EOF'
+   <new-public-key>
+   EOF
+   CLOUDFLARE_API_TOKEN="..." npx wrangler secret put VAPID_PRIVATE_KEY << 'EOF'
+   <new-private-key>
+   EOF
+   ```
+
+4. **Update GitHub Actions secret** `VITE_VAPID_PUBLIC_KEY` to the new public key value.
+
+5. **Trigger a frontend redeploy** to rebake the new public key into the JS bundle:
+   ```bash
+   gh workflow run "Scrape & Deploy"
+   ```
+
+6. **Subscribers must re-subscribe** — existing push subscriptions will be cleaned up automatically (Worker returns 410 cleanup) when the next notification attempt fails.
+
+> **Note**: Set secrets AFTER the worker is already deployed. Secrets set when no worker exists ("no worker found" wrangler warning) do NOT persist to the live worker.

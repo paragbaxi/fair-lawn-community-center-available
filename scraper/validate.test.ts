@@ -22,9 +22,10 @@ function makeValidData(): ScheduleData {
   });
 
   const schedule: Record<string, DaySchedule> = {};
-  // 5 weekdays with 3 activities each = 15 total, 2 weekend days with 0
+  // 6 days with 3 activities each = 18 total, Sunday with 0
+  // (6/7 days satisfies both Rule 3 ≥5 and Rule 9 ≥6)
   for (const day of DAYS) {
-    if (day === 'Saturday' || day === 'Sunday') {
+    if (day === 'Sunday') {
       schedule[day] = makeDay('9:00 AM', '5:00 PM', 0);
     } else {
       schedule[day] = makeDay('7:00 AM', '9:00 PM', 3);
@@ -43,15 +44,19 @@ describe('validateSchedule', () => {
     const result = validateSchedule(makeValidData());
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
-    expect(result.stats.daysWithActivities).toBe(5);
-    expect(result.stats.totalActivities).toBe(15);
+    expect(result.stats.daysWithActivities).toBe(6);
+    expect(result.stats.totalActivities).toBe(18);
   });
 
-  it('passes when 5 days have activities and 2 are empty', () => {
+  it('fails Rule 9 when exactly 5 days have activities', () => {
     const data = makeValidData();
-    // Default factory already has 5 weekdays with activities, 2 weekend days empty
+    // Remove Saturday activities so only 5 weekdays have activities
+    data.schedule['Saturday'].activities = [];
     const result = validateSchedule(data);
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes("next week's schedule may not be published yet"))).toBe(true);
+    // Rule 3 should NOT fire (5 >= 5)
+    expect(result.errors.some(e => e.includes('day(s) have activities'))).toBe(false);
   });
 
   it('fails when scrapedAt is empty', () => {
@@ -87,9 +92,9 @@ describe('validateSchedule', () => {
     expect(result.errors).toContain('Missing day: Friday');
   });
 
-  it('fails when fewer than 3 days have activities', () => {
+  it('fails Rule 3 when fewer than 5 days have activities', () => {
     const data = makeValidData();
-    // Clear all but 2 days
+    // Clear all but 2 days (DAYS[0] = Monday, DAYS[1] = Tuesday)
     for (const day of DAYS.slice(2)) {
       data.schedule[day].activities = [];
     }
@@ -159,17 +164,21 @@ describe('validateSchedule', () => {
     expect(result.errors.some(e => e.includes('Backwards') && e.includes('not before end'))).toBe(true);
   });
 
-  it('fails Rule 9 when only 3 days have activities', () => {
+  it('fails Rule 9 when only 4 days have activities (also triggers Rule 3)', () => {
     const data = makeValidData();
-    data.schedule['Thursday'].activities = [];
+    // Remove Saturday and Friday activities: 6 - 2 = 4 days remain
+    data.schedule['Saturday'].activities = [];
     data.schedule['Friday'].activities = [];
     const result = validateSchedule(data);
     expect(result.valid).toBe(false);
+    // Both Rule 3 (< 5) and Rule 9 (< 6) should fire
+    expect(result.errors.some(e => e.includes('day(s) have activities'))).toBe(true);
     expect(result.errors.some(e => e.includes("next week's schedule may not be published yet"))).toBe(true);
+    expect(result.stats.daysWithActivities).toBe(4);
   });
 
-  it('passes Rule 9 when exactly 5 days have activities', () => {
-    const data = makeValidData(); // 5 weekdays with activities, Sat/Sun empty
+  it('passes all rules when exactly 6 days have activities', () => {
+    const data = makeValidData(); // default: 6 days with activities, Sunday empty
     const result = validateSchedule(data);
     expect(result.valid).toBe(true);
     expect(result.errors.some(e => e.includes("next week's schedule"))).toBe(false);

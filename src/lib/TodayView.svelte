@@ -24,6 +24,8 @@
 
 {#if selectedSchedule}
   <Timeline schedule={selectedSchedule} dayName={selectedDay} isToday={isSelectedToday} />
+{:else}
+  <p class="day-empty-state">No schedule data for {selectedDay}.</p>
 {/if}
 
 <p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>
@@ -48,6 +50,13 @@
 </footer>
 
 <style>
+  .day-empty-state {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 16px 12px;
+  }
+
   .rest-of-week-heading {
     font-size: 1rem;
     font-weight: 600;

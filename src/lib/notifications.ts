@@ -80,22 +80,19 @@ export async function unsubscribe(): Promise<void> {
   localStorage.removeItem(PREFS_KEY);
 }
 
-/** Update notification preferences without re-subscribing. */
+/** Update notification preferences without re-subscribing.
+ * Throws if the network request fails so callers can surface the error. */
 export async function updatePrefs(prefs: NotifPrefs): Promise<void> {
   const endpoint = localStorage.getItem(ENDPOINT_KEY);
   if (!endpoint) return;
 
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 
-  try {
-    await fetch(`${WORKER_URL}/subscription`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint, prefs }),
-    });
-  } catch (err) {
-    console.error('Failed to update prefs on server:', err);
-  }
+  await fetch(`${WORKER_URL}/subscription`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint, prefs }),
+  });
 }
 
 /** Get the current notification subscription state. */

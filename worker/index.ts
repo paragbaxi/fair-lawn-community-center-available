@@ -118,7 +118,7 @@ async function fanOut(
   // Paginate through all subscriptions
   do {
     const list = await env.SUBSCRIPTIONS.list({ cursor });
-    cursor = list.cursor;
+    cursor = list.list_complete ? undefined : list.cursor;
 
     const sendPromises = list.keys
       .filter((k) => !k.name.startsWith('idempotent:'))
@@ -144,6 +144,7 @@ async function fanOut(
         const pushSub: PushSubscription = {
           endpoint: sub.endpoint,
           keys: sub.keys,
+          expirationTime: null,
         };
 
         try {
@@ -299,6 +300,33 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, results });
 }
 
+async function handleStats(request: Request, env: Env): Promise<Response> {
+  // Auth check — GET request, no body, header only
+  const apiKey = request.headers.get('X-Api-Key') ?? '';
+  if (apiKey !== env.NOTIFY_API_KEY) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  let cursor: string | undefined;
+  let subscribers = 0;
+  let idempotencyKeys = 0;
+
+  do {
+    const list = await env.SUBSCRIPTIONS.list({ cursor });
+    cursor = list.list_complete ? undefined : list.cursor;
+
+    for (const k of list.keys) {
+      if (k.name.startsWith('idempotent:')) {
+        idempotencyKeys++;
+      } else {
+        subscribers++;
+      }
+    }
+  } while (cursor);
+
+  return json({ ok: true, subscribers, idempotencyKeys });
+}
+
 async function handleScheduled(env: Env): Promise<void> {
   let data: ScheduleData;
   try {
@@ -380,6 +408,10 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/notify') {
       return handleNotify(request, env);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/stats') {
+      return handleStats(request, env);
     }
 
     return json({ error: 'Not found' }, 404);

@@ -309,6 +309,136 @@ test('chip deselect clears sport URL param', async ({ page }) => {
   expect(url).not.toContain('sport=');
 });
 
+// --- Notification sheet tests ---
+
+test.describe('notification sheet', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    // Wait for data to load (status card appears after data fetch resolves)
+    await expect(page.locator('.status-card')).toBeVisible();
+  });
+
+  test('bell button is visible after data loads', async ({ page }) => {
+    // notifStore.initialized becomes true after initNotifStore() resolves.
+    // getState() has a 3-second SW timeout; allow up to 5 seconds total.
+    await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 5000 });
+    await expect(page.locator('[aria-label="Notification settings"]')).toBeVisible();
+  });
+
+  test('clicking bell opens the notification sheet', async ({ page }) => {
+    await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 5000 });
+    await page.locator('[aria-label="Notification settings"]').click();
+
+    // Sheet dialog should be visible
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    // Sheet title should read "My Alerts"
+    await expect(page.locator('#sheet-title')).toHaveText('My Alerts');
+
+    // Sheet content is visible regardless of permission state (prompt shows enable-btn,
+    // denied shows blocked message — both render inside .sheet-empty-state or .sheet-section)
+    await expect(page.locator('.sheet-content')).toBeVisible();
+  });
+
+  test('Escape key closes the sheet and returns focus to bell button', async ({ page }) => {
+    await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 5000 });
+    await page.locator('[aria-label="Notification settings"]').click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    // Press Escape to close
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+
+    // Focus should have returned to the bell button
+    const focusedLabel = await page.evaluate(() =>
+      document.activeElement?.getAttribute('aria-label')
+    );
+    expect(focusedLabel).toBe('Notification settings');
+  });
+
+  test('clicking backdrop closes the sheet', async ({ page }) => {
+    await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 5000 });
+    await page.locator('[aria-label="Notification settings"]').click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+
+    // Click the backdrop (outside the panel)
+    await page.locator('.sheet-backdrop').click();
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+  });
+});
+
+// --- DayPicker keyboard navigation tests ---
+
+test.describe('DayPicker keyboard navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/#today');
+    // Wait for data to load (tab bar appears after load)
+    await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
+    // Ensure the Today panel is active
+    await expect(page.locator('#panel-today')).not.toHaveAttribute('hidden', '');
+  });
+
+  test('ArrowRight moves focus to the next enabled day', async ({ page }) => {
+    const toolbar = page.locator('[role="toolbar"][aria-label="Select day"]');
+    await expect(toolbar).toBeVisible();
+
+    // The currently selected day button has tabindex=0 (roving tabindex pattern)
+    const activeBtn = page.locator('.day-btn[aria-pressed="true"]');
+    await expect(activeBtn).toHaveCount(1);
+
+    // Read the text of the currently focused/selected day
+    const initialDayText = await activeBtn.textContent();
+
+    // Focus the selected day button and press ArrowRight
+    await activeBtn.focus();
+    await page.keyboard.press('ArrowRight');
+
+    // After ArrowRight, a different button should now be pressed
+    // (DayPicker calls onSelectDay which updates selectedDay, which moves aria-pressed)
+    const newActiveBtn = page.locator('.day-btn[aria-pressed="true"]');
+    await expect(newActiveBtn).toHaveCount(1);
+    const newDayText = await newActiveBtn.textContent();
+
+    // The selected day should have changed
+    expect(newDayText).not.toBe(initialDayText);
+  });
+
+  test('ArrowLeft from the first enabled day wraps focus to a later day', async ({ page }) => {
+    const toolbar = page.locator('[role="toolbar"][aria-label="Select day"]');
+    await expect(toolbar).toBeVisible();
+
+    // Find the first enabled day button and click it to make it the selected/focused one
+    const allBtns = page.locator('.day-btn');
+    const allBtnEls = await allBtns.all();
+    let firstEnabledBtn = null;
+    for (const btn of allBtnEls) {
+      if (!(await btn.isDisabled())) {
+        firstEnabledBtn = btn;
+        break;
+      }
+    }
+
+    if (!firstEnabledBtn) {
+      test.skip(true, 'No enabled day buttons found — cannot test ArrowLeft wrap');
+      return;
+    }
+
+    // Click to select and focus the first enabled day
+    await firstEnabledBtn.click();
+    await firstEnabledBtn.focus();
+    const firstDayText = await firstEnabledBtn.textContent();
+
+    // Press ArrowLeft — should wrap to the last enabled day (not the first)
+    await page.keyboard.press('ArrowLeft');
+
+    // The newly selected/focused day should differ from the first enabled day
+    const newActiveBtn = page.locator('.day-btn[aria-pressed="true"]');
+    await expect(newActiveBtn).toHaveCount(1);
+    const newDayText = await newActiveBtn.textContent();
+    expect(newDayText).not.toBe(firstDayText);
+  });
+});
+
 test('back navigation restores previous tab and filter state', async ({ page }) => {
   // Start on Sports tab, wait for data to load
   await page.goto('/#sports');

@@ -122,6 +122,13 @@ async function main() {
   }
 
   const now = getEasternNow();
+
+  // Skip outside gym hours (8 AM – 10 PM Eastern) to avoid no-op runs
+  if (!force && (now.getHours() < 8 || now.getHours() >= 22)) {
+    console.log(`Outside gym hours (${now.getHours()}:xx ET), skipping.`);
+    return;
+  }
+
   const dayName = getEasternDayName(now);
   const isoDate = getEasternIsoDate(now);
 

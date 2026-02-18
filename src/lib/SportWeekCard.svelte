@@ -111,6 +111,8 @@
             </span>
           {/if}
         </div>
+      {:else if sportStatus?.kind === 'none'}
+        <p class="no-results">No {selectedSport?.label} sessions scheduled this week.</p>
       {/if}
 
       {#if showNotifBtn}

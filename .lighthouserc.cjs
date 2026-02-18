@@ -13,6 +13,9 @@ module.exports = {
     },
     assert: {
       assertions: {
+        // Performance: 0.8 threshold is conservative to handle CI runner variance.
+        // Bump to 0.85+ once a few runs confirm stable scores with throttlingMethod:'provided'.
+        'categories:performance':    ['error', { minScore: 0.8 }],
         'categories:accessibility':  ['error', { minScore: 0.9 }],
         'categories:best-practices': ['error', { minScore: 0.9 }],
         // Bundle budget: ~2x current sizes (JS: 71 KB -> 150 KB, CSS: 21 KB -> 50 KB)
