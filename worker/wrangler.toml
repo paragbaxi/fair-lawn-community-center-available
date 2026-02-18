@@ -1,6 +1,7 @@
 name = "flcc-push"
 main = "index.ts"
 compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 APP_ORIGIN = "https://paragbaxi.github.io"
@@ -9,8 +10,8 @@ PAGES_DATA_URL = "https://paragbaxi.github.io/fair-lawn-community-center-availab
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "<kv-namespace-id>"
-preview_id = "<preview-kv-id>"
+id = "18a2bae93c5f425099d775f27787cab1"
+preview_id = "2e4bbce83a0743ad8f6a759609ad8c4a"
 
 [triggers]
 crons = ["0 12 * * *"]
