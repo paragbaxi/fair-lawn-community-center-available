@@ -215,6 +215,18 @@ Importing `scraper/index.ts` in vitest caused the top-level `scrape().catch(...)
 ### ~~P3/P4/P5: fanOut failed counter, esbuild alert, getEasternNow doc, non-2xx test~~
 Four items resolved: (1) `fanOut` return type now includes `failed` counter — increments on non-2xx/non-410/non-429 push delivery; idempotency early return includes `failed: 0`; `handleScheduled` log shows all 4 fields; 14 worker tests (added non-2xx regression test asserting `sent: 0, failed: 1` when push endpoint returns 400). (2) esbuild GHSA-67mh-4wv8-2f99 dismissed as `tolerable_risk` — only affects `esbuild --serve`, which this project never uses. (3) `getEasternNow()` in `check-and-notify.mjs` analyzed: arithmetic is genuinely correct because offsets cancel in epoch subtraction; added a detailed comment explaining the "Eastern-as-local" coordinate system, why `parseActivityTime` math is safe, and the fragility caveat for future contributors. (4) No code change needed for getEasternNow — comment is sufficient. 199 unit tests + 14 worker tests. Deployed 2026-02-18.
 
+### P3: `unsubscribe()` — browser PushManager sub not removed when server DELETE fails
+When `fetch /unsubscribe` returns non-ok, we throw — but that exits the function before the `pushManager.getSubscription()` / `sub.unsubscribe()` block at line 75. Result: user clicks "Turn off" → sees error → still receives push notifications. Fix: always remove the browser-side PushManager subscription in a finally/separate try block, then throw on server failure. Zombie server KV entries are self-cleaning: `fanOut` gets a 410 and deletes them automatically.
+
+### P3: `check-and-notify.mjs` — `failed` count not highlighted in CI
+After the `failed` counter was added, the result is logged as JSON: `{"ok":true,"result":{"sent":1,"failed":0,...}}`. If `failed > 0`, no dedicated `console.error` fires — the failure is only visible if you scan the JSON blob. Add an explicit `if (result?.result?.failed > 0) console.error(...)` check so CI log annotations surface delivery failures immediately (e.g. VAPID expiry causing all-401 responses).
+
+### P4: Sport notification button — no E2E coverage
+`SportWeekCard` renders a "🔔 Notify me 30 min before {sport}" button (`showNotifBtn` gate). E2E suite covers the bell/sheet flow but never tests the sport notify button. Even a basic test — navigate to `#sports?sport=basketball`, assert button visible when notifStore initialized — would catch rendering regressions.
+
+### P4: Multiple open gym slots in same 30-min window → duplicate notifications
+If a day has two open gym sessions both starting in the window (e.g. 12:00–1:00 PM and 12:30–2:00 PM), `check-and-notify.mjs` sends two separate `/notify` calls with different idempotency keys. User gets two back-to-back "Open Gym in ~30 min" notifications. Fix: group same-window slots and send one notification whose body lists both start times.
+
 ---
 
 ## Deferred / Future
