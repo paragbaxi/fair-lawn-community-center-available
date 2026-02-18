@@ -198,12 +198,10 @@
         aria-label="Notification settings"
         aria-expanded={sheetOpen}
       >
+        🔔
         {#if notifStore.state === 'subscribed'}
-          🔔<span class="bell-badge" aria-hidden="true"></span>
-        {:else}
-          🔔
-        {/if}
-        {#if bellPulsing}
+          <span class="bell-badge" aria-hidden="true"></span>
+        {:else if bellPulsing}
           <span class="bell-badge-new" aria-hidden="true"></span>
         {/if}
       </button>

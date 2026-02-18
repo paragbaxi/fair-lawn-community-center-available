@@ -268,6 +268,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
       url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports`,
     };
     const idKey = `idempotent:${isoDate}:${act.dayName}:sport-${body.sportId}`;
+    // 'thirtyMin' is unused when sportId is provided — fanOut branches on sportId presence
     const result = await fanOut(env, notifData, 'thirtyMin', idKey, body.sportId);
     return json({ ok: true, result });
   }

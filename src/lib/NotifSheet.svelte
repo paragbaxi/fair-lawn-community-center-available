@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+  import { fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { getAvailableSports } from './filters.js';
   import { activityEmoji } from './emoji.js';
   import { notifStore, handleEnable, handleDisable, savePrefs, toggleSport } from './notifStore.svelte.js';
@@ -11,20 +14,48 @@
     onClose: () => void;
   } = $props();
 
+  let panelEl: HTMLDivElement | null = $state(null);
+
   // Only show sports with sessions this week (matches SportWeekCard behavior)
   const notifiableSports = $derived(data ? getAvailableSports(data.schedule) : []);
 
-  // Body scroll lock + Escape key
+  // Returns 0 when user prefers reduced motion, so transitions are instant
+  function dur(ms: number): number {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms;
+  }
+
+  const focusableSelector =
+    'button:not(:disabled), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+  // Body scroll lock + focus trap + Escape key
   $effect(() => {
     if (!open) return;
     document.body.style.overflow = 'hidden';
+
+    // Move initial focus into dialog after panel renders
+    tick().then(() => {
+      panelEl?.querySelector<HTMLElement>(focusableSelector)?.focus();
+    });
+
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+      if (e.key === 'Tab' && panelEl) {
+        const focusable = Array.from(panelEl.querySelectorAll<HTMLElement>(focusableSelector));
+        if (focusable.length === 0) { e.preventDefault(); return; }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onKeyDown);
+      notifStore.error = null;  // clear error when sheet closes
     };
   });
 
@@ -35,12 +66,19 @@
 </script>
 
 {#if open}
-  <div class="sheet-backdrop" onclick={onClose} role="presentation"></div>
+  <div
+    class="sheet-backdrop"
+    onclick={onClose}
+    role="presentation"
+    transition:fade={{ duration: dur(200) }}
+  ></div>
   <div
     class="sheet-panel"
+    bind:this={panelEl}
     role="dialog"
     aria-modal="true"
     aria-labelledby="sheet-title"
+    transition:fly={{ y: 300, duration: dur(300), easing: cubicOut }}
   >
     <div class="sheet-handle" aria-hidden="true"></div>
     <div class="sheet-header">
@@ -49,6 +87,9 @@
       <button class="sheet-close" onclick={onClose} aria-label="Close">✕</button>
     </div>
     <div class="sheet-content">
+      {#if notifStore.error}
+        <p class="sheet-error" role="alert">{notifStore.error}</p>
+      {/if}
       {#if !notifStore.initialized}
         <div class="sheet-loading" aria-busy="true">…</div>
       {:else if notifStore.isIos && !notifStore.isStandalone}
@@ -157,18 +198,6 @@
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     background: var(--color-bg);
-    animation: slideUp 0.3s ease;
-  }
-
-  @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sheet-panel {
-      animation: none;
-    }
   }
 
   .sheet-handle {
@@ -193,8 +222,8 @@
   }
 
   .sheet-close {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border: none;
     background: var(--color-surface);
     border-radius: 50%;
@@ -209,6 +238,16 @@
 
   .sheet-content {
     padding: 8px 20px 32px;
+  }
+
+  .sheet-error {
+    background: var(--color-closed-bg);
+    border: 1px solid var(--color-closed-border);
+    color: var(--color-closed);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+    margin-bottom: 12px;
   }
 
   .sheet-loading {

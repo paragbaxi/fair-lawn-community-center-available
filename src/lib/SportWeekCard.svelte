@@ -65,8 +65,6 @@
     if (!selectedSport) return null;
     return computeSportStatus(data.schedule, selectedSport.match, clock.now, todayName);
   });
-
-
 </script>
 
 {#if availableSports.length > 0}

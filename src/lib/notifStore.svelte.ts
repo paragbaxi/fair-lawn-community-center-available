@@ -11,6 +11,7 @@ export const notifStore = $state({
   isIos: false,
   isStandalone: false,
   initialized: false,
+  error: null as string | null,    // transient error message; null = no error
 });
 
 /** Call once from App.svelte onMount. Idempotent — no-op if already initialized. */
@@ -32,6 +33,7 @@ export async function initNotifStore(): Promise<void> {
  */
 export async function handleEnable(): Promise<void> {
   notifStore.loading = true;
+  notifStore.error = null;
   const result = await notifications.subscribe(notifStore.prefs);
   notifStore.loading = false;
   if (result === true) {
@@ -40,12 +42,16 @@ export async function handleEnable(): Promise<void> {
     if (stored) notifStore.prefs = stored;
   } else if (result === 'denied') {
     notifStore.state = 'denied';
+  } else if (result !== 'unsupported') {
+    // result === false: SW subscribe failed (network error etc.)
+    notifStore.error = 'Failed to enable — please try again';
   }
 }
 
 /** Unsubscribe fully — removes from server (DELETE) and clears localStorage. */
 export async function handleDisable(): Promise<void> {
   notifStore.loading = true;
+  notifStore.error = null;
   await notifications.unsubscribe();
   notifStore.state = 'prompt';
   notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [] };
@@ -66,6 +72,7 @@ export async function savePrefs(prefs: NotifPrefs): Promise<void> {
  */
 export async function toggleSport(sportId: string): Promise<void> {
   notifStore.loading = true;
+  notifStore.error = null;
   if (notifStore.state !== 'subscribed') {
     const result = await notifications.subscribe({
       thirtyMin: false, dailyBriefing: false, sports: [sportId],
@@ -76,6 +83,8 @@ export async function toggleSport(sportId: string): Promise<void> {
       if (stored) notifStore.prefs = stored;
     } else if (result === 'denied') {
       notifStore.state = 'denied';
+    } else if (result !== 'unsupported') {
+      notifStore.error = 'Failed to subscribe — please try again';
     }
   } else {
     const current = notifications.getStoredPrefs() ?? { thirtyMin: false, dailyBriefing: false, sports: [] };
