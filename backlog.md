@@ -183,6 +183,31 @@ Added `<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>` in `Today
 
 ---
 
+## Open
+
+### 🚨 P2: Scraper failure notification via GitHub issue
+The `scrape-and-deploy.yml` workflow creates/updates a GitHub issue on scraper failure — but `gotoWithRetry` exhaustion (both attempts timeout) still exits 1 and triggers the issue. However, **there is currently no notification if the scraper silently succeeds but parses stale/empty data** (validation passes with partial content). The `scraper-smoke.yml` smoke test catches structural breakage, but a gradual data-quality regression (e.g. Fair Lawn restructures their page so only 3 days parse instead of 7) would pass Rule 3 (≥3 days) and Rule 9 (warning, not error) and deploy silently. **Recommended:** Lower Rule 3 threshold to 5 days (error) and promote Rule 9 to error after the smoke test has run clean for a week.
+
+### P2: DayPicker keyboard nav — E2E test coverage
+The keyboard navigation added in this sweep is tested only by TypeScript compilation. There's no E2E test that programmatically presses ArrowRight/ArrowLeft and asserts focus moves. **Recommended:** add a `DayPicker keyboard navigation` test using `page.keyboard.press('ArrowRight')` after focusing a day button, asserting the next enabled day gets `aria-pressed="true"`.
+
+### P3: SportWeekCard — show "No upcoming [sport] this week" state
+`computeSportStatus` returns `kind: 'none'` when the sport never appears in the weekly schedule. Currently nothing renders in this case — the banner is just absent. A neutral message ("No Basketball scheduled this week") would clarify the state vs. a loading failure.
+
+### P3: Scraper — structured error classification
+`gotoWithRetry` catches all errors the same way. It would be useful to distinguish: (a) DNS failure / connection refused (Fair Lawn site down), (b) timeout (slow response), (c) HTTP 4xx/5xx. Each has a different remediation. Currently all produce the same `[retry 1/1]` log line. Log the error type so the GitHub issue body has actionable context.
+
+### P4: Timeline — "no activities today" empty state
+When `selectedSchedule` is `null` (day has no schedule entry), `TodayView` renders nothing between the DayPicker and "Rest of Week". A brief empty state ("No schedule data for [day]") would make the blank space intentional rather than looking like a load failure.
+
+### P4: Sport chip — show count badge
+Each sport chip could show how many slots this week it has (e.g. "Basketball · 4"). This is already computable from `DISPLAY_DAYS` + `data.schedule` without new derived state — just count activities matching the sport filter across days.
+
+### P4: Lighthouse CI — re-enable performance gate
+The performance assertion was removed because shared GitHub runners produce unreliable scores (~0.44) with CPU throttling. Now that `throttlingMethod: 'provided'` is set, scores should be stable. Re-run Lighthouse a few times locally to confirm the score, then re-add `"minScore": 0.85` (or whatever the baseline is).
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
