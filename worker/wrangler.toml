@@ -1,5 +1,6 @@
 name = "flcc-push"
 main = "index.ts"
+account_id = "2a173a2cfd2f56ac9d314d3fcfde4ad6"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
