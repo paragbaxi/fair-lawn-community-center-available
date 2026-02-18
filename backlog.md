@@ -154,9 +154,15 @@ Removed dead `.footer-meta + .footer-meta` adjacent-sibling rule — only one `.
 ### ~~P3: Scraper staleness alerting~~
 Added `.github/workflows/freshness-check.yml` — runs daily at 9 AM UTC (4h after scraper), reads `scrapedAt` from `public/data/latest.json`, creates/comments on a `stale-data` issue if age > 26h, and auto-closes it when fresh again. Concurrency group prevents duplicate issues on concurrent `workflow_dispatch` runs. Pure bash + `jq` — no Node.js, ~15s runtime. Deployed 2026-02-17.
 
+### ~~P2: Sport status banner ("Is it on now — and if not, when's next?")~~
+Compact status banner between sport chips and the week list in the Sports tab. Three states: **active** (green, mirrors gym StatusCard) — "Basketball is on now — ends at 2:00 PM"; **upcoming-today** (neutral) — "Next Basketball at 5:30 PM today"; **upcoming-week** (neutral) — "Next Basketball: Thu at 5:00 PM". `SportStatus` discriminated union in `types.ts` enables TypeScript narrowing. `computeSportStatus()` accepts `matchFn` callback to avoid circular import with `filters.ts`. 8 unit tests (180 total). Deployed 2026-02-18.
+
 ---
 
 ## Open
+
+### ⚠️ P2: Scraper — no retry or dry-run mode (fragile on HTML changes)
+`scraper/validate.ts` catches bad data _after_ parsing, but the scraper has no retry logic and no way to test against live HTML without risking a bad commit. If the Fair Lawn site changes its table structure, the next scheduled scrape will silently produce empty or malformed data. **Recommended:** add a `--dry-run` flag that runs the full parse+validate pipeline but exits before `git commit`. This lets CI or a developer test the scraper against the live site HTML safely. Priority elevated from P3 because a bad scrape currently requires a manual revert + re-deploy.
 
 ### P3: Scraper resilience — handle Fair Lawn site HTML changes
 Rule 5/6/7 in `validate.ts` catch bad data after the fact, but the scraper has no retry logic and no fallback if the page structure changes. **Recommended:** add a `--dry-run` mode that parses without committing, so scraper changes can be tested in CI against live site HTML without risk of pushing bad data.
@@ -170,7 +176,13 @@ DayPicker buttons respond to click but not arrow-key navigation (roving tabindex
 ### P4: WeeklySchedule `{#if expanded}` wrapper cleanup
 After the tab merge, `WeeklySchedule` is always called with `expanded={true}`. The outer `{#if expanded}` block is now dead guard logic. Could be removed to simplify the template — but only after confirming no other callers pass `expanded={false}`.
 
-### P2: Fair Lawn Library availability tracker (+ multi-venue coexistence)
+### P3: E2E test — sport status banner renders correctly
+Unit tests cover `computeSportStatus` logic, but there's no browser-level test verifying the banner actually appears between the chips and the week list when a sport is active or upcoming. **Recommended:** add a test that sets a mocked clock time (via `page.clock.install()`) to a known basketball slot, navigates to `#sports?sport=basketball`, and asserts `.sport-status-banner` is visible with the expected text. Pairs well with the existing sport chip E2E tests.
+
+### P3: Sport status banner — collapsed mode (deferred)
+The banner was intentionally skipped for the collapsed `<details>` branch of `SportWeekCard` (no active consumer in the app). If the collapsed mode is ever re-enabled, the banner markup and `sportStatus` derived state are already wired up — just duplicate the `{#if sportStatus ...}` block into the collapsed branch. No code changes needed until then.
+
+### P4: WeeklySchedule `{#if expanded}` wrapper cleanup
 Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:
 - **Coexistence model**: same repo (monorepo with shared `src/lib/`) vs. separate repo? Shared repo avoids duplicating the Svelte app scaffold and CI workflows, but complicates routing and deployment (two GitHub Pages sites vs. one multi-venue app).
 - **Multi-venue app option**: a single app at a shared URL that lets the user toggle between Community Center and Library — may be a better long-term UX than two separate bookmarks.
