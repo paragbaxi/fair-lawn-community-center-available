@@ -24,10 +24,10 @@ export interface ScheduleData {
 
 export type GymStatus = 'available' | 'in-use' | 'closed';
 
-export type TabId = 'status' | 'today' | 'sports' | 'schedule';
+export type TabId = 'status' | 'today' | 'sports';
 
 // Keep types.ts pure (no logic imports) to avoid circular dependencies.
-export const VALID_TABS: TabId[] = ['status', 'today', 'sports', 'schedule'];
+export const VALID_TABS: TabId[] = ['status', 'today', 'sports'];
 
 export interface GymState {
   status: GymStatus;

@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { GymState, ScheduleData } from './types.js';
   import StatusCard from './StatusCard.svelte';
-  import AboutFaq from './AboutFaq.svelte';
   import { formatEasternDate } from './time.js';
 
   let { gymState, data }: {
@@ -11,8 +10,6 @@
 </script>
 
 <StatusCard {gymState} />
-
-<AboutFaq />
 
 <footer class="micro-footer">
   <p>

@@ -44,11 +44,6 @@ test('tab switching shows correct panels', async ({ page }) => {
   await expect(page.locator('#panel-sports')).not.toHaveAttribute('hidden', '');
   await expect(page.locator('#panel-today')).toHaveAttribute('hidden', '');
 
-  // Click Schedule tab
-  await page.locator('#tab-schedule').click();
-  await expect(page.locator('#panel-schedule')).not.toHaveAttribute('hidden', '');
-  await expect(page.locator('#panel-sports')).toHaveAttribute('hidden', '');
-
   // Click Status tab to go back
   await page.locator('#tab-status').click();
   await expect(statusPanel).not.toHaveAttribute('hidden', '');
@@ -67,10 +62,6 @@ test('compact status bar visible on Today tab only', async ({ page }) => {
 
   // Sports tab — no compact status
   await page.locator('#tab-sports').click();
-  await expect(page.locator('.compact-status')).not.toBeVisible();
-
-  // Schedule tab — no compact status
-  await page.locator('#tab-schedule').click();
   await expect(page.locator('.compact-status')).not.toBeVisible();
 });
 
@@ -127,28 +118,23 @@ test('DayPicker renders and responds to clicks on Today tab', async ({ page }) =
   }
 });
 
-test('Schedule tab accordion shows today expanded', async ({ page }) => {
+test('Rest of Week accordion shows today when a different day is selected', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.status-card')).toBeVisible();
 
-  // Navigate to Schedule tab
-  await page.locator('#tab-schedule').click();
+  // Navigate to Schedule tab (Today tab, relabeled)
+  await page.locator('#tab-today').click();
 
-  // Today's accordion item should be visible with Today badge
-  const todayBadge = page.locator('#panel-schedule .today-badge');
-  await expect(todayBadge.first()).toBeVisible();
+  // Switch to a day that isn't today so today appears in the Rest-of-Week accordion
+  const dayBtns = page.locator('#panel-today .day-btn');
+  // Find a day button that is NOT today (no .today-dot inside it)
+  const nonTodayBtn = dayBtns.filter({ hasNot: page.locator('.today-dot') }).first();
+  await nonTodayBtn.click();
 
-  // Click another accordion header to expand it
-  const headers = page.locator('#panel-schedule .accordion-header');
-  const count = await headers.count();
-  if (count > 1) {
-    // Find a header that doesn't have Today badge (i.e. collapsed)
-    // Click the last header to expand it
-    await headers.last().click();
-    // Verify expanded content exists (last accordion item now has content)
-    const lastItem = page.locator('#panel-schedule .accordion-item').last();
-    await expect(lastItem.locator('.accordion-content')).toBeVisible();
-  }
+  // Today's badge should now appear in the accordion section (not the Timeline)
+  await expect(
+    page.locator('#panel-today .schedule-accordion .accordion-item .today-badge')
+  ).toBeVisible();
 });
 
 test('Sports tab shows chips and responds to selection', async ({ page }) => {
@@ -234,21 +220,6 @@ test('deep link #sports?sport=basketball pre-selects a sport chip', async ({ pag
   // At least one chip should be pressed (data-independent assertion)
   const pressedChip = page.locator('#panel-sports .sport-chip[aria-pressed="true"]').first();
   await expect(pressedChip).toBeVisible();
-});
-
-test('deep link #schedule?day=Friday pre-expands Friday accordion', async ({ page }) => {
-  await page.goto('/#schedule?day=Friday');
-  // Wait for data to load (tab bar appears after load)
-  await expect(page.locator('#tab-schedule')).toBeVisible({ timeout: 5000 });
-
-  // Schedule tab should be active
-  await expect(page.locator('#tab-schedule')).toHaveAttribute('aria-selected', 'true');
-
-  // Friday accordion should be expanded (content visible)
-  const fridayItem = page.locator('#panel-schedule .accordion-item').filter({ hasText: 'Friday' });
-  if (await fridayItem.count() > 0) {
-    await expect(fridayItem.locator('.accordion-content')).toBeVisible();
-  }
 });
 
 test('URL updates reactively when user changes day on Today tab', async ({ page }) => {
