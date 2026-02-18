@@ -152,3 +152,10 @@ The "Schedule" tab (full weekly accordion) and "Today" tab (timeline + day picke
 
 ### ~~P5: Fix unused CSS selector in `ScheduleView.svelte`~~
 Removed dead `.footer-meta + .footer-meta` adjacent-sibling rule — only one `.footer-meta` element exists in the markup; the second paragraph it targeted was removed in an earlier refactor. Merged 2026-02-17.
+
+### P2: Fair Lawn Library availability tracker (+ multi-venue coexistence)
+Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:
+- **Coexistence model**: same repo (monorepo with shared `src/lib/`) vs. separate repo? Shared repo avoids duplicating the Svelte app scaffold and CI workflows, but complicates routing and deployment (two GitHub Pages sites vs. one multi-venue app).
+- **Multi-venue app option**: a single app at a shared URL that lets the user toggle between Community Center and Library — may be a better long-term UX than two separate bookmarks.
+- **Scraper source**: confirm the Library posts a machine-readable schedule (HTML table, calendar feed, etc.) and identify the target URL before committing to a scraper approach.
+- **Data shape**: Library room-booking / hours / events may not map 1:1 to the gym's activity-slot model — the shared `ScheduleData` type may need extension or a new type.
