@@ -186,59 +186,67 @@ Changed from `mailto:paragbaxi@github.io` to `https://paragbaxi.github.io/fair-l
 
 ### ~~P1: Worker deploy broken — missing `account_id` in `wrangler.toml`~~
 `deploy-worker.yml` had been failing with error 9106 since the worker was added. Root cause: without `account_id`, wrangler calls `GET /user/memberships` to discover the account — a user-level endpoint that an account-scoped API token can't access. Added `account_id = "2a173a2cfd2f56ac9d314d3fcfde4ad6"`. Also committed missing `worker/package-lock.json` (required for `npm ci`), and set a valid `CLOUDFLARE_API_TOKEN` GitHub secret. Worker now live at `https://flcc-push.trueto.workers.dev`. Deployed 2026-02-18.
-Added `<p class="scroll-hint" aria-hidden="true">↓ Rest of week</p>` in `TodayView.svelte` between the Timeline and the "Rest of Week" heading. CSS-only: `display: none` by default, `display: block` at `max-width: 500px`. Uses `var(--color-text-secondary)`. Deployed 2026-02-17.
 
 ### ~~P1: Per-sport notification alerts + notification UX overhaul~~
 Full notifications system: Cloudflare Worker (`worker/index.ts`) with KV-backed subscriptions, VAPID push, sport-level prefs, daily briefing cron, and `POST /notify` endpoint for both `30min` and `sport-30min` types. Frontend: `notifStore.svelte.ts` module-level $state singleton eliminating triple `onMount` duplication and `localSports` desync; `NotifSheet.svelte` bottom sheet with focus trap, `fly`/`fade` Svelte transitions, iOS-style toggles, error banner, body-scroll lock; bell button in `App.svelte` header with session-scoped pulse dot; `NotificationSettings.svelte` refactored to thin CTA strip; `SportWeekCard.svelte` migrated to notifStore; `check-and-notify.mjs` sends open gym + per-sport 30-min notifications; `push-notify.yml` cron workflow triggers every 30 min; `deploy-worker.yml` auto-deploys worker on `worker/**` push to main. Merged 2026-02-18.
+
+### ~~P1: Set Cloudflare Worker secrets + end-to-end push verification~~
+Generated fresh VAPID key pair and hex NOTIFY_API_KEY (`openssl rand -hex 32` — no special chars). Root cause of prior failures: secrets set via `printf "..." | wrangler secret put` had `=`/`/` chars mangled by the zsh pipe; secrets set before the worker existed ("no worker found" warning) didn't persist to the live worker. Fix: all secrets set via heredoc (`<< 'EOF'`) after first successful deploy. Set all three Worker secrets (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `NOTIFY_API_KEY`) and matching GitHub secrets (`VITE_VAPID_PUBLIC_KEY`, `NOTIFY_API_KEY`, `CLOUDFLARE_WORKER_URL`). Frontend redeployed to rebake new VAPID public key into bundle. End-to-end verified via `POST /notify` → `{"sent":1,"skipped":0,"cleaned":0}`. Done 2026-02-18.
 
 ---
 
 ## Open
 
-### ~~P1: Set Cloudflare Worker secrets (VAPID keys + NOTIFY_API_KEY)~~
-Generated fresh VAPID key pair and NOTIFY_API_KEY. Set all three Worker secrets via `wrangler secret put`. Updated matching GitHub secrets (`VITE_VAPID_PUBLIC_KEY`, `NOTIFY_API_KEY`, `CLOUDFLARE_WORKER_URL`). Verified `/notify` endpoint authenticates and responds correctly. Frontend redeploy triggered to rebake new `VITE_VAPID_PUBLIC_KEY` into bundle. Done 2026-02-18.
+### 🚨 P2: `push-notify.yml` cron runs 24/7 — narrow to gym hours
+The cron `*/30 * * * *` fires 48×/day including 3 AM ET. The script exits cleanly with no matching activities, but the GitHub Actions minutes cost is real and unnecessary. Change cron to `*/30 8-22 * * *` (8–10:30 PM UTC = 3–5:30 PM ET, covering full gym hours with buffer). Alternatively, add an early-exit Eastern-time gate at the top of the script: `if (now.getHours() < 8 || now.getHours() >= 22) { console.log('Outside gym hours, skipping.'); process.exit(0); }`. Reduces Actions minutes by ~60%.
 
-### ~~P1: Verify `CLOUDFLARE_WORKER_URL` secret matches actual worker URL~~
-Worker URL confirmed as `https://flcc-push.trueto.workers.dev`. Secret updated. Done 2026-02-18.
+### 🚨 P2: Scraper silent data-quality regression
+The `scrape-and-deploy.yml` workflow creates a GitHub issue on hard scraper failure. However, **a partial parse (e.g. Fair Lawn restructures their HTML so only 3 days parse instead of 7) passes Rule 3 (≥3 days) and Rule 9 (warning only) and deploys silently**. Push notification subscribers would then miss days that aren't in the data. **Fix:** Lower Rule 3 threshold from 3 to 5 days (error), and promote Rule 9 (forward-schedule completeness) from warning to error — the smoke test has been running clean for a week so the baseline is stable.
 
-### 🚨 P2: Scraper failure notification via GitHub issue
-The `scrape-and-deploy.yml` workflow creates/updates a GitHub issue on scraper failure — but `gotoWithRetry` exhaustion (both attempts timeout) still exits 1 and triggers the issue. However, **there is currently no notification if the scraper silently succeeds but parses stale/empty data** (validation passes with partial content). The `scraper-smoke.yml` smoke test catches structural breakage, but a gradual data-quality regression (e.g. Fair Lawn restructures their page so only 3 days parse instead of 7) would pass Rule 3 (≥3 days) and Rule 9 (warning, not error) and deploy silently. **Recommended:** Lower Rule 3 threshold to 5 days (error) and promote Rule 9 to error after the smoke test has run clean for a week.
-
-### P2: `savePrefs` swallows `updatePrefs` network errors
-In `NotifSheet.svelte`, `onclick={() => savePrefs(...)}` fires the async function without `await` or `.catch()`. If `notifications.updatePrefs()` throws (worker down, network failure), the rejection is unhandled, the optimistic UI update persists, and the user's prefs are silently lost on server. Fix: wrap `updatePrefs` in `savePrefs` with try/catch and set `notifStore.error` on failure (same pattern as `toggleSport`).
+### P2: `savePrefs` error swallowed — user prefs silently lost
+`onclick={() => savePrefs(...)}` fires the async function fire-and-forget in `NotifSheet.svelte`. If `notifications.updatePrefs()` fails (worker down, network error), the rejection is unhandled: the optimistic UI update persists but the server has stale prefs. Fix: wrap `updatePrefs` in `savePrefs` with try/catch and set `notifStore.error` on failure (same pattern as `toggleSport`).
 
 ### P2: E2E tests for NotifSheet
-The main deliverable from the notification overhaul has zero Playwright coverage. Minimum test cases: (1) bell visible after data loads; (2) bell tap opens sheet; (3) Escape closes sheet; (4) "Turn on notifications" shows browser permission prompt; (5) subscribed state shows toggles. Use `page.addInitScript` to mock `Notification.permission` and service worker APIs.
+The main deliverable from the notification overhaul has zero Playwright coverage. Minimum test cases: (1) bell visible after data loads; (2) bell tap opens sheet; (3) Escape closes sheet; (4) "Turn on notifications" triggers browser permission prompt; (5) subscribed state shows toggles. Use `page.addInitScript` to mock `Notification.permission` and service worker APIs since real push subscriptions can't be created in CI.
 
 ### P2: DayPicker keyboard nav — E2E test coverage
-The keyboard navigation added in this sweep is tested only by TypeScript compilation. There's no E2E test that programmatically presses ArrowRight/ArrowLeft and asserts focus moves. **Recommended:** add a `DayPicker keyboard navigation` test using `page.keyboard.press('ArrowRight')` after focusing a day button, asserting the next enabled day gets `aria-pressed="true"`.
+Keyboard navigation (ArrowRight/ArrowLeft) is tested only by TypeScript compilation. Add a `DayPicker keyboard navigation` E2E test: focus a day button, press `ArrowRight`, assert the next enabled day receives `aria-pressed="true"`.
 
-### P3: SportWeekCard — show "No upcoming [sport] this week" state
-`computeSportStatus` returns `kind: 'none'` when the sport never appears in the weekly schedule. Currently nothing renders in this case — the banner is just absent. A neutral message ("No Basketball scheduled this week") would clarify the state vs. a loading failure.
+### P3: `notifStore.error` not set on `toggleSport` / `handleEnable` general failures
+`toggleSport` catches errors but only logs them — it never sets `notifStore.error`. `handleEnable` only sets error state for `'denied'`; a generic subscribe failure (network error, Worker 500) returns `false` and silently resets `loading` with no user feedback. Both should set `notifStore.error` with a human-readable message on failure so the sheet's error banner activates.
 
-### P3: Scraper — structured error classification
-`gotoWithRetry` catches all errors the same way. It would be useful to distinguish: (a) DNS failure / connection refused (Fair Lawn site down), (b) timeout (slow response), (c) HTTP 4xx/5xx. Each has a different remediation. Currently all produce the same `[retry 1/1]` log line. Log the error type so the GitHub issue body has actionable context.
-
-### P3: `push-notify.yml` cron runs 24/7 — add gym-hours time window
-The cron `*/30 * * * *` fires 48×/day regardless of whether the gym is open. The script already handles finding zero activities gracefully (exits 0 with a log line), but 30+ of those runs are guaranteed no-ops (midnight–9 AM, after 10 PM). Narrow the cron to gym hours, e.g. `*/30 9-21 * * *` (9 AM–9:30 PM UTC = 4 AM–4:30 PM ET), or add an Eastern-time gate at the top of the script. Reduces Actions minutes by ~60%.
+### P3: `push-notify.yml` missing node_modules caching
+All other workflows use the `setup-node-deps` composite action for caching `node_modules`. `push-notify.yml` uses bare `actions/setup-node@v4` with no cache. At 48 runs/day this re-downloads `node-fetch` (and any other deps) on every invocation. Replace the two-step node setup + `npm ci` with `uses: ./.github/actions/setup-node-deps`.
 
 ### P3: `SPORT_PATTERNS` in `check-and-notify.mjs` can drift from `filters.ts`
-The `SYNC:` comment is the only guard preventing the two lists from diverging when a sport is added to `FILTER_CATEGORIES`. Adding a sport to `filters.ts` but forgetting `check-and-notify.mjs` silently skips sport-specific notifications. Fix: either import `FILTER_CATEGORIES` directly (requires ESM-compatible build step) or add a small CI test that reads both files and asserts their sport IDs match.
+The `SYNC:` comment is the only guard preventing the two lists diverging when a sport is added to `FILTER_CATEGORIES`. A sport added to `filters.ts` but forgotten in `check-and-notify.mjs` silently skips sport-specific notifications. Fix: add a small CI step (or unit test) that reads both files and asserts their sport IDs match — no build step needed, plain `node -e` comparison is sufficient.
+
+### P3: SportWeekCard — "No upcoming [sport] this week" state
+`computeSportStatus` returns `kind: 'none'` when the sport never appears in the weekly schedule. Currently nothing renders — the banner is absent and it looks like a load failure. A neutral message ("No Basketball sessions scheduled this week") clarifies the state.
+
+### P3: Scraper — structured error classification
+`gotoWithRetry` catches all errors identically. Distinguishing (a) DNS failure/connection refused (site down), (b) timeout (slow response), (c) HTTP 4xx/5xx would give the GitHub issue body actionable context rather than a generic `[retry 1/1]` log line.
+
+### P4: `deploy-worker.yml` missing node_modules caching
+`deploy-worker.yml` runs bare `npm ci` in `worker/` on every push to `worker/**`. Wrangler and its deps could be cached using `actions/cache@v4` keyed on `worker/package-lock.json`. Low-frequency workflow but trivially fixable alongside the `push-notify.yml` cache fix.
+
+### P4: KV subscriber count visibility
+There's no way to observe how many active push subscribers exist without `npx wrangler kv key list`. Consider adding a `/stats` endpoint to the Worker (auth-gated via `NOTIFY_API_KEY`) that returns `{subscribers: N, idempotencyKeys: M}` — useful for debugging and capacity awareness.
+
+### P4: Document VAPID key rotation in SETUP.md
+The current SETUP.md covers initial bootstrap but not the "rotate keys" scenario. If `VAPID_PRIVATE_KEY` is ever compromised, all existing browser subscriptions must be cleared (they're tied to the old public key). Add a "Key Rotation" section: (1) generate new keys, (2) clear all KV subscriptions, (3) set new Worker secrets, (4) redeploy frontend, (5) subscribers must re-subscribe.
 
 ### P4: Timeline — "no activities today" empty state
-When `selectedSchedule` is `null` (day has no schedule entry), `TodayView` renders nothing between the DayPicker and "Rest of Week". A brief empty state ("No schedule data for [day]") would make the blank space intentional rather than looking like a load failure.
+When `selectedSchedule` is `null` (day has no schedule entry), `TodayView` renders nothing between the DayPicker and "Rest of Week". A brief empty state ("No schedule data for [day]") makes the blank space intentional rather than a load failure.
 
-### P4: Sport chip — show count badge
-Each sport chip could show how many slots this week it has (e.g. "Basketball · 4"). This is already computable from `DISPLAY_DAYS` + `data.schedule` without new derived state — just count activities matching the sport filter across days.
+### P4: Sport chip — count badge
+Each sport chip could show slot count for the week (e.g. "Basketball · 4"). Already computable from `DISPLAY_DAYS` + `data.schedule` without new derived state.
 
 ### P4: Worker unit tests
-`worker/index.ts` has zero test coverage. The fan-out logic, idempotency check, sport-filter branch, and error cleanup (410 handling) are all untested. Add `worker/index.test.ts` using `vitest` + Cloudflare's `@cloudflare/vitest-pool-workers` (or mock the KV namespace with a simple Map). Minimum coverage: `fanOut` idempotency, sport filtering, subscription cleanup on 410, `handleNotify` routing.
-
-### P4: `push-notify.yml` missing node_modules caching
-All other workflows use the `setup-node-deps` composite action for caching `node_modules`. `push-notify.yml` uses bare `actions/setup-node@v4` with no cache. Since it runs 48×/day, it re-downloads dependencies each time. Replace the two-step node setup + `npm ci` with `uses: ./.github/actions/setup-node-deps`.
+`worker/index.ts` has zero test coverage. Critical paths untested: `fanOut` idempotency check, sport-filter branch, 410 subscription cleanup, `handleNotify` routing. Add `worker/index.test.ts` using `vitest` with a KV mock (`Map`-based) — no `@cloudflare/vitest-pool-workers` needed for unit tests.
 
 ### P4: Lighthouse CI — re-enable performance gate
-The performance assertion was removed because shared GitHub runners produce unreliable scores (~0.44) with CPU throttling. Now that `throttlingMethod: 'provided'` is set, scores should be stable. Re-run Lighthouse a few times locally to confirm the score, then re-add `"minScore": 0.85` (or whatever the baseline is).
+Removed because shared runners produced ~0.44 with CPU throttling. Now that `throttlingMethod: 'provided'` is set, scores should be stable. Run Lighthouse locally a few times to confirm the baseline, then re-add `"minScore": 0.85`.
 
 ---
 
