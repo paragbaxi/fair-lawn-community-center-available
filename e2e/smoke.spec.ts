@@ -336,6 +336,110 @@ test.describe('Sports tab', () => {
     const btnText = await notifBtn.textContent();
     expect(btnText).toMatch(/notify|notifying/i);
   });
+
+  test('Open Gym chip is visible on Sports tab', async ({ page }) => {
+    await page.goto('/#sports');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    const openGymChip = page.locator('.sport-chip-opengym');
+    if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No Open Gym chip — schedule has no open gym sessions this week');
+      return;
+    }
+
+    await expect(openGymChip).toBeVisible();
+  });
+
+  test('Open Gym chip select and deselect', async ({ page }) => {
+    await page.goto('/#sports');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    const openGymChip = page.locator('.sport-chip-opengym');
+    if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No Open Gym chip — schedule has no open gym sessions this week');
+      return;
+    }
+
+    // Wait for notifStore to initialize (SW 3s timeout + margin)
+    await page.waitForTimeout(5500);
+
+    // Click chip to select
+    await openGymChip.click();
+    await expect(openGymChip).toHaveAttribute('aria-pressed', 'true');
+
+    // Week results or no-results should appear
+    const results = page.locator('#panel-sports .week-results');
+    const noResults = page.locator('#panel-sports .no-results');
+    const hasResults = await results.isVisible().catch(() => false);
+    const hasNoResults = await noResults.isVisible().catch(() => false);
+    expect(hasResults || hasNoResults).toBe(true);
+
+    // Click chip again to deselect
+    await openGymChip.click();
+    await expect(openGymChip).toHaveAttribute('aria-pressed', 'false');
+
+    // Hint text should return
+    await expect(page.locator('#panel-sports .hint-text')).toBeVisible();
+  });
+
+  test('deep link #sports?sport=open-gym pre-selects Open Gym chip', async ({ page }) => {
+    await page.goto('/#sports?sport=open-gym');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    const openGymChip = page.locator('.sport-chip-opengym');
+    if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No Open Gym chip — schedule has no open gym sessions this week');
+      return;
+    }
+
+    // Chip should be pre-selected from URL
+    await expect(openGymChip).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('"Alert me before Open Gym" button opens the notification sheet (happy path)', async ({ page }) => {
+    await page.goto('/#sports?sport=open-gym');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    const openGymChip = page.locator('.sport-chip-opengym');
+    if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No Open Gym chip — schedule has no open gym sessions this week');
+      return;
+    }
+
+    // Wait for notifStore to initialize (SW 3s timeout + margin)
+    await page.waitForTimeout(5500);
+
+    // The sport-notif-btn for Open Gym should be visible (state may be 'prompt' or 'subscribed')
+    const alertBtn = page.locator('.sport-notif-btn');
+    if (!await alertBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      test.skip(true, 'No notification button — unsupported or iOS non-standalone context');
+      return;
+    }
+
+    // Clicking either "Alert me before Open Gym" or "✓ Open Gym alerts on" calls onManageAlerts('thirtyMin')
+    await alertBtn.click();
+
+    // The notification sheet dialog should open
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    await expect(page.locator('#sheet-title')).toHaveText('My Alerts');
+  });
+
+  test('"Alert me before Open Gym" absent when Open Gym chip not selected (unhappy path)', async ({ page }) => {
+    await page.goto('/#sports');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    const openGymChip = page.locator('.sport-chip-opengym');
+    if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No Open Gym chip — schedule has no open gym sessions this week');
+      return;
+    }
+
+    // No sport chip is selected — notif button should not appear
+    await expect(page.locator('.sport-notif-btn')).not.toBeVisible();
+
+    // Hint text should be visible instead
+    await expect(page.locator('.hint-text')).toBeVisible();
+  });
 });
 
 // --- Notification sheet tests ---

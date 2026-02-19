@@ -58,10 +58,10 @@ export function getAvailableSportsAndOpenGym(
   schedule: Record<string, DaySchedule>,
 ): FilterCategory[] {
   const sports = getAvailableSports(schedule);
-  const allActivities = Object.values(schedule).flatMap(d => d.activities);
-  if (allActivities.some(act => OPEN_GYM_CATEGORY.match(act.name))) {
-    return [...sports, OPEN_GYM_CATEGORY];
-  }
+  const hasOpenGym = Object.values(schedule).some(day =>
+    day.activities.some(act => OPEN_GYM_CATEGORY.match(act.name))
+  );
+  if (hasOpenGym) return [...sports, OPEN_GYM_CATEGORY];
   return sports;
 }
 

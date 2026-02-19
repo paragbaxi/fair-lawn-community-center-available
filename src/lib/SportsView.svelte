@@ -12,7 +12,7 @@
     data: ScheduleData;
     selectedSport?: FilterCategory | null;
     onSelectSport?: (sport: FilterCategory | null) => void;
-    onManageAlerts?: () => void;
+    onManageAlerts?: (highlight?: 'thirtyMin' | null) => void;
   } = $props();
 </script>
 

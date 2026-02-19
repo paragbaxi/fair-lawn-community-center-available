@@ -171,6 +171,7 @@ async function fanOut(
           }
         } catch (err) {
           console.error(`Failed to send to ${k.name}:`, err);
+          failed++;
         }
       });
 
@@ -231,12 +232,12 @@ async function handleUpdatePrefs(request: Request, env: Env): Promise<Response> 
 
 async function handleUnsubscribe(request: Request, env: Env): Promise<Response> {
   const body = await request.json() as { endpoint?: string };
-
-  if (!body.endpoint) {
-    return json({ error: 'Missing endpoint' }, 400);
-  }
+  if (!body.endpoint) return json({ error: 'Missing endpoint' }, 400);
 
   const key = await sha256hex(body.endpoint);
+  const existing = await env.SUBSCRIPTIONS.get(key);
+  if (!existing) return json({ error: 'Subscription not found' }, 404);
+
   await env.SUBSCRIPTIONS.delete(key);
   return json({ ok: true });
 }
