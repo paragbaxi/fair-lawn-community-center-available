@@ -260,6 +260,19 @@ Added test to `e2e/smoke.spec.ts` inside `describe('Sports tab')`. Navigates to 
 ### ~~P4: Open Gym notification CTA — highlight thirtyMin toggle in sheet~~
 Implemented in the Open Gym discoverability fix (PR #20). Merged 2026-02-19.
 
+### ~~P3: E2E ready-signal fragility + notif button timeout inconsistency~~
+Three tests navigating to `/#sports` (no pre-selected sport) used `.sport-week-expanded` as their ready signal — that class only renders when a chip is already selected, causing silent 5s timeout burns before the test logic ran. Fixed to `#panel-sports .sport-chip`. "Alert me before Open Gym" test aligned from `isVisible({ timeout: 8000 })` to `waitForTimeout(5500)` + `isVisible({ timeout: 1000 })` — consistent with the other sport notification test. Added explanatory comment to `highlightTimer` in `NotifSheet.svelte`. 29 E2E tests pass. Done 2026-02-19.
+
+---
+
+## Open
+
+### P3: `waitForTimeout(5500)` hard wait in E2E sport notification tests
+Two tests in `describe('Sports tab')` block unconditionally sleep 5.5 seconds waiting for `notifStore` to initialize (SW `getState()` has a 3s timeout). This adds 11s of dead time to every local and CI run of the Sports tab describe block. Fix: replace the hard wait with `page.waitForFunction(() => document.querySelector('.sport-notif-btn') !== null || document.querySelector('.sport-notif-btn') === null, { timeout: 5500 })` — or better, expose a data attribute on the panel (e.g. `data-notif-initialized`) when `notifStore.initialized` is true, then `waitForSelector('[data-notif-initialized]')`. Alternative: reduce the SW timeout constant in `notifications.ts` from 3000ms to 1000ms for non-production builds via `import.meta.env.DEV`.
+
+### P4: Visual regression baselines may be stale after NotifSheet restructure
+The sheet interior (SPORTS/DAILY layout) is not captured in the visual snapshot tests — those only screenshot the 4 tabs in their default state. However if the bell button or any overlay element is visible in the Sports tab dark-mode baseline (`sports-dark.png`), the snapshot may now differ. Run `npx playwright test e2e/visual.spec.ts --update-snapshots` locally to verify and refresh if needed.
+
 ---
 
 ## Deferred / Future
