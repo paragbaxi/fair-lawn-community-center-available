@@ -263,6 +263,9 @@ Implemented in the Open Gym discoverability fix (PR #20). Merged 2026-02-19.
 ### ~~P3: E2E ready-signal fragility + notif button timeout inconsistency~~
 Three tests navigating to `/#sports` (no pre-selected sport) used `.sport-week-expanded` as their ready signal — that class only renders when a chip is already selected, causing silent 5s timeout burns before the test logic ran. Fixed to `#panel-sports .sport-chip`. "Alert me before Open Gym" test aligned from `isVisible({ timeout: 8000 })` to `waitForTimeout(5500)` + `isVisible({ timeout: 1000 })` — consistent with the other sport notification test. Added explanatory comment to `highlightTimer` in `NotifSheet.svelte`. 29 E2E tests pass. Done 2026-02-19.
 
+### ~~P3: Fix 30-min timing context in NotifSheet — move to section subtitle~~
+Removed `(30-min heads-up)` label from Open Gym row (false implied asymmetry vs per-sport rows). Added `~30 min before each activity` section subtitle under Sports heading and `Today's schedule summary` under Daily. Replaced `.sheet-row-sub` with `.sheet-section-sub` (`margin: -4px 0 8px` to tighten visual bond with h3). QA selectors upgraded to section-scoped locators. 6/6 QA tests pass. Merged 2026-02-19.
+
 ---
 
 ## Open
@@ -272,6 +275,12 @@ Two tests in `describe('Sports tab')` block unconditionally sleep 5.5 seconds wa
 
 ### P4: Visual regression baselines may be stale after NotifSheet restructure
 The sheet interior (SPORTS/DAILY layout) is not captured in the visual snapshot tests — those only screenshot the 4 tabs in their default state. However if the bell button or any overlay element is visible in the Sports tab dark-mode baseline (`sports-dark.png`), the snapshot may now differ. Run `npx playwright test e2e/visual.spec.ts --update-snapshots` locally to verify and refresh if needed.
+
+### P4: Daily briefing timing not communicated
+`Today's schedule summary` subtitle describes what the Daily notification contains but not *when* it fires. The exact cron time for the morning briefing is not exposed to users. Consider adding the time (e.g. "~9 AM each morning") to the subtitle text.
+
+### P5: Open Gym row categorically different from per-sport rows
+Open Gym represents gym-wide availability; per-sport toggles filter a specific sport. Both share identical visual weight and layout in the sheet. If user research surfaces confusion, consider a subtle visual hierarchy hint (e.g. a thin divider between the Open Gym row and sport rows, or a faint indent on sport rows).
 
 ---
 
