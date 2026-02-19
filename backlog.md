@@ -311,6 +311,47 @@ The sports dark-mode baseline includes the chip row and `hint-text`. If a sport 
 
 ---
 
+### P2: Context-aware bell button — offer single-subject alert from current view
+
+**Idea:** When the user taps the bell with a sport chip selected, instead of always opening the full alerts sheet, show a focused 140px mini-sheet offering to turn on that one alert.
+
+**Decision tree (UX agent reviewed):**
+
+| State | Alert OFF | Alert ON | Push denied | Not yet subscribed |
+|---|---|---|---|---|
+| Sports tab, sport chip selected | Show contextual mini-sheet | Open full sheet | Open full sheet (blocked state) | Open full sheet (onboarding) |
+| Sports tab, Open Gym chip selected | Show contextual mini-sheet | Open full sheet | Open full sheet | Open full sheet |
+| Sports tab, no chip selected | Open full sheet | — | Open full sheet | Open full sheet |
+| Status tab | Open full sheet | — | Open full sheet | Open full sheet |
+| Schedule tab | Open full sheet | — | Open full sheet | Open full sheet |
+| Daily briefing | Never contextual (time pref, not subject pref) | — | — | — |
+
+**Contextual mini-sheet copy:**
+> **Get notified before Table Tennis**
+> Tap to receive a 30-minute heads-up when Table Tennis is scheduled.
+>
+> [Turn on alerts] · [View all alerts]
+
+- Bottom-anchored, 140px tall, dismisses on backdrop tap or swipe down
+- "Turn on alerts" — filled primary button; toggles the sport pref ON, shows snackbar "Table Tennis alerts on", dismisses
+- "View all alerts" — text link; opens full sheet
+- Open Gym variant: "Get notified before Open Gym / You'll get a 30-minute heads-up on Open Gym days."
+
+**Fallbacks:**
+- Push denied → skip mini-sheet, open full sheet (blocked state shown there)
+- Not subscribed → open full sheet (onboarding must complete before per-sport can be set)
+- Alert already ON → open full sheet (re-prompting an already-on alert is confusing)
+- Multiple chips (if ever allowed) → open full sheet (ambiguous subject)
+- Daily briefing never contextually triggered
+
+**Implementation notes:**
+- `App.svelte` bell `onclick` needs to read `selectedSport` (already lifted state) and check `notifStore.prefs.sports.includes(sportId)` before deciding which sheet to show
+- Add a new `ContextualAlertSheet.svelte` component (or extend `NotifSheet` with a `contextSport` prop) for the mini-sheet
+- `savePrefs` call on "Turn on alerts" is identical to the toggle in `NotifSheet` — reuse `notifStore.toggleSport()`
+- Snackbar confirmation is a new UI primitive (none exists yet); a simple fixed-bottom toast with auto-dismiss after 2.5s suffices
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
