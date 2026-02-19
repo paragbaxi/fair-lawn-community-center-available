@@ -76,7 +76,7 @@ export async function unsubscribe(): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endpoint }),
   });
-  if (!res.ok) {
+  if (!res.ok && res.status !== 404) {
     throw new Error(`Worker /unsubscribe returned ${res.status}`);
   }
   localStorage.removeItem(ENDPOINT_KEY);

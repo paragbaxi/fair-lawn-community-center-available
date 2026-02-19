@@ -223,6 +223,9 @@ Four items resolved: (1) `unsubscribe()` now removes browser PushManager subscri
 ### ~~P2/P2/P3/P3/P4: error visibility, visual baselines, daily briefing UX, sport-30min test, time-dependent test~~
 Five items resolved in commit 82708eb: (1) `NotificationSettings.svelte` `onEnableClick` now opens sheet on error path (`notifStore.error` truthy) so user sees error feedback instead of silent re-enable. (2) Visual regression baselines regenerated — `status-dark.png`, `today-dark.png`, `sports-dark.png` updated to include bell button and header layout; all 3 visual tests pass locally. (3) `handleScheduled` returns early when `openGymSlots.length === 0` — no "No open gym today" push sent; `console.log` for observability. (4) `sport-30min` positive-path test added: subscriber with `sports:['basketball']` receives push, subscriber with `sports:[]` skipped; `sent: 1, skipped: 1`. (5) `dailyBriefing filtering` test uses `vi.useFakeTimers({ now: new Date('2026-02-18T12:00:00.000Z') })` so `handleScheduled`'s `Intl.DateTimeFormat(new Date())` always resolves to Wednesday regardless of real day; `afterEach(() => vi.useRealTimers())` restores timers. 15 worker tests. Deployed 2026-02-19.
 
+### ~~P2: Open Gym chip in Sports tab~~
+Added Open Gym as the last chip in the Sports tab chip row. `OPEN_GYM_CATEGORY`, `getAvailableSportsAndOpenGym`, and `findSportById` exported from `filters.ts` — `SPORT_CATEGORIES` / worker / NotifSheet untouched. Green `--color-available-*` tokens (consistent with NOW badge / status banner). Open Gym notification CTA opens the alerts sheet (thirtyMin pref path) rather than calling `toggleSport`. `openGymAlertOn` derived from `notifStore.prefs.thirtyMin`. Stale-sport guard updated to `getAvailableSportsAndOpenGym` so `#sports?sport=open-gym` deep-links survive data load. 208 unit tests. Merged 2026-02-19.
+
 ---
 
 ## Open
@@ -245,6 +248,15 @@ The `failed` counter only increments on non-2xx/non-410/non-429 HTTP status code
 
 ### P4: E2E test for "Manage all alerts →" link in SportWeekCard
 When subscribed to a sport, `SportWeekCard` renders a `<button class="sport-manage-inline">Manage all alerts →</button>`. No E2E test exercises this path. Add a test (gated with `test.skip` if notif state unavailable): subscribe via sport button → assert "Manage all alerts →" visible → click it → assert sheet opens.
+
+### P4: E2E test for Open Gym chip
+No E2E coverage for the new Open Gym chip. Add a test to `e2e/smoke.spec.ts` (gated with `test.skip` if no open gym data in schedule): navigate to `#sports` → assert `.sport-chip-opengym` is visible → click it → assert `.week-results` or `.no-results` renders → click again to deselect → assert hint text reappears. Also cover deep-link: navigate directly to `#sports?sport=open-gym` → assert chip is pressed.
+
+### ~~P4: Open Gym notification CTA — highlight thirtyMin toggle in sheet~~
+When the user taps "🔔 Alert me before Open Gym", the full NotifSheet opens with no visual indication of which toggle to use. Consider passing an `initialFocus` or `highlight` prop to `NotifSheet` that scrolls to and briefly highlights the "30 min before Open Gym" row. Low urgency (sheet is short), but useful discoverability improvement.
+
+### P5: `getAvailableSportsAndOpenGym` double-flattens `allActivities`
+`getAvailableSports` (called internally) already flatMaps the schedule into activities, and `getAvailableSportsAndOpenGym` does it again for the Open Gym check. Negligible at current data scale. Could be avoided by accepting a pre-flattened activities array or inlining the Open Gym check into a single pass. Only worth addressing if this function ever appears in a hot path.
 
 ---
 

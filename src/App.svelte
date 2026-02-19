@@ -16,14 +16,17 @@
   let sheetOpen = $state(false);
   let bellPulsing = $state(false);
   let bellTriggerEl: HTMLButtonElement | null = $state(null);
+  let sheetHighlight = $state<'thirtyMin' | null>(null);
 
-  function openMyAlerts() {
+  function openMyAlerts(highlight: 'thirtyMin' | null = null) {
+    sheetHighlight = highlight;
     sheetOpen = true;
     sessionStorage.setItem('flcc-bell-seen', '1');
     bellPulsing = false;
   }
   function closeMyAlerts() {
     sheetOpen = false;
+    sheetHighlight = null;
     bellTriggerEl?.focus();
   }
 
@@ -260,7 +263,7 @@
     </div>
 
     <TabBar {activeTab} onSelectTab={setTab} />
-    <NotifSheet open={sheetOpen} {gymState} {data} onClose={closeMyAlerts} />
+    <NotifSheet open={sheetOpen} {gymState} {data} onClose={closeMyAlerts} highlight={sheetHighlight} />
   {/if}
 </main>
 

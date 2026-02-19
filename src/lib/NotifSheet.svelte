@@ -7,14 +7,17 @@
   import { notifStore, handleEnable, handleDisable, savePrefs, toggleSport } from './notifStore.svelte.js';
   import type { GymState, ScheduleData } from './types.js';
 
-  let { open, gymState, data, onClose }: {
+  let { open, gymState, data, onClose, highlight = null }: {
     open: boolean;
     gymState: GymState | null;
     data: ScheduleData | null;
     onClose: () => void;
+    highlight?: 'thirtyMin' | null;
   } = $props();
 
   let panelEl: HTMLDivElement | null = $state(null);
+  let thirtyMinRowEl: HTMLLabelElement | null = $state(null);
+  let isHighlighted = $state(false);
 
   // Only show sports with sessions this week (matches SportWeekCard behavior)
   const notifiableSports = $derived(data ? getAvailableSports(data.schedule) : []);
@@ -29,14 +32,25 @@
 
   // Body scroll lock + focus trap + Escape key
   $effect(() => {
-    if (!open) return;
+    if (!open) {
+      isHighlighted = false;
+      return;
+    }
     document.body.style.overflow = 'hidden';
+    let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Move initial focus into dialog after panel renders.
     // Guard on `open` in case the sheet closes before the tick resolves.
     tick().then(() => {
       if (!open) return;
       panelEl?.querySelector<HTMLElement>(focusableSelector)?.focus();
+
+      // If highlight=thirtyMin and user is subscribed, scroll to and flash the 30-min toggle row
+      if (highlight === 'thirtyMin' && notifStore.state === 'subscribed' && thirtyMinRowEl) {
+        thirtyMinRowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        isHighlighted = true;
+        highlightTimer = setTimeout(() => { isHighlighted = false; }, 1800);
+      }
     });
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -55,9 +69,11 @@
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
+      clearTimeout(highlightTimer);
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onKeyDown);
       notifStore.error = null;  // clear error when sheet closes
+      isHighlighted = false;
     };
   });
 
@@ -103,22 +119,45 @@
           🔕 Notifications blocked — enable in browser Settings
         </div>
       {:else if notifStore.state === 'subscribed'}
-        <!-- Open Gym section -->
+        <!-- Sports section — always rendered; Open Gym row first, then per-sport rows -->
         <section class="sheet-section">
-          <h3 class="sheet-section-title">Open Gym</h3>
-          <label class="sheet-toggle-row">
-            🔔 30-min heads-up
+          <h3 class="sheet-section-title">Sports</h3>
+          <label class="sheet-toggle-row" class:sheet-toggle-highlight={isHighlighted} bind:this={thirtyMinRowEl}>
+            👟 Open Gym <span class="sheet-row-sub">(30-min heads-up)</span>
             <button
               class="toggle"
               class:on={notifStore.prefs.thirtyMin}
               role="switch"
-              aria-label="30-min heads-up"
+              aria-label="Open Gym 30-min heads-up"
               aria-checked={notifStore.prefs.thirtyMin}
               onclick={() => savePrefs({ ...notifStore.prefs, thirtyMin: !notifStore.prefs.thirtyMin })}
+              disabled={notifStore.loading}
             >
               <span class="toggle-thumb"></span>
             </button>
           </label>
+          {#each notifiableSports as sport}
+            {@const emoji = activityEmoji(sport.label)}
+            {@const on = (notifStore.prefs.sports ?? []).includes(sport.id)}
+            <label class="sheet-toggle-row">
+              {#if emoji}<span aria-hidden="true">{emoji}</span>{/if} {sport.label}
+              <button
+                class="toggle"
+                class:on
+                role="switch"
+                aria-label={sport.label}
+                aria-checked={on}
+                onclick={() => toggleSport(sport.id)}
+                disabled={notifStore.loading}
+              >
+                <span class="toggle-thumb"></span>
+              </button>
+            </label>
+          {/each}
+        </section>
+        <!-- Daily section -->
+        <section class="sheet-section">
+          <h3 class="sheet-section-title">Daily</h3>
           <label class="sheet-toggle-row">
             ☀️ Morning briefing
             <button
@@ -128,35 +167,12 @@
               aria-label="Morning briefing"
               aria-checked={notifStore.prefs.dailyBriefing}
               onclick={() => savePrefs({ ...notifStore.prefs, dailyBriefing: !notifStore.prefs.dailyBriefing })}
+              disabled={notifStore.loading}
             >
               <span class="toggle-thumb"></span>
             </button>
           </label>
         </section>
-        <!-- Sports section (only when there are sports with sessions) -->
-        {#if notifiableSports.length > 0}
-          <section class="sheet-section">
-            <h3 class="sheet-section-title">Sports</h3>
-            {#each notifiableSports as sport}
-              {@const emoji = activityEmoji(sport.label)}
-              {@const on = (notifStore.prefs.sports ?? []).includes(sport.id)}
-              <label class="sheet-toggle-row">
-                {#if emoji}<span aria-hidden="true">{emoji}</span>{/if} {sport.label}
-                <button
-                  class="toggle"
-                  class:on
-                  role="switch"
-                  aria-label={sport.label}
-                  aria-checked={on}
-                  onclick={() => toggleSport(sport.id)}
-                  disabled={notifStore.loading}
-                >
-                  <span class="toggle-thumb"></span>
-                </button>
-              </label>
-            {/each}
-          </section>
-        {/if}
         <button class="sheet-destructive" onclick={handleDisable} disabled={notifStore.loading}>
           {notifStore.loading ? 'Turning off…' : 'Turn off all alerts'}
         </button>
@@ -383,6 +399,12 @@
     }
   }
 
+  .sheet-row-sub {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin-left: 4px;
+  }
+
   .sheet-destructive {
     border: 1px solid var(--color-closed-border);
     background: var(--color-closed-bg);
@@ -399,5 +421,25 @@
   .sheet-destructive:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  @keyframes highlight-pulse {
+    0% { background: var(--color-available-bg); }
+    60% { background: var(--color-available-bg); }
+    100% { background: transparent; }
+  }
+
+  .sheet-toggle-highlight {
+    animation: highlight-pulse 1.8s ease-out forwards;
+    border-radius: 6px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet-toggle-highlight {
+      animation: none;
+      background: var(--color-available-bg);
+    }
   }
 </style>

@@ -525,6 +525,101 @@ describe('cursor pagination', () => {
   });
 });
 
+describe('/unsubscribe', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  function unsubscribeRequest(endpoint: string) {
+    return new Request('https://example.com/unsubscribe', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    });
+  }
+
+  it('subscribe then unsubscribe returns 200 ok', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    // Subscribe first
+    const subReq = new Request('https://example.com/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: 'https://push.example.com/to-remove',
+        keys: { p256dh: 'dGVzdA==', auth: 'dGVzdA==' },
+        prefs: { thirtyMin: true, dailyBriefing: true, sports: [] },
+      }),
+    });
+    const subRes = await worker.fetch(subReq, env as never);
+    expect(subRes.status).toBe(201);
+
+    // Now unsubscribe
+    const unsubRes = await worker.fetch(unsubscribeRequest('https://push.example.com/to-remove'), env as never);
+    expect(unsubRes.status).toBe(200);
+    const data = await unsubRes.json() as { ok: boolean };
+    expect(data.ok).toBe(true);
+  });
+
+  it('returns 404 for unknown endpoint', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const res = await worker.fetch(unsubscribeRequest('https://push.example.com/nonexistent'), env as never);
+    expect(res.status).toBe(404);
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('Subscription not found');
+  });
+
+  it('returns 400 when endpoint field is missing', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/unsubscribe', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(400);
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('Missing endpoint');
+  });
+});
+
+describe('fanOut network failure', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('counts network errors in failed', async () => {
+    const kv = createKVMock({
+      'sub-net-err': makeSub({
+        endpoint: 'https://push.example.com/net-err',
+        thirtyMin: true,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: '16:00', end: '17:00', dayName: 'Wednesday' }],
+    });
+
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number; skipped: number; cleaned: number; failed: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.results[0].failed).toBe(1);
+    expect(data.results[0].sent).toBe(0);
+    expect(data.results[0].cleaned).toBe(0);
+    expect(data.results[0].skipped).toBe(0);
+  });
+});
+
 describe('sport-30min', () => {
   beforeEach(() => {
     vi.resetAllMocks();
