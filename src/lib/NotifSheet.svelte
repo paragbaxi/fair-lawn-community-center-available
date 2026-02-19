@@ -124,8 +124,9 @@
         <!-- Sports section — always rendered; Open Gym row first, then per-sport rows -->
         <section class="sheet-section">
           <h3 class="sheet-section-title">Sports</h3>
+          <p class="sheet-section-sub">~30 min before each activity</p>
           <label class="sheet-toggle-row" class:sheet-toggle-highlight={isHighlighted} bind:this={thirtyMinRowEl}>
-            👟 Open Gym <span class="sheet-row-sub">(30-min heads-up)</span>
+            👟 Open Gym
             <button
               class="toggle"
               class:on={notifStore.prefs.thirtyMin}
@@ -160,6 +161,7 @@
         <!-- Daily section -->
         <section class="sheet-section">
           <h3 class="sheet-section-title">Daily</h3>
+          <p class="sheet-section-sub">Today's schedule summary</p>
           <label class="sheet-toggle-row">
             ☀️ Morning briefing
             <button
@@ -401,10 +403,10 @@
     }
   }
 
-  .sheet-row-sub {
+  .sheet-section-sub {
     font-size: 0.75rem;
     color: var(--color-text-secondary);
-    margin-left: 4px;
+    margin: -4px 0 8px;
   }
 
   .sheet-destructive {

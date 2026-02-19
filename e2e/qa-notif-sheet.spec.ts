@@ -145,8 +145,17 @@ test('My Alerts sheet shows correct section structure', async ({ page }) => {
 
     // Open Gym row must appear inside SPORTS section
     await expect(dialog.locator('.sheet-toggle-row').filter({ hasText: /open gym/i })).toBeVisible();
+    // Open Gym row must NOT contain the old row-level timing label
+    const openGymText = await dialog.locator('.sheet-toggle-row').filter({ hasText: /open gym/i }).textContent();
+    expect(openGymText).not.toContain('30-min heads-up');
+    // Section subtitle must appear under Sports heading (scoped to Sports section)
+    const sportsSect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^sports$/i }) });
+    await expect(sportsSect.locator('.sheet-section-sub')).toHaveText('~30 min before each activity');
     // Morning briefing must appear in DAILY section
     await expect(dialog.locator('.sheet-toggle-row').filter({ hasText: /morning briefing/i })).toBeVisible();
+    // Section subtitle must appear under Daily heading (scoped to Daily section)
+    const dailySect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^daily$/i }) });
+    await expect(dailySect.locator('.sheet-section-sub')).toHaveText("Today's schedule summary");
 
     await page.screenshot({ path: shot('07-sheet-subscribed-sections.png') });
 
