@@ -270,17 +270,30 @@ Removed `(30-min heads-up)` label from Open Gym row (false implied asymmetry vs 
 
 ## Open
 
-### P3: `waitForTimeout(5500)` hard wait in E2E sport notification tests
-Two tests in `describe('Sports tab')` block unconditionally sleep 5.5 seconds waiting for `notifStore` to initialize (SW `getState()` has a 3s timeout). This adds 11s of dead time to every local and CI run of the Sports tab describe block. Fix: replace the hard wait with `page.waitForFunction(() => document.querySelector('.sport-notif-btn') !== null || document.querySelector('.sport-notif-btn') === null, { timeout: 5500 })` — or better, expose a data attribute on the panel (e.g. `data-notif-initialized`) when `notifStore.initialized` is true, then `waitForSelector('[data-notif-initialized]')`. Alternative: reduce the SW timeout constant in `notifications.ts` from 3000ms to 1000ms for non-production builds via `import.meta.env.DEV`.
+### ~~P3: `waitForTimeout(5500)` hard wait in E2E sport notification tests~~
+Added `data-notif-initialized` attribute to `.sport-week-expanded` in `SportWeekCard.svelte` (present when `notifStore.initialized` is true). Both `waitForTimeout(5500)` hard waits in `smoke.spec.ts` replaced with `waitForSelector('[data-notif-initialized]', { timeout: 6000 })`. Tests 17 and 21 now run in <150ms vs ~7500ms previously — saves 11s per CI run. Merged 2026-02-19.
 
-### P4: Visual regression baselines may be stale after NotifSheet restructure
-The sheet interior (SPORTS/DAILY layout) is not captured in the visual snapshot tests — those only screenshot the 4 tabs in their default state. However if the bell button or any overlay element is visible in the Sports tab dark-mode baseline (`sports-dark.png`), the snapshot may now differ. Run `npx playwright test e2e/visual.spec.ts --update-snapshots` locally to verify and refresh if needed.
+### ~~P4: Visual regression baselines may be stale after NotifSheet restructure~~
+Refreshed `status-dark.png` and `today-dark.png` via `npx playwright test e2e/visual.spec.ts --update-snapshots`. `sports-dark.png` was unchanged (Sports tab layout unaffected by the NotifSheet changes). Merged 2026-02-19.
 
-### P4: Daily briefing timing not communicated
-`Today's schedule summary` subtitle describes what the Daily notification contains but not *when* it fires. The exact cron time for the morning briefing is not exposed to users. Consider adding the time (e.g. "~9 AM each morning") to the subtitle text.
+### ~~P4: Daily briefing timing not communicated~~
+Daily section subtitle updated from `Today's schedule summary` to `Today's schedule summary · ~8 AM ET`. Cron is `0 12 * * *` UTC = 7 AM EST / 8 AM EDT. Merged 2026-02-19.
 
-### P5: Open Gym row categorically different from per-sport rows
-Open Gym represents gym-wide availability; per-sport toggles filter a specific sport. Both share identical visual weight and layout in the sheet. If user research surfaces confusion, consider a subtle visual hierarchy hint (e.g. a thin divider between the Open Gym row and sport rows, or a faint indent on sport rows).
+### ~~P5: Open Gym row categorically different from per-sport rows~~
+Added a subtle dashed divider (`border-top: 1px dashed var(--color-border)`) between the Open Gym row and per-sport rows in the NotifSheet Sports section. Divider is `aria-hidden` and guarded by `{#if notifiableSports.length > 0}`. Merged 2026-02-19.
+
+---
+
+## Open
+
+### P4: Daily briefing fires even when Open Gym section is empty
+`handleScheduled` in `worker/index.ts` already returns early when `openGymSlots.length === 0` — but this means users who subscribe for "daily briefing" receive no notification on days when the gym has no open gym sessions. Consider sending a "no open gym today" message or the full day schedule instead of silently skipping, so the feature feels reliable.
+
+### P4: `data-notif-initialized` not set in the sheet itself
+The ready-signal attribute is on `.sport-week-expanded` in `SportWeekCard.svelte`, but the NotifSheet panel does not have an equivalent. If a future test needs to wait for the sheet's notification state (e.g. to assert section structure after subscribing), it would need its own ready signal or a longer `waitForSelector` on `.sheet-content`.
+
+### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
+The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison.
 
 ---
 
