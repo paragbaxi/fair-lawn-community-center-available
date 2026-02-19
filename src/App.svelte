@@ -259,7 +259,7 @@
     </div>
 
     <div role="tabpanel" id="panel-sports" aria-labelledby="tab-sports" tabindex="-1" hidden={activeTab !== 'sports'}>
-      <SportsView {data} {selectedSport} onSelectSport={(s) => { selectedSport = s; }} onManageAlerts={(h) => openMyAlerts(h ?? null)} />
+      <SportsView {data} {selectedSport} onSelectSport={(s) => { selectedSport = s; }} onManageAlerts={openMyAlerts} />
     </div>
 
     <TabBar {activeTab} onSelectTab={setTab} />

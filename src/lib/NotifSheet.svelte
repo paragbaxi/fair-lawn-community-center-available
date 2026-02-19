@@ -37,6 +37,7 @@
       return;
     }
     document.body.style.overflow = 'hidden';
+    let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Move initial focus into dialog after panel renders.
     // Guard on `open` in case the sheet closes before the tick resolves.
@@ -48,7 +49,7 @@
       if (highlight === 'thirtyMin' && notifStore.state === 'subscribed' && thirtyMinRowEl) {
         thirtyMinRowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         isHighlighted = true;
-        setTimeout(() => { isHighlighted = false; }, 1800);
+        highlightTimer = setTimeout(() => { isHighlighted = false; }, 1800);
       }
     });
 
@@ -68,6 +69,7 @@
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
+      clearTimeout(highlightTimer);
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onKeyDown);
       notifStore.error = null;  // clear error when sheet closes

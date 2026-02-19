@@ -126,12 +126,12 @@
           <button
             class="sport-notif-btn"
             class:subscribed={openGymAlertOn}
-            onclick={() => onManageAlerts('thirtyMin')}
+            onclick={() => onManageAlerts?.('thirtyMin')}
           >
             {openGymAlertOn ? '✓ Open Gym alerts on' : '🔔 Alert me before Open Gym'}
           </button>
           {#if openGymAlertOn}
-            <button class="sport-manage-inline" onclick={() => onManageAlerts()}>Manage all alerts →</button>
+            <button class="sport-manage-inline" onclick={() => onManageAlerts?.()}>Manage all alerts →</button>
           {/if}
         {:else}
           <button
@@ -145,7 +145,7 @@
               : `🔔 Notify me 30 min before ${selectedSport!.label}`}
           </button>
           {#if sportSubscribed}
-            <button class="sport-manage-inline" onclick={() => onManageAlerts()}>Manage all alerts →</button>
+            <button class="sport-manage-inline" onclick={() => onManageAlerts?.()}>Manage all alerts →</button>
           {/if}
         {/if}
       {:else if notifStore.initialized && notifStore.isIos && !notifStore.isStandalone && selectedSport}

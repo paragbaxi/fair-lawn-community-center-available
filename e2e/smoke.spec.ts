@@ -360,9 +360,6 @@ test.describe('Sports tab', () => {
       return;
     }
 
-    // Wait for notifStore to initialize (SW 3s timeout + margin)
-    await page.waitForTimeout(5500);
-
     // Click chip to select
     await openGymChip.click();
     await expect(openGymChip).toHaveAttribute('aria-pressed', 'true');
@@ -406,12 +403,10 @@ test.describe('Sports tab', () => {
       return;
     }
 
-    // Wait for notifStore to initialize (SW 3s timeout + margin)
-    await page.waitForTimeout(5500);
-
     // The sport-notif-btn for Open Gym should be visible (state may be 'prompt' or 'subscribed')
+    // Allow up to 8s for notifStore to initialize (SW has a 3s timeout)
     const alertBtn = page.locator('.sport-notif-btn');
-    if (!await alertBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (!await alertBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
       test.skip(true, 'No notification button — unsupported or iOS non-standalone context');
       return;
     }

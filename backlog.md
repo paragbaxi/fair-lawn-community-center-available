@@ -252,7 +252,7 @@ When subscribed to a sport, `SportWeekCard` renders a `<button class="sport-mana
 ### P4: E2E test for Open Gym chip
 No E2E coverage for the new Open Gym chip. Add a test to `e2e/smoke.spec.ts` (gated with `test.skip` if no open gym data in schedule): navigate to `#sports` → assert `.sport-chip-opengym` is visible → click it → assert `.week-results` or `.no-results` renders → click again to deselect → assert hint text reappears. Also cover deep-link: navigate directly to `#sports?sport=open-gym` → assert chip is pressed.
 
-### P4: Open Gym notification CTA — consider highlighting thirtyMin toggle in sheet
+### ~~P4: Open Gym notification CTA — highlight thirtyMin toggle in sheet~~
 When the user taps "🔔 Alert me before Open Gym", the full NotifSheet opens with no visual indication of which toggle to use. Consider passing an `initialFocus` or `highlight` prop to `NotifSheet` that scrolls to and briefly highlights the "30 min before Open Gym" row. Low urgency (sheet is short), but useful discoverability improvement.
 
 ### P5: `getAvailableSportsAndOpenGym` double-flattens `allActivities`
