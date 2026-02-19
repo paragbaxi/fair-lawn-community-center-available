@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notification UX Mockup — FLCC</title>
+<style>
+  :root {
+    --color-available: #16a34a;
+    --color-available-bg: #f0fdf4;
+    --color-available-border: #bbf7d0;
+    --color-inuse: #d97706;
+    --color-inuse-bg: #fffbeb;
+    --color-text: #1f2937;
+    --color-text-secondary: #4b5563;
+    --color-bg: #ffffff;
+    --color-surface: #f9fafb;
+    --color-border: #e5e7eb;
+    --color-accent: #3182ce;
+    --radius: 12px;
+    --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f0f0f0;
+    font-family: var(--font);
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+
+  h1.page-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .page-subtitle {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 32px;
+  }
+
+  /* ── Layout ───────────────────────────────────── */
+  .row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+    align-items: flex-start;
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #888;
+    text-align: center;
+  }
+
+  /* ── Phone frame ──────────────────────────────── */
+  .phone {
+    width: 375px;
+    background: var(--color-bg);
+    border-radius: 44px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 10px #1a1a1a,
+      0 0 0 12px #3a3a3a,
+      0 20px 60px rgba(0,0,0,0.35);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .phone-inner {
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Dynamic island */
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 36px;
+    background: #1a1a1a;
+    border-radius: 20px;
+    z-index: 100;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 28px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--color-bg);
+    position: relative;
+    z-index: 10;
+  }
+
+  .status-bar .time { font-size: 0.9rem; font-weight: 700; }
+  .status-icons { display: flex; align-items: center; gap: 6px; }
+  .status-icons svg { width: 16px; height: 16px; }
+
+  /* App header */
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 20px 12px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .app-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
+  }
+
+  .bell-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 50%;
+    position: relative;
+    color: var(--color-text-secondary);
+  }
+
+  .bell-btn:hover { background: var(--color-surface); }
+
+  .bell-btn svg { width: 22px; height: 22px; }
+
+  .bell-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: var(--color-available);
+    border-radius: 50%;
+    border: 2px solid var(--color-bg);
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg);
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  .tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 0 6px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    min-height: 56px;
+  }
+
+  .tab-btn.active { color: var(--color-available); }
+  .tab-btn svg { width: 22px; height: 22px; }
+
+  /* Scrollable content area */
+  .screen-content {
+    padding: 16px 16px 0;
+    overflow-y: auto;
+    max-height: 640px;
+    background: var(--color-bg);
+  }
+
+  /* ── Status card ──────────────────────────────── */
+  .status-card {
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+    background: var(--color-available-bg);
+    border: 1px solid var(--color-available-border);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-available);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.6); }
+  }
+
+  .bell-badge.new {
+    animation: pulse-dot 1.6s ease-in-out infinite;
+    width: 10px;
+    height: 10px;
+    top: 6px;
+    right: 6px;
+    background: var(--color-accent);
+  }
+
+  .status-card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; }
+  .status-card p { font-size: 0.85rem; color: var(--color-text-secondary); }
+
+  /* ── Notif row (subscribed state) ──────────────── */
+  .notif-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+
+  .notif-row-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-available);
+  }
+
+  .notif-row-left svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .notif-manage-link {
+    font-size: 0.8rem;
+    color: var(--color-accent);
+    font-weight: 500;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 4px 0;
+  }
+
+  /* Improved: full-row tappable affordance */
+  .notif-row-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--font);
+    min-height: 52px;
+  }
+
+  .notif-row-btn:active { background: #eef2ff; border-color: #c7d2fe; }
+
+  .notif-row-chevron {
+    font-size: 1.2rem;
+    color: var(--color-text-secondary);
+    line-height: 1;
+    margin-left: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Hint text under CTA */
+  .notif-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    margin-top: -6px;
+    margin-bottom: 14px;
+  }
+
+  /* Inline manage link below sport button */
+  .sport-manage-inline {
+    display: block;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--color-accent);
+    font-weight: 500;
+    padding: 2px 0 12px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    font-family: var(--font);
+  }
+
+  /* ── Subscribe CTA (prompt state) ──────────────── */
+  .notif-cta-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 13px 16px;
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+
+  /* ── Schedule section ─────────────────────────── */
+  .section-heading {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .activity-row {
+    display: flex;
+    align-items: center;
+    padding: 9px 12px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    background: var(--color-surface);
+    font-size: 0.85rem;
+    gap: 8px;
+  }
+
+  .activity-time { color: var(--color-text-secondary); font-size: 0.8rem; min-width: 80px; }
+  .activity-name { font-weight: 500; }
+  .now-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: var(--color-available);
+    color: white;
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  /* ── Sport chips ──────────────────────────────── */
+  .sport-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .sport-chip {
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: pointer;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .sport-chip.active {
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
+  }
+
+  /* ── Sport status banner ──────────────────────── */
+  .sport-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 13px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  .sport-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  .sport-status-banner strong { font-weight: 600; color: var(--color-text); }
+
+  /* ── Sport notif button ───────────────────────── */
+  .sport-notif-btn {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    margin-bottom: 12px;
+    font-family: var(--font);
+  }
+
+  .sport-notif-btn.subscribed {
+    background: var(--color-available-bg);
+    border-color: var(--color-available-border);
+    color: var(--color-available);
+    font-weight: 600;
+  }
+
+  /* ── Bottom sheet ─────────────────────────────── */
+  .sheet-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: flex-end;
+    z-index: 50;
+    border-radius: 36px;
+    overflow: hidden;
+  }
+
+  .sheet {
+    width: 100%;
+    background: var(--color-bg);
+    border-radius: 20px 20px 0 0;
+    padding: 0 0 24px;
+    max-height: 85%;
+    overflow-y: auto;
+  }
+
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--color-border);
+    border-radius: 2px;
+    margin: 12px auto 0;
+  }
+
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .sheet-title { font-size: 1rem; font-weight: 700; }
+
+  .sheet-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+  }
+
+  .sheet-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    padding: 14px 20px 6px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    padding: 13px 20px;
+    gap: 12px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .toggle-row:last-of-type { border-bottom: none; }
+
+  .toggle-row-icon { font-size: 1.2rem; width: 24px; text-align: center; flex-shrink: 0; }
+
+  .toggle-row-text { flex: 1; }
+  .toggle-row-text .primary { font-size: 0.9rem; font-weight: 500; color: var(--color-text); }
+  .toggle-row-text .secondary { font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 1px; }
+
+  /* iOS-style toggle */
+  .toggle {
+    width: 51px;
+    height: 31px;
+    border-radius: 16px;
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: var(--color-available); }
+  .toggle.off { background: #d1d5db; }
+
+  .toggle-thumb {
+    width: 27px;
+    height: 27px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  .toggle.on .toggle-thumb { left: 22px; }
+  .toggle.off .toggle-thumb { left: 2px; }
+
+  /* Destructive action */
+  .sheet-destructive {
+    padding: 14px 20px 0;
+  }
+
+  .sheet-destructive button {
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  /* Mini sheet (sports) */
+  .mini-sheet {
+    background: var(--color-bg);
+    border-radius: 20px 20px 0 0;
+    padding-bottom: 24px;
+    width: 100%;
+  }
+
+  .manage-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    color: var(--color-accent);
+    font-weight: 500;
+    cursor: pointer;
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* ── Unsubscribed sheet ───────────────────────── */
+  .sheet-empty-state {
+    padding: 28px 24px 16px;
+    text-align: center;
+  }
+
+  .sheet-empty-state .bell-icon {
+    font-size: 2.5rem;
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .sheet-empty-state h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .sheet-empty-state p {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .sheet-enable-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 10px;
+    font-family: var(--font);
+  }
+
+  .sheet-empty-state .fine-print {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 20px;
+  }
+
+  .sheet-preview-list {
+    text-align: left;
+    border-top: 1px solid var(--color-border);
+    padding-top: 14px;
+  }
+
+  .sheet-preview-list p {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    margin-bottom: 10px;
+    text-align: left;
+  }
+
+  .sheet-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    color: var(--color-text);
+  }
+
+  .sheet-preview-item span:first-child { font-size: 1rem; width: 20px; text-align: center; }
+
+  /* ── Week results (sports tab) ───────────────── */
+  .week-results { margin-top: 4px; }
+
+  .result-row {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    align-items: start;
+    margin-bottom: 2px;
+  }
+
+  .result-row.today { background: var(--color-available-bg); }
+  .result-day { font-weight: 700; font-size: 0.8rem; padding-top: 1px; }
+  .result-detail { display: flex; flex-direction: column; gap: 1px; }
+  .result-time { color: var(--color-text-secondary); font-size: 0.78rem; }
+  .result-name { font-weight: 500; font-size: 0.82rem; }
+
+  /* ── Section divider ─────────────────────────── */
+  .divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 12px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Notification UX — High-Fidelity Mockup</h1>
+<p class="page-subtitle">Fair Lawn Community Center · Mobile PWA · 375px</p>
+
+<!-- ROW 1: Header states + Status tab -->
+<div class="row">
+
+  <!-- A: Header unsubscribed -->
+  <div class="col">
+    <div class="label">A — Header<br>Unsubscribed (first visit)</div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="dynamic-island"></div>
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="app-header">
+          <span class="app-title">Fair Lawn Gym</span>
+          <!-- Outline bell with pulsing blue dot (first-time discovery) -->
+          <button class="bell-btn" title="Notification settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="bell-badge new"></span>
+          </button>
+        </div>
+        <div class="screen-content" style="padding-top:12px;">
+          <div class="status-card">
+            <div class="status-pill"><span class="status-dot"></span>OPEN NOW</div>
+            <h2>Gym is Available</h2>
+            <p>Open until 9:00 PM · No activities in session</p>
+          </div>
+          <button class="notif-cta-btn">
+            🔔&nbsp; Alert me before Open Gym at 6:00 PM
+          </button>
+          <p class="notif-hint">Tap 🔔 anytime to adjust alerts</p>
+          <div class="section-heading">Today's Schedule</div>
+          <div class="activity-row"><span class="activity-time">12:00 – 2:00 PM</span><span class="activity-name">Open Gym <span class="now-badge">NOW</span></span></div>
+          <div class="activity-row"><span class="activity-time">6:00 – 8:00 PM</span><span class="activity-name">Open Gym</span></div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-btn active">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            Status
+          </button>
+          <button class="tab-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>
+            Schedule
+          </button>
+          <button class="tab-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>
+            Sports
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Header subscribed + status row -->
+  <div class="col">
+    <div class="label">B — Status Tab<br>Subscribed</div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="dynamic-island"></div>
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="app-header">
+          <span class="app-title">Fair Lawn Gym</span>
+          <!-- Filled bell + green dot -->
+          <button class="bell-btn" title="Manage notifications" style="color: var(--color-text);">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+            </svg>
+            <span class="bell-badge"></span>
+          </button>
+        </div>
+        <div class="screen-content" style="padding-top:12px;">
+          <div class="status-card">
+            <div class="status-pill"><span class="status-dot"></span>OPEN NOW</div>
+            <h2>Gym is Available</h2>
+            <p>Open until 9:00 PM · No activities in session</p>
+          </div>
+
+          <!-- Full-row tappable notification button (improved affordance) -->
+          <button class="notif-row-btn" title="Manage notifications">
+            <div class="notif-row-left">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="color: var(--color-available); flex-shrink:0;"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              <span style="color:var(--color-available);font-size:0.85rem;font-weight:500;">Notifications on ✓</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:0.78rem;color:var(--color-accent);font-weight:500;">Manage</span>
+              <span class="notif-row-chevron">›</span>
+            </div>
+          </button>
+
+          <div class="section-heading">Today's Schedule</div>
+          <div class="activity-row"><span class="activity-time">12:00 – 2:00 PM</span><span class="activity-name">Open Gym <span class="now-badge">NOW</span></span></div>
+          <div class="activity-row"><span class="activity-time">6:00 – 8:00 PM</span><span class="activity-name">Open Gym</span></div>
+          <div class="activity-row"><span class="activity-time">7:00 – 9:00 PM</span><span class="activity-name">Basketball</span></div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-btn active"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Status</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>Schedule</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>Sports</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Management sheet — subscribed -->
+  <div class="col">
+    <div class="label">C — Management Sheet<br>Subscribed</div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="dynamic-island"></div>
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="app-header">
+          <span class="app-title">Fair Lawn Gym</span>
+          <button class="bell-btn" style="color: var(--color-text);">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+            <span class="bell-badge"></span>
+          </button>
+        </div>
+        <div style="position:relative; background: var(--color-bg); min-height:600px;">
+          <!-- dimmed background -->
+          <div style="padding:16px; opacity:0.25; pointer-events:none;">
+            <div class="status-card" style="margin-bottom:12px;">
+              <div class="status-pill"><span class="status-dot"></span>OPEN NOW</div>
+              <h2>Gym is Available</h2>
+            </div>
+            <button class="notif-row-btn" style="margin-bottom:12px;">
+              <div class="notif-row-left"><span style="color:var(--color-available);font-size:0.85rem;font-weight:500;">Notifications on ✓</span></div>
+              <div style="display:flex;align-items:center;gap:4px;"><span style="font-size:0.78rem;color:var(--color-accent);">Manage</span><span class="notif-row-chevron">›</span></div>
+            </button>
+          </div>
+          <!-- Overlay -->
+          <div class="sheet-overlay">
+            <div class="sheet">
+              <div class="sheet-handle"></div>
+              <div class="sheet-header">
+                <span class="sheet-title">My Alerts</span>
+                <button class="sheet-close">✕</button>
+              </div>
+
+              <div class="sheet-section-label">Open Gym</div>
+
+              <div class="toggle-row">
+                <div class="toggle-row-icon">🔔</div>
+                <div class="toggle-row-text">
+                  <div class="primary">30-min heads-up</div>
+                  <div class="secondary">Before each Open Gym session</div>
+                </div>
+                <div class="toggle on"><div class="toggle-thumb"></div></div>
+              </div>
+
+              <div class="toggle-row">
+                <div class="toggle-row-icon">☀️</div>
+                <div class="toggle-row-text">
+                  <div class="primary">Morning briefing</div>
+                  <div class="secondary">Daily 7 AM summary</div>
+                </div>
+                <div class="toggle on"><div class="toggle-thumb"></div></div>
+              </div>
+
+              <div class="sheet-section-label">Sports alerts</div>
+
+              <div class="toggle-row">
+                <div class="toggle-row-icon">🏀</div>
+                <div class="toggle-row-text"><div class="primary">Basketball</div></div>
+                <div class="toggle on"><div class="toggle-thumb"></div></div>
+              </div>
+
+              <div class="toggle-row">
+                <div class="toggle-row-icon">🏓</div>
+                <div class="toggle-row-text"><div class="primary">Pickleball</div></div>
+                <div class="toggle off"><div class="toggle-thumb"></div></div>
+              </div>
+
+              <div class="toggle-row">
+                <div class="toggle-row-icon">🏐</div>
+                <div class="toggle-row-text"><div class="primary">Volleyball</div></div>
+                <div class="toggle off"><div class="toggle-thumb"></div></div>
+              </div>
+
+              <div class="toggle-row" style="border-bottom: 1px solid var(--color-border);">
+                <div class="toggle-row-icon">🏓</div>
+                <div class="toggle-row-text"><div class="primary">Table Tennis</div></div>
+                <div class="toggle off"><div class="toggle-thumb"></div></div>
+              </div>
+
+              <div class="sheet-destructive">
+                <button>Turn off all alerts</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-btn active"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Status</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>Schedule</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>Sports</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ROW 2: Unsubscribed sheet + Sports states -->
+<div class="row">
+
+  <!-- D: Management sheet — unsubscribed -->
+  <div class="col">
+    <div class="label">D — Management Sheet<br>Unsubscribed</div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="dynamic-island"></div>
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="app-header">
+          <span class="app-title">Fair Lawn Gym</span>
+          <button class="bell-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </button>
+        </div>
+        <div style="position:relative;min-height:600px;">
+          <div style="padding:16px; opacity:0.2; pointer-events:none; background: var(--color-bg);">
+            <div class="status-card"><div class="status-pill"><span class="status-dot"></span>OPEN NOW</div><h2>Gym is Available</h2></div>
+          </div>
+          <div class="sheet-overlay">
+            <div class="sheet">
+              <div class="sheet-handle"></div>
+              <div class="sheet-header">
+                <span class="sheet-title">My Alerts</span>
+                <button class="sheet-close">✕</button>
+              </div>
+              <div class="sheet-empty-state">
+                <span class="bell-icon">🔔</span>
+                <h3>Stay in the loop</h3>
+                <p>Get notified before the gym opens or before your sport starts.</p>
+                <button class="sheet-enable-btn">Turn on notifications</button>
+                <p class="fine-print">No account needed · Free · Turn off any time</p>
+                <div class="sheet-preview-list">
+                  <p>What you'll get</p>
+                  <div class="sheet-preview-item"><span>🔔</span> Gym opening — 30-min heads-up</div>
+                  <div class="sheet-preview-item"><span>☀️</span> Morning briefing (optional)</div>
+                  <div class="sheet-preview-item"><span>🏀</span> Basketball sessions</div>
+                  <div class="sheet-preview-item"><span>🏓</span> Pickleball · Volleyball · more</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-btn active"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Status</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>Schedule</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>Sports</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- E: Sports tab — NOT subscribed -->
+  <div class="col">
+    <div class="label">E — Sports Tab<br>Not Subscribed</div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="dynamic-island"></div>
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="app-header">
+          <span class="app-title">Fair Lawn Gym</span>
+          <button class="bell-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </button>
+        </div>
+        <div class="screen-content">
+          <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:4px;">When can I play...?</h2>
+          <p style="font-size:0.8rem;color:var(--color-text-secondary);margin-bottom:12px;">Feb 17 – Feb 23</p>
+          <div class="sport-chips">
+            <button class="sport-chip active">🏀 Basketball</button>
+            <button class="sport-chip">🏓 Pickleball</button>
+            <button class="sport-chip">🏐 Volleyball</button>
+            <button class="sport-chip">🏓 Table Tennis</button>
+          </div>
+          <div class="sport-status-banner">
+            <span class="sport-status-dot"></span>
+            <span>Next <strong>Basketball</strong> at 7:00 PM today</span>
+          </div>
+          <!-- Subscribe CTA -->
+          <button class="sport-notif-btn">
+            🔔&nbsp; Notify me 30 min before Basketball
+          </button>
+          <div class="week-results">
+            <div class="result-row today">
+              <span class="result-day">Wed</span>
+              <div class="result-detail"><span class="result-time">7:00 – 9:00 PM</span><span class="result-name">Open Basketball</span></div>
+            </div>
+            <div class="result-row">
+              <span class="result-day">Thu</span>
+              <div class="result-detail"><span class="result-time">6:00 – 8:00 PM</span><span class="result-name">Open Basketball</span></div>
+            </div>
+            <div class="result-row">
+              <span class="result-day">Fri</span>
+              <div class="result-detail"><span class="result-time">7:00 – 9:00 PM</span><span class="result-name">Open Basketball</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Status</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>Schedule</button>
+          <button class="tab-btn active"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>Sports</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- F: Sports tab — subscribed to Basketball, no mini-sheet (direct toggle) -->
+  <div class="col">
+    <div class="label">F — Sports Tab<br>Subscribed (direct toggle)</div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="dynamic-island"></div>
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <div class="status-icons">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="app-header">
+          <span class="app-title">Fair Lawn Gym</span>
+          <button class="bell-btn" style="color:var(--color-text);">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+            <span class="bell-badge"></span>
+          </button>
+        </div>
+        <!-- Normal screen content, no overlay, no mini-sheet -->
+        <div class="screen-content">
+          <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:4px;">When can I play...?</h2>
+          <p style="font-size:0.8rem;color:var(--color-text-secondary);margin-bottom:12px;">Feb 17 – Feb 23</p>
+          <div class="sport-chips">
+            <button class="sport-chip active">🏀 Basketball</button>
+            <button class="sport-chip">🏓 Pickleball</button>
+            <button class="sport-chip">🏐 Volleyball</button>
+            <button class="sport-chip">🏓 Table Tennis</button>
+          </div>
+          <div class="sport-status-banner">
+            <span class="sport-status-dot"></span>
+            <span>Next <strong>Basketball</strong> at 7:00 PM today</span>
+          </div>
+          <!-- Subscribed state: button acts as direct toggle (tap to unsubscribe) -->
+          <button class="sport-notif-btn subscribed">
+            ✓ Notifying me before Basketball
+          </button>
+          <!-- Inline manage link — no sheet popup -->
+          <button class="sport-manage-inline">Manage all alerts →</button>
+          <div class="week-results">
+            <div class="result-row today">
+              <span class="result-day">Wed</span>
+              <div class="result-detail"><span class="result-time">7:00 – 9:00 PM</span><span class="result-name">Open Basketball</span></div>
+            </div>
+            <div class="result-row">
+              <span class="result-day">Thu</span>
+              <div class="result-detail"><span class="result-time">6:00 – 8:00 PM</span><span class="result-name">Open Basketball</span></div>
+            </div>
+            <div class="result-row">
+              <span class="result-day">Fri</span>
+              <div class="result-detail"><span class="result-time">7:00 – 9:00 PM</span><span class="result-name">Open Basketball</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Status</button>
+          <button class="tab-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>Schedule</button>
+          <button class="tab-btn active"><svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>Sports</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ROW 3: Management Sheet alert configurations -->
+<div style="font-size:0.7rem;font-weight:700;color:#aaa;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;">My Alerts — Configuration Varieties</div>
+<div id="mgmt-row" class="row" style="margin-bottom:40px;"></div>
+
+<!-- ROW 4: Sports tab per-sport states -->
+<div style="font-size:0.7rem;font-weight:700;color:#aaa;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;">Sports Tab — Per-Sport States</div>
+<div id="sports-row" class="row"></div>
+
+<script>
+const ico = {
+  wifi: `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 0 0-6 0zm-4-4l2 2a7.074 7.074 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>`,
+  battery: `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>`,
+  bellFilled: `<svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`,
+  bellOutline: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  tabStatus: `<svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`,
+  tabSchedule: `<svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h14v-4H8v4zm0 5h14v-4H8v4zM8 5v4h14V5H8z"/></svg>`,
+  tabSports: `<svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM5.61 16.78C4.6 15.45 4 13.8 4 12s.6-3.45 1.61-4.78L7.8 9.42C7.29 10.2 7 11.07 7 12s.29 1.8.8 2.58l-2.19 2.2zM12 20c-1.8 0-3.45-.6-4.78-1.61l2.2-2.19C10.2 16.71 11.07 17 12 17s1.8-.29 2.58-.8l2.2 2.19C15.45 19.4 13.8 20 12 20zm0-5a3 3 0 110-6 3 3 0 010 6zm6.39 1.78l-2.19-2.2c.51-.78.8-1.65.8-2.58s-.29-1.8-.8-2.58l2.19-2.2C19.4 8.55 20 10.2 20 12s-.6 3.45-1.61 4.78zM12 4c1.8 0 3.45.6 4.78 1.61l-2.2 2.19C13.8 7.29 12.93 7 12 7s-1.8.29-2.58.8L7.22 5.61C8.55 4.6 10.2 4 12 4z"/></svg>`,
+};
+
+const tog = on => `<div class="toggle ${on?'on':'off'}"><div class="toggle-thumb"></div></div>`;
+
+function tabBar(active) {
+  const btn = (id, label, svg) => `<button class="tab-btn ${active===id?'active':''}">${svg}${label}</button>`;
+  return `<div class="tab-bar">${btn('status','Status',ico.tabStatus)}${btn('schedule','Schedule',ico.tabSchedule)}${btn('sports','Sports',ico.tabSports)}</div>`;
+}
+
+function chrome(subscribed) {
+  const bell = subscribed
+    ? `<button class="bell-btn" style="color:var(--color-text)">${ico.bellFilled}<span class="bell-badge"></span></button>`
+    : `<button class="bell-btn">${ico.bellOutline}</button>`;
+  return `<div class="dynamic-island"></div>
+    <div class="status-bar"><span class="time">9:41</span><div class="status-icons">${ico.wifi}${ico.battery}</div></div>
+    <div class="app-header"><span class="app-title">Fair Lawn Gym</span>${bell}</div>`;
+}
+
+function phone(label, content, { subscribed=false, activeTab='status' }={}) {
+  return `<div class="col"><div class="label">${label}</div><div class="phone"><div class="phone-inner">
+    ${chrome(subscribed)}${content}${tabBar(activeTab)}
+  </div></div></div>`;
+}
+
+// ── Management sheet renderer ──────────────────────────────────────
+function mgmtSheet({ gym30, briefing, bball, pickle, volley, tt }) {
+  const count = [bball,pickle,volley,tt].filter(Boolean).length;
+  const countLabel = count===0 ? 'None enabled' : count===1 ? '1 sport enabled' : `${count} sports enabled`;
+  const dimBg = `<div style="padding:16px;opacity:0.18;pointer-events:none;background:var(--color-bg)">
+    <div class="status-card"><div class="status-pill"><span class="status-dot"></span>OPEN NOW</div><h2>Gym is Available</h2></div>
+    <button class="notif-row-btn"><div class="notif-row-left"><span style="color:var(--color-available);font-size:0.85rem;font-weight:500">Notifications on ✓</span></div>
+    <div style="display:flex;align-items:center;gap:4px"><span style="font-size:0.78rem;color:var(--color-accent)">Manage</span><span class="notif-row-chevron">›</span></div></button>
+  </div>`;
+  const sheet = `<div class="sheet-overlay"><div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><span class="sheet-title">My Alerts</span><button class="sheet-close">✕</button></div>
+    <div class="sheet-section-label">Open Gym</div>
+    <div class="toggle-row"><div class="toggle-row-icon">🔔</div>
+      <div class="toggle-row-text"><div class="primary">30-min heads-up</div><div class="secondary">Before each Open Gym session</div></div>${tog(gym30)}</div>
+    <div class="toggle-row"><div class="toggle-row-icon">☀️</div>
+      <div class="toggle-row-text"><div class="primary">Morning briefing</div><div class="secondary">Daily 7 AM summary</div></div>${tog(briefing)}</div>
+    <div class="sheet-section-label">Sports <span style="font-weight:400;font-size:0.6rem;letter-spacing:0;text-transform:none;color:var(--color-text-secondary)">${countLabel}</span></div>
+    <div class="toggle-row"><div class="toggle-row-icon">🏀</div><div class="toggle-row-text"><div class="primary">Basketball</div></div>${tog(bball)}</div>
+    <div class="toggle-row"><div class="toggle-row-icon">🏓</div><div class="toggle-row-text"><div class="primary">Pickleball</div></div>${tog(pickle)}</div>
+    <div class="toggle-row"><div class="toggle-row-icon">🏐</div><div class="toggle-row-text"><div class="primary">Volleyball</div></div>${tog(volley)}</div>
+    <div class="toggle-row" style="border-bottom:1px solid var(--color-border)"><div class="toggle-row-icon">🏓</div><div class="toggle-row-text"><div class="primary">Table Tennis</div></div>${tog(tt)}</div>
+    <div class="sheet-destructive"><button>Turn off all alerts</button></div>
+  </div></div>`;
+  return `<div style="position:relative;background:var(--color-bg);min-height:600px">${dimBg}${sheet}</div>`;
+}
+
+// ── Sports tab renderer ────────────────────────────────────────────
+const SPORTS = [
+  { label:'Basketball', emoji:'🏀' },
+  { label:'Pickleball', emoji:'🏓' },
+  { label:'Volleyball', emoji:'🏐' },
+  { label:'Table Tennis', emoji:'🏓' },
+];
+
+function sportsTab({ sport, nextTime, activeIdx, subscribed, noSession, sessions=[] }) {
+  const chips = SPORTS.map((s,i) =>
+    `<button class="sport-chip ${i===activeIdx?'active':''}">${s.emoji} ${s.label}</button>`).join('');
+
+  let middle;
+  if (noSession) {
+    middle = `<div style="padding:20px 14px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;text-align:center;margin-bottom:10px;">
+      <div style="font-size:1.3rem;margin-bottom:6px">📅</div>
+      <div style="font-size:0.875rem;font-weight:600;color:var(--color-text);margin-bottom:2px">No ${sport} this week</div>
+      <div style="font-size:0.78rem;color:var(--color-text-secondary)">Check back next week</div>
+    </div>`;
+  } else {
+    const btn = subscribed
+      ? `<button class="sport-notif-btn subscribed">✓ Notifying me before ${sport}</button><button class="sport-manage-inline">Manage all alerts →</button>`
+      : `<button class="sport-notif-btn">🔔&nbsp; Notify me 30 min before ${sport}</button>`;
+    middle = `<div class="sport-status-banner"><span class="sport-status-dot"></span><span>Next <strong>${sport}</strong> ${nextTime}</span></div>${btn}`;
+  }
+
+  const rows = sessions.map((s,i) => `<div class="result-row ${i===0?'today':''}">
+    <span class="result-day">${s.day}</span>
+    <div class="result-detail"><span class="result-time">${s.time}</span><span class="result-name">${s.name}</span></div>
+  </div>`).join('');
+
+  return `<div class="screen-content">
+    <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:4px">When can I play...?</h2>
+    <p style="font-size:0.8rem;color:var(--color-text-secondary);margin-bottom:12px">Feb 17 – Feb 23</p>
+    <div class="sport-chips">${chips}</div>
+    ${middle}
+    ${rows ? `<div class="week-results">${rows}</div>` : ''}
+  </div>`;
+}
+
+// ── Render: Management Sheet varieties ────────────────────────────
+document.getElementById('mgmt-row').innerHTML = [
+  phone('G — My Alerts<br>3 sports on',
+    mgmtSheet({ gym30:true, briefing:true, bball:true, pickle:true, volley:true, tt:false }),
+    { subscribed:true }),
+  phone('H — My Alerts<br>1 sport on (Basketball only)',
+    mgmtSheet({ gym30:true, briefing:false, bball:true, pickle:false, volley:false, tt:false }),
+    { subscribed:true }),
+  phone('I — My Alerts<br>Open Gym only, no sports',
+    mgmtSheet({ gym30:true, briefing:true, bball:false, pickle:false, volley:false, tt:false }),
+    { subscribed:true }),
+].join('');
+
+// ── Render: Sports tab per-sport states ───────────────────────────
+const bbSessions = [
+  { day:'Wed', time:'7:00 – 9:00 PM', name:'Open Basketball' },
+  { day:'Thu', time:'6:00 – 8:00 PM', name:'Open Basketball' },
+  { day:'Fri', time:'7:00 – 9:00 PM', name:'Open Basketball' },
+];
+const pklSessions = [
+  { day:'Wed', time:'8:00 – 10:00 PM', name:'Open Pickleball' },
+  { day:'Sat', time:'9:00 – 11:00 AM', name:'Open Pickleball' },
+];
+
+document.getElementById('sports-row').innerHTML = [
+  phone('J — Pickleball<br>Has alerts · Not for Pickleball',
+    sportsTab({ sport:'Pickleball', nextTime:'at 8:00 PM tonight', activeIdx:1, subscribed:false, noSession:false, sessions:pklSessions }),
+    { subscribed:true, activeTab:'sports' }),
+  phone('K — Pickleball<br>Subscribed ✓',
+    sportsTab({ sport:'Pickleball', nextTime:'at 8:00 PM tonight', activeIdx:1, subscribed:true, noSession:false, sessions:pklSessions }),
+    { subscribed:true, activeTab:'sports' }),
+  phone('L — Basketball<br>Not subscribed (no alerts at all)',
+    sportsTab({ sport:'Basketball', nextTime:'at 7:00 PM today', activeIdx:0, subscribed:false, noSession:false, sessions:bbSessions }),
+    { subscribed:false, activeTab:'sports' }),
+  phone('M — Basketball<br>Subscribed ✓',
+    sportsTab({ sport:'Basketball', nextTime:'at 7:00 PM today', activeIdx:0, subscribed:true, noSession:false, sessions:bbSessions }),
+    { subscribed:true, activeTab:'sports' }),
+  phone('N — Volleyball<br>No sessions this week',
+    sportsTab({ sport:'Volleyball', nextTime:'', activeIdx:2, subscribed:false, noSession:true, sessions:[] }),
+    { subscribed:true, activeTab:'sports' }),
+].join('');
+</script>
+
+</body>
+</html>
