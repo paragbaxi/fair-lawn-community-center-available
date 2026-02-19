@@ -357,23 +357,18 @@ async function handleScheduled(env: Env): Promise<void> {
   const todaySchedule = data.schedule[dayName];
   const openGymSlots = todaySchedule?.activities.filter((a) => a.isOpenGym) ?? [];
 
-  let notifData: NotificationData;
-  if (openGymSlots.length > 0) {
-    const times = openGymSlots.map((a) => a.start).join(', ');
-    notifData = {
-      title: 'FL Gym — Open Gym Today',
-      body: times,
-      tag: 'flcc-daily',
-      url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#status`,
-    };
-  } else {
-    notifData = {
-      title: 'FL Gym — Today\'s Schedule',
-      body: 'No open gym today',
-      tag: 'flcc-daily',
-      url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#status`,
-    };
+  if (openGymSlots.length === 0) {
+    console.log(`Daily briefing: no open gym today (${dayName}), skipping push`);
+    return;
   }
+
+  const times = openGymSlots.map((a) => a.start).join(', ');
+  const notifData: NotificationData = {
+    title: 'FL Gym — Open Gym Today',
+    body: times,
+    tag: 'flcc-daily',
+    url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#status`,
+  };
 
   const idKey = idempotencyKey(isoDate, dayName, 'daily', 'dailyBriefing');
   const result = await fanOut(env, notifData, 'dailyBriefing', idKey);

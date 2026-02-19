@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import worker from './index.js';
 
 // ─── Mock @block65/webcrypto-web-push ─────────────────────────────────────────
@@ -263,6 +263,12 @@ describe('thirtyMin filtering', () => {
 describe('dailyBriefing filtering', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Freeze time to a Wednesday (2026-02-18 is a Wednesday)
+    vi.useFakeTimers({ now: new Date('2026-02-18T12:00:00.000Z') });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('skips subscriber with prefs.dailyBriefing=false for dailyBriefing fanOut', async () => {
@@ -519,7 +525,7 @@ describe('cursor pagination', () => {
   });
 });
 
-describe('sport filtering', () => {
+describe('sport-30min', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -550,5 +556,45 @@ describe('sport filtering', () => {
     expect(data.ok).toBe(true);
     expect(data.result.sent).toBe(0);
     expect(data.result.skipped).toBe(1);
+  });
+
+  it('sends push to subscriber with matching sport', async () => {
+    const kv = createKVMock({
+      'sub-bball': makeSub({
+        endpoint: 'https://push.example.com/bball',
+        sports: ['basketball'],
+      }),
+      'sub-nosport': makeSub({
+        endpoint: 'https://push.example.com/nosport',
+        sports: [],
+      }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const res = await worker.fetch(
+      new Request('https://worker.example.com/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': 'test-key' },
+        body: JSON.stringify({
+          type: 'sport-30min',
+          sportId: 'basketball',
+          sportLabel: 'Basketball',
+          activities: [{ start: '5:00 PM', end: '7:00 PM', dayName: 'Monday' }],
+        }),
+      }),
+      env as never,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { result: { sent: number; skipped: number } };
+    expect(body.result.sent).toBe(1);
+    expect(body.result.skipped).toBe(1); // sub-nosport has sports: []
+
+    const bballCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/bball',
+    );
+    expect(bballCalls.length).toBe(1);
   });
 });

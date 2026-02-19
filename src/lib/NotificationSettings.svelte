@@ -15,7 +15,7 @@
 
   async function onEnableClick() {
     await handleEnable();
-    if (notifStore.state === 'subscribed') onManageAlerts();
+    if (notifStore.state === 'subscribed' || notifStore.error) onManageAlerts();
   }
 </script>
 
