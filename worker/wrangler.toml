@@ -15,4 +15,4 @@ id = "18a2bae93c5f425099d775f27787cab1"
 preview_id = "2e4bbce83a0743ad8f6a759609ad8c4a"
 
 [triggers]
-crons = ["0 12 * * *"]
+crons = ["0 11,12,13,14,15 * * *"]

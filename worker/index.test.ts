@@ -44,6 +44,7 @@ function makeSub(overrides: {
   thirtyMin?: boolean;
   dailyBriefing?: boolean;
   sports?: string[];
+  dailyBriefingHour?: number;
 } = {}) {
   return JSON.stringify({
     endpoint: overrides.endpoint ?? 'https://push.example.com/sub1',
@@ -52,6 +53,7 @@ function makeSub(overrides: {
       thirtyMin: overrides.thirtyMin ?? true,
       dailyBriefing: overrides.dailyBriefing ?? true,
       sports: overrides.sports ?? [],
+      dailyBriefingHour: overrides.dailyBriefingHour ?? 8,
     },
     subscribedAt: '2026-01-01T00:00:00.000Z',
   });
@@ -264,7 +266,8 @@ describe('dailyBriefing filtering', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     // Freeze time to a Wednesday (2026-02-18 is a Wednesday)
-    vi.useFakeTimers({ now: new Date('2026-02-18T12:00:00.000Z') });
+    // 2026-02-18T13:00:00.000Z = 8 AM EST (UTC-5) — matches default dailyBriefingHour=8
+    vi.useFakeTimers({ now: new Date('2026-02-18T13:00:00.000Z') });
   });
 
   afterEach(() => {
@@ -332,6 +335,111 @@ describe('dailyBriefing filtering', () => {
       ([url]: [string]) => url === 'https://push.example.com/yesdaily',
     );
     expect(yesdailyCalls.length).toBe(1);
+  });
+
+  it('skips subscriber whose dailyBriefingHour does not match current ET hour', async () => {
+    // Fake time: 2026-02-18T13:00:00.000Z = 8 AM EST
+    const kv = createKVMock({
+      'sub-8am': makeSub({ endpoint: 'https://push.example.com/8am', dailyBriefingHour: 8 }),
+      'sub-9am': makeSub({ endpoint: 'https://push.example.com/9am', dailyBriefingHour: 9 }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = {
+      scrapedAt: '2026-02-18T00:00:00.000Z',
+      schedule: {
+        Wednesday: {
+          open: '09:00',
+          close: '21:00',
+          activities: [
+            { name: 'Open Gym', start: '09:00', end: '10:00', isOpenGym: true },
+          ],
+        },
+      },
+      notices: [],
+    };
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    let scheduledPromise: Promise<unknown> = Promise.resolve();
+    const ctx = { waitUntil: (p: Promise<unknown>) => { scheduledPromise = p; } } as unknown as ExecutionContext;
+    await worker.scheduled({} as ScheduledEvent, env as never, ctx);
+    await scheduledPromise;
+
+    // sub-8am should receive push (hour matches)
+    expect(mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/8am').length).toBe(1);
+    // sub-9am should NOT receive push (9 ≠ 8)
+    expect(mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/9am').length).toBe(0);
+  });
+
+  it('sends daily briefing when there is no open gym but other activities exist', async () => {
+    // Fake time: 2026-02-18T13:00:00.000Z = 8 AM EST
+    const kv = createKVMock({
+      'sub-daily': makeSub({ endpoint: 'https://push.example.com/daily', dailyBriefingHour: 8 }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = {
+      scrapedAt: '2026-02-18T00:00:00.000Z',
+      schedule: {
+        Wednesday: {
+          open: '09:00',
+          close: '21:00',
+          activities: [
+            { name: 'Basketball', start: '10:00', end: '11:00', isOpenGym: false },
+            { name: 'Tennis', start: '14:00', end: '15:00', isOpenGym: false },
+          ],
+        },
+      },
+      notices: [],
+    };
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    let scheduledPromise: Promise<unknown> = Promise.resolve();
+    const ctx = { waitUntil: (p: Promise<unknown>) => { scheduledPromise = p; } } as unknown as ExecutionContext;
+    await worker.scheduled({} as ScheduledEvent, env as never, ctx);
+    await scheduledPromise;
+
+    // Should send even without open gym
+    const pushCalls = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/daily');
+    expect(pushCalls.length).toBe(1);
+  });
+
+  it('skips daily briefing when no activities are scheduled today', async () => {
+    // Fake time: 2026-02-18T13:00:00.000Z = 8 AM EST
+    const kv = createKVMock({
+      'sub-daily': makeSub({ endpoint: 'https://push.example.com/daily', dailyBriefingHour: 8 }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = {
+      scrapedAt: '2026-02-18T00:00:00.000Z',
+      schedule: {
+        Wednesday: { open: '09:00', close: '21:00', activities: [] },
+      },
+      notices: [],
+    };
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    let scheduledPromise: Promise<unknown> = Promise.resolve();
+    const ctx = { waitUntil: (p: Promise<unknown>) => { scheduledPromise = p; } } as unknown as ExecutionContext;
+    await worker.scheduled({} as ScheduledEvent, env as never, ctx);
+    await scheduledPromise;
+
+    // No activities → no push sent
+    const pushCalls = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/daily');
+    expect(pushCalls.length).toBe(0);
   });
 });
 

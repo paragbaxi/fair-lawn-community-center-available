@@ -30,6 +30,7 @@ export interface NotifPrefs {
   thirtyMin: boolean;
   dailyBriefing: boolean;
   sports?: string[];   // optional; defaults to [] on read; e.g. ['basketball']
+  dailyBriefingHour?: number;  // 7–10 AM ET; defaults to 8
 }
 
 // Keep types.ts pure (no logic imports) to avoid circular dependencies.

@@ -24,6 +24,7 @@ interface NotifPrefs {
   thirtyMin: boolean;
   dailyBriefing: boolean;
   sports?: string[];
+  dailyBriefingHour?: number;  // 7–10 AM ET; defaults to 8
 }
 
 interface Activity {
@@ -101,6 +102,7 @@ async function fanOut(
   type: 'thirtyMin' | 'dailyBriefing',
   idempotencyKeyStr: string,
   sportId?: string,
+  etHour?: number,
 ): Promise<{ sent: number; skipped: number; cleaned: number; failed: number }> {
   // Idempotency check
   const existing = await env.SUBSCRIPTIONS.get(idempotencyKeyStr);
@@ -136,7 +138,9 @@ async function fanOut(
 
         const allowed = sportId
           ? (sub.prefs.sports ?? []).includes(sportId)
-          : Boolean(sub.prefs[type]);
+          : Boolean(sub.prefs[type]) && (
+              etHour === undefined || (sub.prefs.dailyBriefingHour ?? 8) === etHour
+            );
         if (!allowed) {
           skipped++;
           return;
@@ -194,6 +198,11 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
     return json({ error: 'Missing endpoint or keys' }, 400);
   }
 
+  const incomingHour = body.prefs?.dailyBriefingHour;
+  if (incomingHour !== undefined && (!Number.isInteger(incomingHour) || incomingHour < 7 || incomingHour > 10)) {
+    return json({ error: 'dailyBriefingHour must be 7, 8, 9, or 10' }, 400);
+  }
+
   const key = await sha256hex(body.endpoint);
   const sub: StoredSubscription = {
     endpoint: body.endpoint,
@@ -202,6 +211,7 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
       thirtyMin: body.prefs?.thirtyMin ?? true,
       dailyBriefing: body.prefs?.dailyBriefing ?? true,
       sports: body.prefs?.sports ?? [],
+      dailyBriefingHour: incomingHour ?? 8,
     },
     subscribedAt: new Date().toISOString(),
   };
@@ -225,6 +235,11 @@ async function handleUpdatePrefs(request: Request, env: Env): Promise<Response> 
   if (body.prefs?.thirtyMin !== undefined) sub.prefs.thirtyMin = body.prefs.thirtyMin;
   if (body.prefs?.dailyBriefing !== undefined) sub.prefs.dailyBriefing = body.prefs.dailyBriefing;
   if (body.prefs?.sports !== undefined) sub.prefs.sports = body.prefs.sports;
+  if (body.prefs?.dailyBriefingHour !== undefined) {
+    const h = body.prefs.dailyBriefingHour;
+    if (!Number.isInteger(h) || h < 7 || h > 10) return json({ error: 'dailyBriefingHour must be 7, 8, 9, or 10' }, 400);
+    sub.prefs.dailyBriefingHour = h;
+  }
 
   await env.SUBSCRIPTIONS.put(key, JSON.stringify(sub));
   return json({ ok: true });
@@ -357,40 +372,67 @@ async function handleScheduled(env: Env): Promise<void> {
     return;
   }
 
-  // Get today's date in US Eastern time
+  // Get today's date + current hour in US Eastern time
+  const now = new Date();
   const etParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     weekday: 'long',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(new Date());
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(now);
 
   const dayName = etParts.find((p) => p.type === 'weekday')?.value ?? '';
-  const month = etParts.find((p) => p.type === 'month')?.value ?? '01';
-  const day = etParts.find((p) => p.type === 'day')?.value ?? '01';
-  const year = etParts.find((p) => p.type === 'year')?.value ?? '2024';
+  const month   = etParts.find((p) => p.type === 'month')?.value   ?? '01';
+  const day     = etParts.find((p) => p.type === 'day')?.value     ?? '01';
+  const year    = etParts.find((p) => p.type === 'year')?.value    ?? '2024';
+  const etHour  = parseInt(etParts.find((p) => p.type === 'hour')?.value ?? '8', 10);
   const isoDate = `${year}-${month}-${day}`;
 
   const todaySchedule = data.schedule[dayName];
-  const openGymSlots = todaySchedule?.activities.filter((a) => a.isOpenGym) ?? [];
+  const allActivities = todaySchedule?.activities ?? [];
+  const openGymSlots  = allActivities.filter((a) => a.isOpenGym);
+  const otherActs     = allActivities.filter((a) => !a.isOpenGym);
 
-  if (openGymSlots.length === 0) {
-    console.log(`Daily briefing: no open gym today (${dayName}), skipping push`);
+  // Skip if gym has no activities today — nothing useful to tell users
+  if (allActivities.length === 0) {
+    console.log(`Daily briefing: no activities for ${dayName} (${etHour}h ET), skipping`);
     return;
   }
 
-  const times = openGymSlots.map((a) => a.start).join(', ');
+  // Build notification body (≤100 chars for lock-screen visibility)
+  let body: string;
+  if (openGymSlots.length > 0) {
+    const gymTimes = openGymSlots.map((a) => a.start).join(' & ');
+    body = `Open Gym: ${gymTimes}`;
+    if (otherActs.length > 0) {
+      // Abbreviate to first word of activity name; show up to 2
+      const names = otherActs.slice(0, 2).map((a) => a.name.split(/\s+/)[0]).join(', ');
+      body += ` · ${names}`;
+    }
+  } else {
+    body = 'No open gym today';
+    if (otherActs.length > 0) {
+      const acts = otherActs.slice(0, 2)
+        .map((a) => `${a.name.split(/\s+/)[0]}: ${a.start}`)
+        .join(' · ');
+      body += ` · ${acts}`;
+    }
+  }
+
   const notifData: NotificationData = {
-    title: 'FL Gym — Open Gym Today',
-    body: times,
+    title: 'Fair Lawn Gym · Today',
+    body,
     tag: 'flcc-daily',
-    url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#status`,
+    url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#today`,
   };
 
-  const idKey = idempotencyKey(isoDate, dayName, 'daily', 'dailyBriefing');
-  const result = await fanOut(env, notifData, 'dailyBriefing', idKey);
-  console.log(`Daily briefing sent: sent=${result.sent} skipped=${result.skipped} cleaned=${result.cleaned} failed=${result.failed}`);
+  // Idempotency key scoped to date + hour so each user's chosen hour gets one send per day
+  const idKey = idempotencyKey(isoDate, dayName, `${etHour}h`, 'dailyBriefing');
+  const result = await fanOut(env, notifData, 'dailyBriefing', idKey, undefined, etHour);
+  console.log(`Daily briefing (${etHour}h ET, ${dayName}): sent=${result.sent} skipped=${result.skipped} cleaned=${result.cleaned} failed=${result.failed}`);
 }
 
 // ─── Main fetch handler ──────────────────────────────────────────────────────
