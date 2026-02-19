@@ -74,7 +74,7 @@
 {#if availableSports.length > 0}
   {#if expanded}
     <!-- Expanded mode: no <details>, persistent chips -->
-    <div class="sport-week-expanded">
+    <div class="sport-week-expanded" data-notif-initialized={notifStore.initialized ? '' : undefined}>
       <h2 class="section-heading">When can I play...?</h2>
       <p class="date-range">{dateRange}</p>
 

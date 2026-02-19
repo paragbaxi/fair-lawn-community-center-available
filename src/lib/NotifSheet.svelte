@@ -139,6 +139,9 @@
               <span class="toggle-thumb"></span>
             </button>
           </label>
+          {#if notifiableSports.length > 0}
+            <div class="sheet-sport-divider" aria-hidden="true"></div>
+          {/if}
           {#each notifiableSports as sport}
             {@const emoji = activityEmoji(sport.label)}
             {@const on = (notifStore.prefs.sports ?? []).includes(sport.id)}
@@ -161,7 +164,7 @@
         <!-- Daily section -->
         <section class="sheet-section">
           <h3 class="sheet-section-title">Daily</h3>
-          <p class="sheet-section-sub">Today's schedule summary</p>
+          <p class="sheet-section-sub">Today's schedule summary · ~8 AM ET</p>
           <label class="sheet-toggle-row">
             ☀️ Morning briefing
             <button
@@ -407,6 +410,11 @@
     font-size: 0.75rem;
     color: var(--color-text-secondary);
     margin: -4px 0 8px;
+  }
+
+  .sheet-sport-divider {
+    border-top: 1px dashed var(--color-border);
+    margin: 2px 0 4px;
   }
 
   .sheet-destructive {
