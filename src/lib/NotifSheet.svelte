@@ -37,6 +37,8 @@
       return;
     }
     document.body.style.overflow = 'hidden';
+    // highlightTimer is effect-local: Svelte calls the cleanup fn before re-running the effect,
+    // so clearTimeout() in the cleanup always targets the timer from the same effect run.
     let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
     // Move initial focus into dialog after panel renders.

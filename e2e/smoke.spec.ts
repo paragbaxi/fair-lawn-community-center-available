@@ -339,7 +339,7 @@ test.describe('Sports tab', () => {
 
   test('Open Gym chip is visible on Sports tab', async ({ page }) => {
     await page.goto('/#sports');
-    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+    await page.waitForSelector('#panel-sports .sport-chip', { timeout: 5000 });
 
     const openGymChip = page.locator('.sport-chip-opengym');
     if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -352,7 +352,7 @@ test.describe('Sports tab', () => {
 
   test('Open Gym chip select and deselect', async ({ page }) => {
     await page.goto('/#sports');
-    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+    await page.waitForSelector('#panel-sports .sport-chip', { timeout: 5000 });
 
     const openGymChip = page.locator('.sport-chip-opengym');
     if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -403,10 +403,12 @@ test.describe('Sports tab', () => {
       return;
     }
 
-    // The sport-notif-btn for Open Gym should be visible (state may be 'prompt' or 'subscribed')
-    // Allow up to 8s for notifStore to initialize (SW has a 3s timeout)
+    // Wait for notifStore to initialize (SW has a 3-second timeout; allow 5.5s total).
+    await page.waitForTimeout(5500);
+
+    // The sport-notif-btn for Open Gym should be visible after store initializes
     const alertBtn = page.locator('.sport-notif-btn');
-    if (!await alertBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
+    if (!await alertBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
       test.skip(true, 'No notification button — unsupported or iOS non-standalone context');
       return;
     }
@@ -421,7 +423,7 @@ test.describe('Sports tab', () => {
 
   test('"Alert me before Open Gym" absent when Open Gym chip not selected (unhappy path)', async ({ page }) => {
     await page.goto('/#sports');
-    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+    await page.waitForSelector('#panel-sports .sport-chip', { timeout: 5000 });
 
     const openGymChip = page.locator('.sport-chip-opengym');
     if (!await openGymChip.isVisible({ timeout: 3000 }).catch(() => false)) {
