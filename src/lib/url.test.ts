@@ -88,12 +88,16 @@ describe('parseUrlState', () => {
     }
   });
 
-  it('open-gym and all are NOT valid sport ids', () => {
-    window.location.hash = '#sports?sport=open-gym';
-    expect(parseUrlState().sport).toBeNull();
-
+  it("'all' is NOT a valid sport id", () => {
     window.location.hash = '#sports?sport=all';
     expect(parseUrlState().sport).toBeNull();
+  });
+
+  it('#sports?sport=open-gym → sport=open-gym', () => {
+    window.location.hash = '#sports?sport=open-gym';
+    const s = parseUrlState();
+    expect(s.tab).toBe('sports');
+    expect(s.sport).toBe('open-gym');
   });
 
   it('#bogus → tab=status (fallback)', () => {

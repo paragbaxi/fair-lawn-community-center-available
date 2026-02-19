@@ -5,6 +5,9 @@ import {
   filterActivities,
   SPORT_CATEGORIES,
   getAvailableSports,
+  OPEN_GYM_CATEGORY,
+  getAvailableSportsAndOpenGym,
+  findSportById,
   getWeekSummary,
   getWeeklySessionCounts,
 } from './filters.js';
@@ -285,5 +288,66 @@ describe('getWeeklySessionCounts', () => {
 
   it('returns empty map when sports array is empty', () => {
     expect(getWeeklySessionCounts(schedule, [])).toEqual(new Map());
+  });
+});
+
+// --- OPEN_GYM_CATEGORY ---
+
+describe('OPEN_GYM_CATEGORY', () => {
+  it('has id open-gym and matches Open Gym activity names', () => {
+    expect(OPEN_GYM_CATEGORY.id).toBe('open-gym');
+    expect(OPEN_GYM_CATEGORY.match('Open Gym')).toBe(true);
+    expect(OPEN_GYM_CATEGORY.match('FLAS Open Gym')).toBe(true);
+  });
+});
+
+// --- getAvailableSportsAndOpenGym ---
+
+describe('getAvailableSportsAndOpenGym', () => {
+  it('appends Open Gym as last chip when open gym sessions exist', () => {
+    const schedule = { Monday: { open: '8:00 AM', close: '10:00 PM', activities: [
+      { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+      { name: 'Basketball', start: '12:00 PM', end: '2:00 PM', isOpenGym: false },
+    ]}};
+    const result = getAvailableSportsAndOpenGym(schedule);
+    const ids = result.map(c => c.id);
+    expect(ids).toContain('basketball');
+    expect(ids[ids.length - 1]).toBe('open-gym');
+  });
+
+  it('excludes Open Gym when no open gym sessions exist', () => {
+    const schedule = { Monday: { open: '8:00 AM', close: '10:00 PM', activities: [
+      { name: 'Basketball', start: '12:00 PM', end: '2:00 PM', isOpenGym: false },
+    ]}};
+    expect(getAvailableSportsAndOpenGym(schedule).map(c => c.id)).not.toContain('open-gym');
+  });
+
+  it('returns only Open Gym when no sport sessions exist', () => {
+    const schedule = { Monday: { open: '8:00 AM', close: '10:00 PM', activities: [
+      { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+    ]}};
+    const result = getAvailableSportsAndOpenGym(schedule);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('open-gym');
+  });
+
+  it('returns empty array for empty schedule', () => {
+    expect(getAvailableSportsAndOpenGym({})).toHaveLength(0);
+  });
+});
+
+// --- findSportById ---
+
+describe('findSportById', () => {
+  it('returns OPEN_GYM_CATEGORY for open-gym', () => {
+    expect(findSportById('open-gym')).toBe(OPEN_GYM_CATEGORY);
+  });
+
+  it('returns sport category for valid sport id', () => {
+    expect(findSportById('basketball')?.id).toBe('basketball');
+  });
+
+  it('returns null for unknown id', () => {
+    expect(findSportById('unknown')).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import type { TabId } from './types.js';
 import { VALID_TABS } from './types.js';
 import { DISPLAY_DAYS } from './time.js';
-import { SPORT_CATEGORIES } from './filters.js';
+import { findSportById } from './filters.js';
 
 export interface AppUrlState {
   tab: TabId;
@@ -25,9 +25,9 @@ export function parseUrlState(): AppUrlState {
     ? (DISPLAY_DAYS.find(d => d.full.toLowerCase() === dayRaw.toLowerCase())?.full ?? null)
     : null;
 
-  // Sport: validate against SPORT_CATEGORIES ids
+  // Sport: validate against SPORT_CATEGORIES + OPEN_GYM_CATEGORY ids
   const sportRaw = (params.get('sport') ?? '').toLowerCase();
-  const sport = sportRaw && SPORT_CATEGORIES.some(c => c.id === sportRaw) ? sportRaw : null;
+  const sport = sportRaw ? (findSportById(sportRaw) ? sportRaw : null) : null;
 
   return { tab, day, sport };
 }

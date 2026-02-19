@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ScheduleData, SportStatus } from './types.js';
   import type { FilterCategory } from './filters.js';
-  import { getAvailableSports, getWeekSummary, getWeeklySessionCounts } from './filters.js';
+  import { getAvailableSportsAndOpenGym, getWeekSummary, getWeeklySessionCounts } from './filters.js';
   import { isActivityPast, isActivityCurrent, shortDayName, computeSportStatus, DISPLAY_DAYS } from './time.js';
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
@@ -35,7 +35,9 @@
     !!selectedSport
   );
 
-  const availableSports = $derived(getAvailableSports(data.schedule));
+  const availableSports = $derived(getAvailableSportsAndOpenGym(data.schedule));
+
+  const openGymAlertOn = $derived(notifStore.state === 'subscribed' && notifStore.prefs.thirtyMin);
 
   const sportSessionCounts = $derived(getWeeklySessionCounts(data.schedule, availableSports));
 
@@ -83,6 +85,7 @@
           <button
             class="sport-chip"
             class:sport-chip-active={selectedSport?.id === sport.id}
+            class:sport-chip-opengym={sport.id === 'open-gym'}
             aria-pressed={selectedSport?.id === sport.id}
             onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
           >
@@ -119,18 +122,31 @@
       {/if}
 
       {#if showNotifBtn}
-        <button
-          class="sport-notif-btn"
-          class:subscribed={sportSubscribed}
-          onclick={() => toggleSport(selectedSport!.id)}
-          disabled={notifStore.loading}
-        >
-          {sportSubscribed
-            ? `✓ Notifying me before ${selectedSport!.label}`
-            : `🔔 Notify me 30 min before ${selectedSport!.label}`}
-        </button>
-        {#if sportSubscribed}
-          <button class="sport-manage-inline" onclick={onManageAlerts}>Manage all alerts →</button>
+        {#if selectedSport?.id === 'open-gym'}
+          <button
+            class="sport-notif-btn"
+            class:subscribed={openGymAlertOn}
+            onclick={onManageAlerts}
+          >
+            {openGymAlertOn ? '✓ Open Gym alerts on' : '🔔 Alert me before Open Gym'}
+          </button>
+          {#if openGymAlertOn}
+            <button class="sport-manage-inline" onclick={onManageAlerts}>Manage all alerts →</button>
+          {/if}
+        {:else}
+          <button
+            class="sport-notif-btn"
+            class:subscribed={sportSubscribed}
+            onclick={() => toggleSport(selectedSport!.id)}
+            disabled={notifStore.loading}
+          >
+            {sportSubscribed
+              ? `✓ Notifying me before ${selectedSport!.label}`
+              : `🔔 Notify me 30 min before ${selectedSport!.label}`}
+          </button>
+          {#if sportSubscribed}
+            <button class="sport-manage-inline" onclick={onManageAlerts}>Manage all alerts →</button>
+          {/if}
         {/if}
       {:else if notifStore.initialized && notifStore.isIos && !notifStore.isStandalone && selectedSport}
         <p class="sport-notif-hint">Add to Home Screen to enable notifications</p>
@@ -231,6 +247,7 @@
                 {@const count = sportSessionCounts.get(sport.id)}
                 <button
                   class="sport-chip"
+                  class:sport-chip-opengym={sport.id === 'open-gym'}
                   aria-pressed={selectedSport?.id === sport.id}
                   onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
                 >
@@ -377,6 +394,24 @@
   @media (hover: hover) {
     .sport-chip:not(.sport-chip-active):hover {
       background: var(--color-border);
+    }
+  }
+
+  .sport-chip-opengym {
+    border-color: var(--color-available-border);
+    background: var(--color-available-bg);
+    color: var(--color-available);
+  }
+
+  .sport-chip-opengym.sport-chip-active {
+    background: var(--color-available);
+    border-color: var(--color-available);
+    color: white;
+  }
+
+  @media (hover: hover) {
+    .sport-chip-opengym:not(.sport-chip-active):hover {
+      background: var(--color-available-border);
     }
   }
 
