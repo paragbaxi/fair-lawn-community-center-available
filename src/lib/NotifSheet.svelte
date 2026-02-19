@@ -406,7 +406,7 @@
   .sheet-section-sub {
     font-size: 0.75rem;
     color: var(--color-text-secondary);
-    margin: 0 0 8px;
+    margin: -4px 0 8px;
   }
 
   .sheet-destructive {
