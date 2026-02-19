@@ -242,11 +242,11 @@ Replaced inner `flatMap().some()` with a single `.some()` on the already-flatten
 
 ## Open
 
-### ⚠️ P2: Local dev setup undocumented — `.env.local` required
-`VITE_VAPID_PUBLIC_KEY` and `VITE_WORKER_URL` are injected as GitHub Actions secrets at build time. No `.env.local` file or documentation exists for local development. Any new contributor hitting `npm run dev` and trying to enable notifications will see **"Failed to enable — please try again"** with no guidance. Fix: add a `.env.local` section to `SETUP.md` (or a new `CONTRIBUTING.md`) documenting the two required vars and where to get them (VAPID public key is baked into the deployed JS bundle; worker URL is `https://flcc-push.trueto.workers.dev`).
+### ~~P3: Commit QA infrastructure to main~~
+Committed in chore commit 34f5081. Done 2026-02-19.
 
-### P3: Commit QA infrastructure to main
-`playwright.qa.config.ts`, `e2e/qa-notif-sheet.spec.ts`, `e2e/qa-teardown.ts`, and the `.gitignore` addition (`.qa-runs/`) were created locally during QA of PR #20 but never committed. They exist on disk only. Risk: lost on next `git clean` or new machine. Fix: commit as a standalone chore PR.
+### ~~P2: Local dev setup undocumented — `.env.local` required~~
+Added "Local Development" section to `SETUP.md` with the two required env vars, exact values, and explanation of why they're safe to document. Done 2026-02-19.
 
 ### P3: Worker `/unsubscribe` endpoint has no authentication
 `handleUnsubscribe` (`worker/index.ts:232`) accepts a DELETE request and deletes the KV entry for any `endpoint` value — **no auth check at all**. `/notify` and `/stats` both require `X-Api-Key`, but `/unsubscribe` does not. An attacker who learns a victim's push endpoint URL (e.g. by intercepting a `/subscribe` call or via a KV namespace leak) could silently unsubscribe them.

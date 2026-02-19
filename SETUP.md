@@ -4,6 +4,27 @@ Two external services. Everything else is GitHub.
 
 ---
 
+## Local Development
+
+```bash
+npm install
+npm run dev   # http://localhost:5173 (port may bump if taken)
+```
+
+Notification features require two env vars that are injected as GitHub Actions secrets in CI but **must be created manually for local dev**:
+
+```bash
+# .env.local (gitignored — never commit this file)
+VITE_VAPID_PUBLIC_KEY=BD38fbzpEbANyDjOz30kbrY3ICXTsBuNUEwrTrlZdHhsbGzFTbELCFLGCqu9tn2nogdYm-VIzNfyfPN1jdfXMnw
+VITE_WORKER_URL=https://flcc-push.trueto.workers.dev
+```
+
+Without these, clicking "Turn on notifications" will fail with **"Failed to enable — please try again"**.
+
+The public VAPID key is safe to commit (it's baked into the deployed JS bundle anyway). The worker URL is also public. Neither is a secret — only `VAPID_PRIVATE_KEY` and `NOTIFY_API_KEY` must stay secret.
+
+---
+
 ## Services
 
 | Service | Account | What it does |
