@@ -220,6 +220,36 @@ Four items resolved: (1) `unsubscribe()` now removes browser PushManager subscri
 
 ---
 
+## Open
+
+### P2: `notifStore.error` invisible when subscribe fails from Status CTA
+When the user clicks "Turn on notifications" in `StatusView` (the `NotificationSettings.svelte` CTA), `onEnableClick()` calls `handleEnable()`. If that fails (network error, SW timeout, etc.), `notifStore.error` is set **but the sheet is not opened** — because the guard is `if (notifStore.state === 'subscribed') onManageAlerts()`. The error is only rendered inside `NotifSheet.svelte` (`{#if notifStore.error}`), so the user sees nothing: the button re-enables silently with no feedback.
+
+Fix options:
+- (a) Always call `onManageAlerts()` after `handleEnable()` when `notifStore.error` is set, so the sheet opens to display the error.
+- (b) Render `notifStore.error` inline in `NotificationSettings.svelte` below the CTA button.
+
+Option (a) preserves the sheet-as-single-source-of-truth pattern and is the minimal change.
+
+### P2: Visual regression baselines stale after notification UX overhaul
+The 3 snapshots in `e2e/snapshots/visual.spec.ts/` (`status-dark.png`, `today-dark.png`, `sports-dark.png`) predate the bell button and header layout changes added in the notification UX overhaul. Running `npx playwright test --project=visual` locally shows 3 failures. CI skips visual tests (Linux font rendering), so CI is green — but local baselines are wrong.
+
+Fix: `npx playwright test --project=visual --update-snapshots` then commit the 3 updated PNG files. No code change required.
+
+### P3: Worker `handleScheduled` sends "No open gym today" push — likely unwanted
+`handleScheduled` (daily briefing cron) always sends a push to everyone with `dailyBriefing: true`, even when there's no open gym (`body: 'No open gym today'`). A user subscribed for morning briefings to plan their day gets a push that effectively says "nothing for you today" — a negative UX. Consider silently skipping when `openGymSlots.length === 0`, with just a `console.log('Daily briefing: no open gym today, skipping push')` for observability.
+
+### P3: Worker `sport-30min` no full-flow unit test
+`worker/index.test.ts` has a test confirming that a subscriber with `sports: []` is skipped for `sport-30min` fanOut. But there's no positive-path test: subscriber with `sports: ['basketball']` receives a push when `sportId: 'basketball'` is in the notify payload. Add a test for `POST /notify` with `type: 'sport-30min', sportId: 'basketball'` asserting `sent: 1` for a matching subscriber.
+
+### P4: E2E test for "Manage all alerts →" link in SportWeekCard
+When subscribed to a sport, `SportWeekCard` renders a `<button class="sport-manage-inline">Manage all alerts →</button>`. No E2E test exercises this path. Add a test (gated with `test.skip` if notif state unavailable): subscribe via sport button → assert "Manage all alerts →" visible → click it → assert sheet opens.
+
+### P4: `handleScheduled` worker test is time-dependent
+The `dailyBriefing filtering` test in `worker/index.test.ts` mocks schedule data with `schedule.Wednesday` but calls the real `Intl.DateTimeFormat` inside `handleScheduled` to determine today's Eastern day name. If the test runs on a day other than Wednesday, `openGymSlots` will be empty and the `notifData.body` will be `'No open gym today'` instead of `'09:00'`. The assertion that `yesdailyCalls.length === 1` still passes (it just sends the "no open gym" message), but the notification content is wrong relative to the mock data's intent. Fix: mock `Date.now()` or inject a fixed reference date so the test always "thinks" it's Wednesday.
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
