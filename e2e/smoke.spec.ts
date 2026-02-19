@@ -324,9 +324,9 @@ test.describe('Sports tab', () => {
       return;
     }
 
-    // Wait for notifStore to initialize (up to 5s for SW timeout + margin)
-    // getState() has a 3-second SW timeout; allow up to 5.5 seconds total.
-    await page.waitForTimeout(5500);
+    // Wait for notifStore to initialize (exits as soon as ready, up to 6s).
+    // data-notif-initialized appears on .sport-week-expanded when notifStore.initialized turns true.
+    await page.waitForSelector('#panel-sports [data-notif-initialized]', { timeout: 6000 });
 
     // The sport-notif-btn should be visible
     const notifBtn = page.locator('.sport-notif-btn');
@@ -403,8 +403,8 @@ test.describe('Sports tab', () => {
       return;
     }
 
-    // Wait for notifStore to initialize (SW has a 3-second timeout; allow 5.5s total).
-    await page.waitForTimeout(5500);
+    // Wait for notifStore to initialize (exits as soon as ready, up to 6s).
+    await page.waitForSelector('#panel-sports [data-notif-initialized]', { timeout: 6000 });
 
     // The sport-notif-btn for Open Gym should be visible after store initializes
     const alertBtn = page.locator('.sport-notif-btn');
