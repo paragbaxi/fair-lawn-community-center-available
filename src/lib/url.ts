@@ -25,7 +25,7 @@ export function parseUrlState(): AppUrlState {
     ? (DISPLAY_DAYS.find(d => d.full.toLowerCase() === dayRaw.toLowerCase())?.full ?? null)
     : null;
 
-  // Sport: validate against SPORT_CATEGORIES ids
+  // Sport: validate against SPORT_CATEGORIES + OPEN_GYM_CATEGORY ids
   const sportRaw = (params.get('sport') ?? '').toLowerCase();
   const sport = sportRaw ? (findSportById(sportRaw) ? sportRaw : null) : null;
 

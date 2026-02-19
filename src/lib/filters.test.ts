@@ -322,6 +322,15 @@ describe('getAvailableSportsAndOpenGym', () => {
     expect(getAvailableSportsAndOpenGym(schedule).map(c => c.id)).not.toContain('open-gym');
   });
 
+  it('returns only Open Gym when no sport sessions exist', () => {
+    const schedule = { Monday: { open: '8:00 AM', close: '10:00 PM', activities: [
+      { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+    ]}};
+    const result = getAvailableSportsAndOpenGym(schedule);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('open-gym');
+  });
+
   it('returns empty array for empty schedule', () => {
     expect(getAvailableSportsAndOpenGym({})).toHaveLength(0);
   });
