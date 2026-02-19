@@ -2,7 +2,7 @@
   import type { ScheduleData, GymState, DaySchedule, Notice, TabId } from './lib/types.js';
   import { computeGymState, getEasternNow, getEasternDayName, DISPLAY_DAYS, formatEasternDate } from './lib/time.js';
   import type { FilterCategory } from './lib/filters.js';
-  import { SPORT_CATEGORIES, getAvailableSports } from './lib/filters.js';
+  import { getAvailableSportsAndOpenGym, findSportById } from './lib/filters.js';
   import { parseUrlState, buildUrlHash } from './lib/url.js';
   import { onMount, tick } from 'svelte';
   import TabBar from './lib/TabBar.svelte';
@@ -41,7 +41,7 @@
   let activeTab: TabId = $state(_initialUrl.tab);
   let selectedDay = $state(_initialUrl.day ?? getEasternDayName());
   let selectedSport = $state<FilterCategory | null>(
-    _initialUrl.sport ? (SPORT_CATEGORIES.find(c => c.id === _initialUrl.sport) ?? null) : null
+    _initialUrl.sport ? (findSportById(_initialUrl.sport)) : null
   );
   async function setTab(tab: TabId, focusPanel = true) {
     activeTab = tab;
@@ -57,7 +57,7 @@
       const { tab, day, sport } = parseUrlState();
       activeTab = tab;
       if (day) selectedDay = day;
-      const newSport = sport ? (SPORT_CATEGORIES.find(c => c.id === sport) ?? null) : null;
+      const newSport = sport ? findSportById(sport) : null;
       if (tab === 'sports') selectedSport = newSport; // only update sport when on sports tab
       // day persists across tab switches by design
     };
@@ -175,7 +175,7 @@
   // Stale-sport guard: reset selectedSport if it's no longer in the schedule
   $effect(() => {
     if (!data || !selectedSport) return;
-    const available = getAvailableSports(data.schedule);
+    const available = getAvailableSportsAndOpenGym(data.schedule);
     if (!available.some(c => c.id === selectedSport!.id)) selectedSport = null;
   });
 

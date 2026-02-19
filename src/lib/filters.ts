@@ -46,6 +46,34 @@ export function getAvailableSports(schedule: Record<string, DaySchedule>): Filte
   return SPORT_CATEGORIES.filter(cat => allActivities.some(act => cat.match(act.name)));
 }
 
+export const OPEN_GYM_CATEGORY: FilterCategory =
+  FILTER_CATEGORIES.find(c => c.id === 'open-gym')!;
+
+/**
+ * Like getAvailableSports, but appends Open Gym as the last chip
+ * when any open gym sessions exist this week.
+ * SportWeekCard uses this; SPORT_CATEGORIES and NotifSheet are unaffected.
+ */
+export function getAvailableSportsAndOpenGym(
+  schedule: Record<string, DaySchedule>,
+): FilterCategory[] {
+  const sports = getAvailableSports(schedule);
+  const allActivities = Object.values(schedule).flatMap(d => d.activities);
+  if (allActivities.some(act => OPEN_GYM_CATEGORY.match(act.name))) {
+    return [...sports, OPEN_GYM_CATEGORY];
+  }
+  return sports;
+}
+
+/**
+ * Find a sport/open-gym category by ID (for URL validation and hydration).
+ * Searches SPORT_CATEGORIES + OPEN_GYM_CATEGORY — does NOT filter by schedule.
+ */
+export function findSportById(id: string): FilterCategory | null {
+  if (id === OPEN_GYM_CATEGORY.id) return OPEN_GYM_CATEGORY;
+  return SPORT_CATEGORIES.find(c => c.id === id) ?? null;
+}
+
 /**
  * Count sessions per sport across the full week.
  * Only sports with at least one session are included in the map.
