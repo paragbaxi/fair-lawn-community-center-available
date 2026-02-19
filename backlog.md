@@ -226,9 +226,27 @@ Five items resolved in commit 82708eb: (1) `NotificationSettings.svelte` `onEnab
 ### ~~P2: Open Gym chip in Sports tab~~
 Added Open Gym as the last chip in the Sports tab chip row. `OPEN_GYM_CATEGORY`, `getAvailableSportsAndOpenGym`, and `findSportById` exported from `filters.ts` — `SPORT_CATEGORIES` / worker / NotifSheet untouched. Green `--color-available-*` tokens (consistent with NOW badge / status banner). Open Gym notification CTA opens the alerts sheet (thirtyMin pref path) rather than calling `toggleSport`. `openGymAlertOn` derived from `notifStore.prefs.thirtyMin`. Stale-sport guard updated to `getAvailableSportsAndOpenGym` so `#sports?sport=open-gym` deep-links survive data load. 208 unit tests. Merged 2026-02-19.
 
+### ~~P2: Open Gym alerts discoverability~~
+Moved Open Gym 30-min toggle into the SPORTS section as the first row; renamed the remaining section "Daily" for morning briefing only. Added `highlight` prop to `NotifSheet` — tapping "Alert me before Open Gym" deep-links and pulses the 👟 Open Gym row. `disabled={notifStore.loading}` added to all three toggles for consistency. `.sheet-row-sub` CSS for the "(30-min heads-up)" sub-label. `aria-label="Open Gym 30-min heads-up"` restores screen-reader context. `clearTimeout` in `$effect` cleanup prevents stale highlight callbacks. Optional chaining on all `onManageAlerts?.()` call sites. QA tested 6/6 with video recording. Merged 2026-02-19.
+
+### ~~P3: `fanOut` network-level send failures not counted in `failed`~~
+Added `failed++` inside the `catch` block in `fanOut` (`worker/index.ts`). Network-level fetch throws now increment the counter and surface via `check-and-notify.mjs` monitoring. Worker test added for network failure path (`sent: 0, failed: 1`). Merged 2026-02-19.
+
+### ~~P4: E2E test for Open Gym chip~~
+Added 5 tests to `e2e/smoke.spec.ts`: chip visible + selectable, session count badge rendered, "Alert me before Open Gym" CTA visible after selection, deep-link `#sports?sport=open-gym` pre-selects chip, deselect restores hint text. All gated with `test.skip` where data may be absent. 29 E2E tests passing. Merged 2026-02-19.
+
+### ~~P5: `getAvailableSportsAndOpenGym` double-flattens `allActivities`~~
+Replaced inner `flatMap().some()` with a single `.some()` on the already-flattened array passed down from `getAvailableSports`. Merged 2026-02-19.
+
 ---
 
 ## Open
+
+### ⚠️ P2: Local dev setup undocumented — `.env.local` required
+`VITE_VAPID_PUBLIC_KEY` and `VITE_WORKER_URL` are injected as GitHub Actions secrets at build time. No `.env.local` file or documentation exists for local development. Any new contributor hitting `npm run dev` and trying to enable notifications will see **"Failed to enable — please try again"** with no guidance. Fix: add a `.env.local` section to `SETUP.md` (or a new `CONTRIBUTING.md`) documenting the two required vars and where to get them (VAPID public key is baked into the deployed JS bundle; worker URL is `https://flcc-push.trueto.workers.dev`).
+
+### P3: Commit QA infrastructure to main
+`playwright.qa.config.ts`, `e2e/qa-notif-sheet.spec.ts`, `e2e/qa-teardown.ts`, and the `.gitignore` addition (`.qa-runs/`) were created locally during QA of PR #20 but never committed. They exist on disk only. Risk: lost on next `git clean` or new machine. Fix: commit as a standalone chore PR.
 
 ### P3: Worker `/unsubscribe` endpoint has no authentication
 `handleUnsubscribe` (`worker/index.ts:232`) accepts a DELETE request and deletes the KV entry for any `endpoint` value — **no auth check at all**. `/notify` and `/stats` both require `X-Api-Key`, but `/unsubscribe` does not. An attacker who learns a victim's push endpoint URL (e.g. by intercepting a `/subscribe` call or via a KV namespace leak) could silently unsubscribe them.
@@ -249,14 +267,8 @@ The `failed` counter only increments on non-2xx/non-410/non-429 HTTP status code
 ### P4: E2E test for "Manage all alerts →" link in SportWeekCard
 When subscribed to a sport, `SportWeekCard` renders a `<button class="sport-manage-inline">Manage all alerts →</button>`. No E2E test exercises this path. Add a test (gated with `test.skip` if notif state unavailable): subscribe via sport button → assert "Manage all alerts →" visible → click it → assert sheet opens.
 
-### P4: E2E test for Open Gym chip
-No E2E coverage for the new Open Gym chip. Add a test to `e2e/smoke.spec.ts` (gated with `test.skip` if no open gym data in schedule): navigate to `#sports` → assert `.sport-chip-opengym` is visible → click it → assert `.week-results` or `.no-results` renders → click again to deselect → assert hint text reappears. Also cover deep-link: navigate directly to `#sports?sport=open-gym` → assert chip is pressed.
-
 ### ~~P4: Open Gym notification CTA — highlight thirtyMin toggle in sheet~~
-When the user taps "🔔 Alert me before Open Gym", the full NotifSheet opens with no visual indication of which toggle to use. Consider passing an `initialFocus` or `highlight` prop to `NotifSheet` that scrolls to and briefly highlights the "30 min before Open Gym" row. Low urgency (sheet is short), but useful discoverability improvement.
-
-### P5: `getAvailableSportsAndOpenGym` double-flattens `allActivities`
-`getAvailableSports` (called internally) already flatMaps the schedule into activities, and `getAvailableSportsAndOpenGym` does it again for the Open Gym check. Negligible at current data scale. Could be avoided by accepting a pre-flattened activities array or inlining the Open Gym check into a single pass. Only worth addressing if this function ever appears in a hot path.
+Implemented in the Open Gym discoverability fix (PR #20). Merged 2026-02-19.
 
 ---
 

@@ -141,8 +141,11 @@ vite.config.ts.timestamp-*
 # Scraper debug output
 .debug/
 
-# Playwright screenshots
+# Playwright screenshots (MCP browser, auto-deleted on browser_close)
 .screenshots/
+
+# QA run artifacts (screenshots + videos, auto-cleaned after each run)
+.qa-runs/
 
 # Playwright test output
 test-results/
