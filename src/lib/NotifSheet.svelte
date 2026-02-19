@@ -106,7 +106,7 @@
       <!-- Close button ALWAYS present (focus trap anchor for info-only states) -->
       <button class="sheet-close" onclick={onClose} aria-label="Close">✕</button>
     </div>
-    <div class="sheet-content">
+    <div class="sheet-content" data-notif-initialized={notifStore.initialized ? '' : undefined}>
       {#if notifStore.error}
         <p class="sheet-error" role="alert">{notifStore.error}</p>
       {/if}
@@ -164,7 +164,7 @@
         <!-- Daily section -->
         <section class="sheet-section">
           <h3 class="sheet-section-title">Daily</h3>
-          <p class="sheet-section-sub">Today's schedule summary · ~8 AM ET</p>
+          <p class="sheet-section-sub">Today's schedule summary{notifStore.prefs.dailyBriefing ? ` · ${notifStore.prefs.dailyBriefingHour ?? 8} AM ET` : ''}</p>
           <label class="sheet-toggle-row">
             ☀️ Morning briefing
             <button
@@ -179,6 +179,44 @@
               <span class="toggle-thumb"></span>
             </button>
           </label>
+          {#if notifStore.prefs.dailyBriefing}
+            <div class="sheet-time-row" role="group" aria-label="Briefing notification time">
+              <span class="sheet-time-label">Notify me at</span>
+              <div
+                class="sheet-time-chips"
+                role="radiogroup"
+                aria-label="Hour"
+                onkeydown={(e) => {
+                  const hours = [7, 8, 9, 10];
+                  const cur = notifStore.prefs.dailyBriefingHour ?? 8;
+                  const idx = hours.indexOf(cur);
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = hours[(idx + 1) % hours.length];
+                    savePrefs({ ...notifStore.prefs, dailyBriefingHour: next });
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prev = hours[(idx - 1 + hours.length) % hours.length];
+                    savePrefs({ ...notifStore.prefs, dailyBriefingHour: prev });
+                  }
+                }}
+              >
+                {#each [7, 8, 9, 10] as hour}
+                  {@const selected = (notifStore.prefs.dailyBriefingHour ?? 8) === hour}
+                  <button
+                    class="time-chip"
+                    class:time-chip-selected={selected}
+                    role="radio"
+                    aria-checked={selected}
+                    tabindex={selected ? 0 : -1}
+                    aria-label="{hour} AM Eastern Time"
+                    onclick={() => savePrefs({ ...notifStore.prefs, dailyBriefingHour: hour })}
+                    disabled={notifStore.loading}
+                  >{hour} AM</button>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </section>
         <button class="sheet-destructive" onclick={handleDisable} disabled={notifStore.loading}>
           {notifStore.loading ? 'Turning off…' : 'Turn off all alerts'}
@@ -415,6 +453,58 @@
   .sheet-sport-divider {
     border-top: 1px dashed var(--color-border);
     margin: 2px 0 4px;
+  }
+
+  .sheet-time-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0 10px 12px;
+    gap: 10px;
+  }
+
+  .sheet-time-label {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .sheet-time-chips {
+    display: flex;
+    gap: 6px;
+  }
+
+  .time-chip {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 18px;
+    border: 1.5px solid var(--color-border);
+    background: var(--color-surface);
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+
+  .time-chip-selected {
+    border-color: var(--color-text-secondary);
+    background: var(--color-text-secondary);
+    color: var(--color-bg);
+    font-weight: 600;
+  }
+
+  .time-chip:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .time-chip {
+      transition: none;
+    }
   }
 
   .sheet-destructive {
