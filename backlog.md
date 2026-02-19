@@ -284,16 +284,30 @@ Added a subtle dashed divider (`border-top: 1px dashed var(--color-border)`) bet
 
 ---
 
+### ~~P4: Daily briefing fires even when Open Gym section is empty~~
+`handleScheduled` rewritten in PR #23: now sends when any activities exist; explicitly says "No open gym today · Basketball: 10:00" when gym is open but only other sports are scheduled. Skips only when `allActivities.length === 0`. Cron expanded to 5 runs/day covering 7–10 AM ET year-round. Per-user delivery hour (7/8/9/10 AM ET) persisted in KV and routed via `etHour` param in `fanOut`. Merged 2026-02-19.
+
+### ~~P4: `data-notif-initialized` not set in the sheet itself~~
+Added `data-notif-initialized` to `<div class="sheet-content">` in `NotifSheet.svelte` — present when `notifStore.initialized` is true. Parallel to `SportWeekCard.svelte` attr added in PR #22. Merged 2026-02-19.
+
+---
+
 ## Open
 
-### P4: Daily briefing fires even when Open Gym section is empty
-`handleScheduled` in `worker/index.ts` already returns early when `openGymSlots.length === 0` — but this means users who subscribe for "daily briefing" receive no notification on days when the gym has no open gym sessions. Consider sending a "no open gym today" message or the full day schedule instead of silently skipping, so the feature feels reliable.
+### P4: Redundant `role="group"` + `role="radiogroup"` nesting in time picker
+`.sheet-time-row` has `role="group" aria-label="Briefing notification time"` and its child `.sheet-time-chips` has `role="radiogroup" aria-label="Hour"`. Screen readers will announce two nested landmark containers ("Briefing notification time, group" → "Hour, radio group"). Simplify to a single `role="radiogroup"` on `.sheet-time-row`, removing the extra wrapping div's role.
 
-### P4: `data-notif-initialized` not set in the sheet itself
-The ready-signal attribute is on `.sport-week-expanded` in `SportWeekCard.svelte`, but the NotifSheet panel does not have an equivalent. If a future test needs to wait for the sheet's notification state (e.g. to assert section structure after subscribing), it would need its own ready signal or a longer `waitForSelector` on `.sheet-content`.
+### P4: Arrow-key handler fires `savePrefs` (API call) on every key-repeat event
+`onkeydown` on the time chip group calls `savePrefs` unconditionally. If a user holds ArrowRight, it fires one network/KV write per key-repeat (~8 Hz). Add a short debounce (e.g. 150ms) or guard with `if (e.repeat) return` to avoid excessive writes.
+
+### P4: Missing unit tests for `dailyBriefingHour` out-of-range validation
+Both `handleSubscribe` and `handleUpdatePrefs` now return 400 for `dailyBriefingHour` outside [7, 10], but there are no worker unit tests asserting this. Low priority given input source is controlled UI, but a gap.
 
 ### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
 The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison.
+
+### P5: Notification body length has no hard truncation
+`handleScheduled` builds body copy using `a.name.split(/\s+/)[0]` — abbreviates to first word, capped at 2 activities. Works well for current data but no explicit truncation guard exists. If scraped activity names are unusually long, body could exceed 100-char lock-screen visibility target.
 
 ---
 
