@@ -230,9 +230,26 @@ async function handleUpdatePrefs(request: Request, env: Env): Promise<Response> 
   return json({ ok: true });
 }
 
+/**
+ * Auth model: endpoint-as-self-authorization.
+ *
+ * This endpoint intentionally does not require X-Api-Key. The push endpoint
+ * URL is a 256-bit random value issued by the browser's push service — it is
+ * effectively unguessable and is only stored in the user's own localStorage.
+ * Presenting the endpoint in the request body is sufficient proof that the
+ * caller is the same browser that subscribed. Adding X-Api-Key would require
+ * distributing a server secret to the browser, which provides no meaningful
+ * security benefit over this model.
+ *
+ * Sanity check: reject requests where endpoint is absent or not a well-formed
+ * https:// URL to prevent accidental or malformed calls from deleting entries.
+ */
 async function handleUnsubscribe(request: Request, env: Env): Promise<Response> {
   const body = await request.json() as { endpoint?: string };
   if (!body.endpoint) return json({ error: 'Missing endpoint' }, 400);
+  if (typeof body.endpoint !== 'string' || !body.endpoint.startsWith('https://')) {
+    return json({ error: 'Invalid endpoint' }, 400);
+  }
 
   const key = await sha256hex(body.endpoint);
   const existing = await env.SUBSCRIPTIONS.get(key);

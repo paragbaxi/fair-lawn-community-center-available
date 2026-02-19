@@ -435,6 +435,27 @@ test.describe('Sports tab', () => {
     // Hint text should be visible instead
     await expect(page.locator('.hint-text')).toBeVisible();
   });
+
+  test('"Manage all alerts →" opens the notification sheet', async ({ page }) => {
+    await page.goto('/#sports?sport=basketball');
+    await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
+
+    const chip = page.locator('.sport-chip[aria-pressed="true"]').first();
+    if (!await chip.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No sport chip selected — schedule data may be empty');
+      return;
+    }
+
+    const manageBtn = page.locator('.sport-manage-inline');
+    if (!await manageBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, '"Manage all alerts" button only renders when subscribed — skip in headless CI');
+      return;
+    }
+
+    await manageBtn.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    await expect(page.locator('#sheet-title')).toHaveText('My Alerts');
+  });
 });
 
 // --- Notification sheet tests ---

@@ -586,6 +586,21 @@ describe('/unsubscribe', () => {
     const data = await res.json() as { error: string };
     expect(data.error).toBe('Missing endpoint');
   });
+
+  it('returns 400 for malformed endpoint (not https://)', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/unsubscribe', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: 'http://push.example.com/bad-scheme' }),
+    });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(400);
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('Invalid endpoint');
+  });
 });
 
 describe('fanOut network failure', () => {

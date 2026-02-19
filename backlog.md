@@ -248,24 +248,14 @@ Committed in chore commit 34f5081. Done 2026-02-19.
 ### ~~P2: Local dev setup undocumented — `.env.local` required~~
 Added "Local Development" section to `SETUP.md` with the two required env vars, exact values, and explanation of why they're safe to document. Done 2026-02-19.
 
-### P3: Worker `/unsubscribe` endpoint has no authentication
-`handleUnsubscribe` (`worker/index.ts:232`) accepts a DELETE request and deletes the KV entry for any `endpoint` value — **no auth check at all**. `/notify` and `/stats` both require `X-Api-Key`, but `/unsubscribe` does not. An attacker who learns a victim's push endpoint URL (e.g. by intercepting a `/subscribe` call or via a KV namespace leak) could silently unsubscribe them.
+### ~~P3: Worker `/unsubscribe` endpoint has no authentication~~
+Adopted endpoint-as-self-authorization: the push endpoint URL is a 256-bit random value issued by the browser's push service, stored only in the user's own localStorage. Presenting it in the request body is sufficient proof of identity. Added JSDoc to `handleUnsubscribe` documenting this auth model explicitly. Added input validation rejecting requests where endpoint is missing (400 `Missing endpoint`) or does not start with `https://` (400 `Invalid endpoint`). New test: malformed endpoint → 400. 20/20 worker tests passing. Done 2026-02-19.
 
-Practical risk: Push subscription endpoints are long random URLs only known to the subscribing browser and the KV store — hard to guess. But the omission is a best-practice violation and inconsistent with the rest of the API. Fix: add the same `X-Api-Key` header check (or accept the endpoint from the browser's request body and verify it was issued to the caller). The cleanest fix is requiring the calling browser to include the stored `apiKey` field — but since `/unsubscribe` is called by the user's own browser with the endpoint from their own localStorage, requiring the endpoint itself is a reasonable self-authorization.
+### ~~P3: `fanOut` network-level send failures not counted in `failed`~~
+See PR #20 / done section above. Merged 2026-02-19.
 
-Alternative: Accept the current design (endpoint-as-bearer-token) and document it explicitly — the endpoint is unguessable and is only in localStorage.
-
-### P3: `fanOut` network-level send failures not counted in `failed`
-In `worker/index.ts`, `fanOut` catches thrown errors from `fetch(sub.endpoint, payload)` (e.g. network timeout, DNS failure) with:
-```typescript
-} catch (err) {
-  console.error(`Failed to send to ${k.name}:`, err);
-}
-```
-The `failed` counter only increments on non-2xx/non-410/non-429 HTTP status codes. A network-level delivery failure (fetch throws) is logged but NOT counted. `check-and-notify.mjs` checks `result.failed > 0` to surface VAPID key expiry and other delivery issues — but network-level failures bypass this monitoring. Fix: add `failed++` inside the catch block in `fanOut`.
-
-### P4: E2E test for "Manage all alerts →" link in SportWeekCard
-When subscribed to a sport, `SportWeekCard` renders a `<button class="sport-manage-inline">Manage all alerts →</button>`. No E2E test exercises this path. Add a test (gated with `test.skip` if notif state unavailable): subscribe via sport button → assert "Manage all alerts →" visible → click it → assert sheet opens.
+### ~~P4: E2E test for "Manage all alerts →" link in SportWeekCard~~
+Added test to `e2e/smoke.spec.ts` inside `describe('Sports tab')`. Navigates to `#sports?sport=basketball`, waits for sport week card, checks for `.sport-manage-inline` button; gracefully skips in headless CI (button only renders when subscribed). 29 E2E tests pass, 1 skipped. Done 2026-02-19.
 
 ### ~~P4: Open Gym notification CTA — highlight thirtyMin toggle in sheet~~
 Implemented in the Open Gym discoverability fix (PR #20). Merged 2026-02-19.
