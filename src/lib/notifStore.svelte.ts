@@ -116,3 +116,10 @@ export async function toggleSport(sportId: string): Promise<void> {
   }
   notifStore.loading = false;
 }
+
+/** Returns true if the given sport's alert is currently enabled. */
+export function isSportAlertOn(sportId: string): boolean {
+  if (!notifStore.initialized || notifStore.state !== 'subscribed') return false;
+  if (sportId === 'open-gym') return notifStore.prefs.thirtyMin;
+  return (notifStore.prefs.sports ?? []).includes(sportId);
+}

@@ -10,13 +10,18 @@
   import TodayView from './lib/TodayView.svelte';
   import SportsView from './lib/SportsView.svelte';
   import NotifSheet from './lib/NotifSheet.svelte';
-  import { initNotifStore, notifStore } from './lib/notifStore.svelte.js';
+  import ContextualAlertSheet from './lib/ContextualAlertSheet.svelte';
+  import Snackbar from './lib/Snackbar.svelte';
+  import { initNotifStore, notifStore, isSportAlertOn } from './lib/notifStore.svelte.js';
 
   // --- Notification sheet ---
   let sheetOpen = $state(false);
   let bellPulsing = $state(false);
   let bellTriggerEl: HTMLButtonElement | null = $state(null);
   let sheetHighlight = $state<'thirtyMin' | null>(null);
+  let contextSheetOpen = $state(false);
+  let contextSheetSport = $state<FilterCategory | null>(null);
+  let snackbarMessage = $state<string | null>(null);
 
   function openMyAlerts(highlight: 'thirtyMin' | null = null) {
     sheetHighlight = highlight;
@@ -28,6 +33,53 @@
     sheetOpen = false;
     sheetHighlight = null;
     bellTriggerEl?.focus();
+  }
+
+  function handleBellClick() {
+    if (
+      activeTab === 'sports' &&
+      selectedSport !== null &&
+      notifStore.initialized &&
+      notifStore.state === 'subscribed' &&
+      !(notifStore.isIos && !notifStore.isStandalone) &&
+      !isSportAlertOn(selectedSport.id)
+    ) {
+      contextSheetSport = selectedSport;
+      contextSheetOpen = true;
+      sessionStorage.setItem('flcc-bell-seen', '1');
+      bellPulsing = false;
+    } else {
+      openMyAlerts();
+    }
+  }
+
+  // Guard: close contextual sheet if selectedSport changes while it's open
+  $effect(() => {
+    const currentSportId = selectedSport?.id;
+    if (!contextSheetOpen) return;
+    if (currentSportId !== contextSheetSport?.id) {
+      contextSheetOpen = false;
+    }
+  });
+
+  function closeContextSheet() {
+    contextSheetOpen = false;
+    // contextSheetSport intentionally NOT nulled — animation must complete first
+    bellTriggerEl?.focus();
+  }
+
+  async function handleContextViewAll() {
+    contextSheetOpen = false;
+    await tick();
+    const animDur = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300;
+    if (animDur > 0) await new Promise(r => setTimeout(r, animDur));
+    openMyAlerts();
+  }
+
+  function handleContextAlertOn(message: string) {
+    contextSheetOpen = false;
+    snackbarMessage = message;
+    // contextSheetSport not nulled — fly-out animation still needs it
   }
 
   onMount(async () => {
@@ -197,9 +249,9 @@
       <button
         class="bell-btn"
         bind:this={bellTriggerEl}
-        onclick={openMyAlerts}
+        onclick={handleBellClick}
         aria-label="Notification settings"
-        aria-expanded={sheetOpen}
+        aria-expanded={sheetOpen || contextSheetOpen}
       >
         🔔
         {#if notifStore.state === 'subscribed'}
@@ -264,6 +316,14 @@
 
     <TabBar {activeTab} onSelectTab={setTab} />
     <NotifSheet open={sheetOpen} {gymState} {data} onClose={closeMyAlerts} highlight={sheetHighlight} />
+    <ContextualAlertSheet
+      open={contextSheetOpen}
+      sport={contextSheetSport}
+      onClose={closeContextSheet}
+      onViewAll={handleContextViewAll}
+      onAlertOn={handleContextAlertOn}
+    />
+    <Snackbar message={snackbarMessage} onDismiss={() => { snackbarMessage = null; }} />
   {/if}
 </main>
 
