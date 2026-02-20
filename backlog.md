@@ -328,23 +328,8 @@ The sports dark-mode baseline includes the chip row and `hint-text`. If a sport 
 
 ---
 
-### P3: Error-path QA test for contextual bell — inline retry flow is untested ⚠️
-**Urgent** — the inline error + retry flow in `ContextualAlertSheet` is production code with no test coverage. `savePrefs` and `toggleSport` don't throw; they set `notifStore.error` instead. The happy path is tested (snackbar fires when pref is set), but the failure path (network offline → error message visible, snackbar NOT fired, sheet stays open for retry) has no automated test.
-
-Test to add in `e2e/qa-contextual-bell.spec.ts`:
-```typescript
-test('network error shows inline error and keeps sheet open', async ({ page }) => {
-  await mockSubscribed(page, { sports: [] });
-  await page.route('**/push/**', r => r.abort('failed'));  // simulate offline
-  await page.goto(BASE_URL + '#sports?sport=basketball');
-  await waitForBell(page);
-  await page.locator('.bell-btn').click();
-  await page.locator('button.ctx-cta').click();
-  await expect(page.locator('.ctx-error[role="alert"]')).toBeVisible();
-  await expect(page.locator('.snackbar')).not.toBeVisible();
-  await expect(page.locator('.ctx-panel')).toBeVisible(); // sheet stays open
-});
-```
+### ~~P3: Error-path QA test for contextual bell — inline retry flow is untested~~
+Worker route overridden to 500 (registered after `mockSubscribed` so Playwright LIFO order ensures it fires first). Asserts: `.ctx-error[role="alert"]` visible, `.snackbar` not visible, mini-sheet stays open. 1 test added to `e2e/qa-contextual-bell.spec.ts` (15 total). Merged 2026-02-20.
 
 ### P4: Shift+Tab focus trap direction not tested in `qa-contextual-bell.spec.ts`
 The focus-trap test in `e2e/qa-contextual-bell.spec.ts` only exercises forward Tab (CTA → "View all alerts" → wraps back to CTA). Shift+Tab (reverse wrap from CTA → "View all alerts") is untested. Add a second keyboard assertion in the existing `focus trap cycles between two buttons` test.

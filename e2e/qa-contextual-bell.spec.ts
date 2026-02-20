@@ -449,3 +449,41 @@ test('Chip change while mini-sheet open → mini-sheet auto-closes', async ({ pa
 
   await page.screenshot({ path: shot('cb-12b-mini-sheet-auto-closed.png') });
 });
+
+test('network error: inline error shown, snackbar NOT fired, sheet stays open for retry', async ({ page }) => {
+  await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
+  // Override worker route to return 500 — registered after mockSubscribed so Playwright
+  // LIFO order ensures this handler fires first, making updatePrefs() throw.
+  await page.route('**/flcc-push.trueto.workers.dev/**', route =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"internal"}' })
+  );
+
+  await page.goto(`${BASE}/#sports`);
+  await waitForBell(page);
+
+  const chip = page.locator('#panel-sports .sport-chip').first();
+  if (!await chip.isVisible({ timeout: 3000 }).catch(() => false)) {
+    test.skip(true, 'No sport chips available');
+    return;
+  }
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('[aria-label="Notification settings"]').click();
+  await expect(page.locator('#ctx-title')).toBeVisible({ timeout: 3000 });
+  await page.waitForTimeout(ANIM_MS);
+
+  // Click "Turn on alerts" — worker returns 500 → updatePrefs throws → notifStore.error set
+  await page.locator('.ctx-cta').click();
+
+  // Inline error alert must appear inside the sheet
+  await expect(page.locator('.ctx-error[role="alert"]')).toBeVisible({ timeout: 3000 });
+
+  // Snackbar must NOT appear (onAlertOn was never called)
+  await expect(page.locator('.snackbar')).not.toBeVisible();
+
+  // Sheet stays open so user can retry
+  await expect(page.locator('#ctx-title')).toBeVisible();
+
+  await page.screenshot({ path: shot('cb-13-error-path-inline-error.png') });
+});
