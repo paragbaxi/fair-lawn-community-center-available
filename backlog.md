@@ -292,24 +292,36 @@ Added `data-notif-initialized` to `<div class="sheet-content">` in `NotifSheet.s
 
 ---
 
-## Open
+### ~~P4: Redundant `role="group"` + `role="radiogroup"` nesting in time picker~~
+Collapsed to a single `role="radiogroup" aria-label="Briefing hour"` on `.sheet-time-row`; inner `.sheet-time-chips` div's role removed. Merged 2026-02-20.
 
-### P4: Redundant `role="group"` + `role="radiogroup"` nesting in time picker
-`.sheet-time-row` has `role="group" aria-label="Briefing notification time"` and its child `.sheet-time-chips` has `role="radiogroup" aria-label="Hour"`. Screen readers will announce two nested landmark containers ("Briefing notification time, group" → "Hour, radio group"). Simplify to a single `role="radiogroup"` on `.sheet-time-row`, removing the extra wrapping div's role.
+### ~~P4: Arrow-key handler fires `savePrefs` (API call) on every key-repeat event~~
+Added `if (e.repeat) return` guard at the top of the time-chip `onkeydown` handler. Merged 2026-02-20.
 
-### P4: Arrow-key handler fires `savePrefs` (API call) on every key-repeat event
-`onkeydown` on the time chip group calls `savePrefs` unconditionally. If a user holds ArrowRight, it fires one network/KV write per key-repeat (~8 Hz). Add a short debounce (e.g. 150ms) or guard with `if (e.repeat) return` to avoid excessive writes.
+### ~~P4: Missing unit tests for `dailyBriefingHour` out-of-range validation~~
+Added 2 worker tests: `handleSubscribe` with hour=6 → 400, `handleUpdatePrefs` with hour=11 → 400. Merged 2026-02-20.
 
-### P4: Missing unit tests for `dailyBriefingHour` out-of-range validation
-Both `handleSubscribe` and `handleUpdatePrefs` now return 400 for `dailyBriefingHour` outside [7, 10], but there are no worker unit tests asserting this. Low priority given input source is controlled UI, but a gap.
+### ~~P5: Notification body length has no hard truncation~~
+Added `truncateBody(s, max=100)` helper in `worker/index.ts`; applied to all 6 notification body construction sites. Merged 2026-02-20.
 
-### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
-The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison.
+### ~~P4: NotifSheet denied state visually sparse~~
+Expanded from single emoji+text line to icon + `<h3>` + `<p>` structure, reusing existing `.sheet-empty-state` CSS. QA approved. Merged 2026-02-20.
 
-### P5: Notification body length has no hard truncation
-`handleScheduled` builds body copy using `a.name.split(/\s+/)[0]` — abbreviates to first word, capped at 2 activities. Works well for current data but no explicit truncation guard exists. If scraped activity names are unusually long, body could exceed 100-char lock-screen visibility target.
+### ~~P4: Redundant QA screenshot `06-sheet-any-state.png`~~
+Removed the pre-branch "any state" screenshot that was always pixel-identical to the denied-state screenshot. Remaining `07-` variants renumbered to `06-`. Merged 2026-02-20.
+
+### ~~P4: Open Gym chip has no "live now" affordance~~
+Added conditional `NOW` badge (reusing existing `.now-badge` CSS) via `openGymIsActive` `$derived` in `SportWeekCard.svelte`; badge renders in both expanded and collapsed chip modes. QA approved. Merged 2026-02-20.
+
+### ~~P5: `check-sport-sync.mjs` pointing at deleted `scripts/check-and-notify.mjs`~~
+Script was silently broken since the worker migration. Updated to read `worker/index.ts` instead. CI passing again. Merged 2026-02-20.
 
 ---
+
+## Open
+
+### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
+The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison. Note: the Open Gym NOW badge may also require a baseline refresh next time visual tests are run locally.
 
 ### P2: Context-aware bell button — offer single-subject alert from current view
 
