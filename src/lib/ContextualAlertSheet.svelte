@@ -152,7 +152,8 @@
     left: 0;
     right: 0;
     z-index: 61;
-    height: 140px;
+    height: calc(140px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
     border-radius: 20px 20px 0 0;
     background: var(--color-bg);
     display: flex;
