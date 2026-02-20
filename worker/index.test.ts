@@ -743,6 +743,235 @@ describe('fanOut network failure', () => {
   });
 });
 
+describe('thirtyMin cron notifications', () => {
+  // Fake time: 2026-02-18T13:30:00.000Z = 8:30 AM EST (UTC-5)
+  // Activity "9:00 AM" = 540 minutes; nowMinutes = 510; diff = 30 → in window [20, 45]
+  const FAKE_NOW = new Date('2026-02-18T13:30:00.000Z');
+
+  function makeScheduleData(activities: Array<{ name: string; start: string; end: string; isOpenGym: boolean }>) {
+    return {
+      scrapedAt: '2026-02-18T00:00:00.000Z',
+      schedule: {
+        Wednesday: {
+          open: '8:00 AM',
+          close: '10:00 PM',
+          activities,
+        },
+      },
+      notices: [],
+    };
+  }
+
+  function makeScheduledCtx() {
+    let scheduledPromise: Promise<unknown> = Promise.resolve();
+    const ctx = {
+      waitUntil: (p: Promise<unknown>) => { scheduledPromise = p; },
+    } as unknown as ExecutionContext;
+    return { ctx, getPromise: () => scheduledPromise };
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useFakeTimers({ now: FAKE_NOW });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sends open gym notification when activity starts in 30-min window', async () => {
+    // 8:30 AM now, activity at 9:00 AM → diff = 30 min → in [20, 45]
+    const kv = createKVMock({
+      'sub-og': makeSub({ endpoint: 'https://push.example.com/og', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Open Gym', start: '9:00 AM', end: '10:00 AM', isOpenGym: true },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    const { ctx, getPromise } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx);
+    await getPromise();
+
+    const pushCalls = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/og');
+    expect(pushCalls.length).toBe(1);
+  });
+
+  it('skips open gym activity outside the 30-min window (2 min away or 60 min away)', async () => {
+    // 8:30 AM now; 8:32 AM = diff 2 (< 20); 9:30 AM = diff 60 (> 45)
+    const kv = createKVMock({
+      'sub-og': makeSub({ endpoint: 'https://push.example.com/og', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Open Gym', start: '8:32 AM', end: '9:00 AM', isOpenGym: true },
+      { name: 'Open Gym', start: '9:30 AM', end: '10:30 AM', isOpenGym: true },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    const { ctx, getPromise } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx);
+    await getPromise();
+
+    const pushCalls = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/og');
+    expect(pushCalls.length).toBe(0);
+  });
+
+  it('sends sport notification to matching subscriber, skips non-matching subscriber', async () => {
+    // 8:30 AM now, basketball at 9:00 AM → diff 30 → in window
+    const kv = createKVMock({
+      'sub-bball': makeSub({ endpoint: 'https://push.example.com/bball', thirtyMin: true, sports: ['basketball'] }),
+      'sub-vball': makeSub({ endpoint: 'https://push.example.com/vball', thirtyMin: true, sports: ['volleyball'] }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Basketball', start: '9:00 AM', end: '10:00 AM', isOpenGym: false },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    const { ctx, getPromise } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx);
+    await getPromise();
+
+    // Basketball subscriber receives push
+    expect(mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/bball').length).toBe(1);
+    // Volleyball subscriber does not
+    expect(mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/vball').length).toBe(0);
+  });
+
+  it('respects idempotency — second identical scheduled run is skipped', async () => {
+    const kv = createKVMock({
+      'sub-og': makeSub({ endpoint: 'https://push.example.com/og', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Open Gym', start: '9:00 AM', end: '10:00 AM', isOpenGym: true },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    // First run
+    const { ctx: ctx1, getPromise: getPromise1 } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx1);
+    await getPromise1();
+    const firstRunPushes = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/og').length;
+    expect(firstRunPushes).toBe(1);
+
+    // Second run with same fake time — idempotency key is already set
+    mockFetch.mockClear();
+    const { ctx: ctx2, getPromise: getPromise2 } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx2);
+    await getPromise2();
+    const secondRunPushes = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/og').length;
+    expect(secondRunPushes).toBe(0);
+  });
+
+  it('skips outside gym hours — before 8 AM ET', async () => {
+    // Override to 7:30 AM EST = 12:30 UTC
+    vi.setSystemTime(new Date('2026-02-18T12:30:00.000Z'));
+
+    const kv = createKVMock({
+      'sub-og': makeSub({ endpoint: 'https://push.example.com/og', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Open Gym', start: '8:00 AM', end: '9:00 AM', isOpenGym: true },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    const { ctx, getPromise } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx);
+    await getPromise();
+
+    // Should not even fetch the schedule (returns early on gym hours check)
+    const pageFetches = mockFetch.mock.calls.filter(([url]: [string]) => url === env.PAGES_DATA_URL);
+    expect(pageFetches.length).toBe(0);
+  });
+
+  it('skips outside gym hours — at 10 PM ET (22:00)', async () => {
+    // 10 PM EST = 03:00 UTC next day
+    vi.setSystemTime(new Date('2026-02-19T03:00:00.000Z'));
+
+    const kv = createKVMock({
+      'sub-og': makeSub({ endpoint: 'https://push.example.com/og', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Open Gym', start: '10:30 PM', end: '11:00 PM', isOpenGym: true },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    const { ctx, getPromise } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx);
+    await getPromise();
+
+    const pageFetches = mockFetch.mock.calls.filter(([url]: [string]) => url === env.PAGES_DATA_URL);
+    expect(pageFetches.length).toBe(0);
+  });
+
+  it('cron dispatch: */30 cron routes to 30-min handler, not daily briefing', async () => {
+    // 8:30 AM ET now; open gym at 9:00 AM = in window
+    // Daily briefing would send title 'Fair Lawn Gym · Today'; 30-min sends 'Open Gym starting soon'
+    const kv = createKVMock({
+      'sub-og': makeSub({ endpoint: 'https://push.example.com/og', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const scheduleData = makeScheduleData([
+      { name: 'Open Gym', start: '9:00 AM', end: '10:00 AM', isOpenGym: true },
+    ]);
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === env.PAGES_DATA_URL) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(scheduleData) });
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+    global.fetch = mockFetch;
+
+    const { ctx, getPromise } = makeScheduledCtx();
+    await worker.scheduled({ cron: '*/30 * * * *' } as ScheduledEvent, env as never, ctx);
+    await getPromise();
+
+    // Verify push was sent (30-min handler ran, not daily)
+    const pushCalls = mockFetch.mock.calls.filter(([url]: [string]) => url === 'https://push.example.com/og');
+    expect(pushCalls.length).toBe(1);
+
+    // Verify notification content is from 30-min handler (not daily briefing)
+    // The push payload body is built by buildPushPayload — check the notifData passed to it
+    // by inspecting the KV idempotency keys written
+    const idempKey = await kv.get('idempotent:2026-02-18:opengym:9:00 AM:thirtyMin');
+    expect(idempKey).toBe('1');
+  });
+});
+
 describe('sport-30min', () => {
   beforeEach(() => {
     vi.resetAllMocks();

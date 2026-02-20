@@ -53,6 +53,23 @@ interface NotificationData {
   url: string;
 }
 
+// ─── Sport patterns & constants ──────────────────────────────────────────────
+
+const SPORT_PATTERNS: Array<{ id: string; label: string; test: (name: string) => boolean }> = [
+  { id: 'basketball',   label: 'Basketball',   test: (n) => /basketball/i.test(n) },
+  { id: 'pickleball',   label: 'Pickleball',   test: (n) => /pickleball/i.test(n) },
+  { id: 'table-tennis', label: 'Table Tennis', test: (n) => /table\s+tennis/i.test(n) },
+  { id: 'volleyball',   label: 'Volleyball',   test: (n) => /volleyball/i.test(n) },
+  { id: 'badminton',    label: 'Badminton',    test: (n) => /badminton/i.test(n) },
+  { id: 'tennis',       label: 'Tennis',       test: (n) => /tennis/i.test(n) && !/table\s+tennis/i.test(n) },
+  { id: 'youth',        label: 'Youth',        test: (n) => /youth center/i.test(n) },
+];
+
+const THIRTY_MIN_WINDOW_MIN = 20;
+const THIRTY_MIN_WINDOW_MAX = 45;
+const GYM_OPEN_HOUR = 8;   // 8 AM ET
+const GYM_CLOSE_HOUR = 22; // 10 PM ET
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function sha256hex(input: string): Promise<string> {
@@ -92,6 +109,18 @@ function idempotencyKey(
   type: string,
 ): string {
   return `idempotent:${isoDate}:${dayName}:${activityStart}:${type}`;
+}
+
+function parseActivityMinutes(timeStr: string): number | null {
+  // timeStr format: "9:00 AM" or "2:30 PM"
+  const m = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
 }
 
 // ─── Fan-out ─────────────────────────────────────────────────────────────────
@@ -361,7 +390,7 @@ async function handleStats(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, subscribers, idempotencyKeys });
 }
 
-async function handleScheduled(env: Env): Promise<void> {
+async function handleDailyBriefing(env: Env): Promise<void> {
   let data: ScheduleData;
   try {
     const res = await fetch(env.PAGES_DATA_URL);
@@ -435,6 +464,101 @@ async function handleScheduled(env: Env): Promise<void> {
   console.log(`Daily briefing (${etHour}h ET, ${dayName}): sent=${result.sent} skipped=${result.skipped} cleaned=${result.cleaned} failed=${result.failed}`);
 }
 
+async function handleThirtyMinNotifications(env: Env): Promise<void> {
+  // Get current ET hour + minute
+  const now = new Date();
+  const etTimeParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric', minute: 'numeric',
+    hourCycle: 'h23',
+    weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => etTimeParts.find((p) => p.type === type)?.value ?? '';
+  const etHour = parseInt(get('hour'), 10);
+  const etMinute = parseInt(get('minute'), 10);
+  const dayName = get('weekday');
+  const isoDate = `${get('year')}-${get('month')}-${get('day')}`;
+  const nowMinutes = etHour * 60 + etMinute;
+
+  // Skip outside gym hours
+  if (etHour < GYM_OPEN_HOUR || etHour >= GYM_CLOSE_HOUR) {
+    console.log(`30-min check: outside gym hours (${etHour}h ET), skipping`);
+    return;
+  }
+
+  // Fetch schedule
+  const res = await fetch(env.PAGES_DATA_URL);
+  if (!res.ok) {
+    console.error(`30-min check: failed to fetch schedule (${res.status})`);
+    return;
+  }
+  const data = await res.json() as ScheduleData;
+  const todaySchedule = data.schedule?.[dayName];
+  if (!todaySchedule) {
+    console.log(`30-min check: no schedule for ${dayName}`);
+    return;
+  }
+
+  const activities = todaySchedule.activities ?? [];
+
+  // ── Open Gym notifications ──────────────────────────────────────────────────
+  const openGymUpcoming = activities.filter((a) => {
+    if (!a.isOpenGym) return false;
+    const startMin = parseActivityMinutes(a.start);
+    if (startMin === null) return false;
+    const diff = startMin - nowMinutes;
+    return diff >= THIRTY_MIN_WINDOW_MIN && diff <= THIRTY_MIN_WINDOW_MAX;
+  });
+
+  if (openGymUpcoming.length > 0) {
+    const slot = openGymUpcoming[0]; // earliest only, prevent duplicates
+    const notifData: NotificationData = {
+      title: 'Open Gym starting soon',
+      body: `Open Gym starts at ${slot.start} · ${dayName}`,
+      tag: `flcc-opengym-${slot.start}`,
+      url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports?sport=open-gym`,
+    };
+    const idKey = idempotencyKey(isoDate, 'opengym', slot.start, 'thirtyMin');
+    const result = await fanOut(env, notifData, 'thirtyMin', idKey);
+    console.log(`30-min open gym (${slot.start}): sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`);
+  }
+
+  // ── Per-sport notifications ─────────────────────────────────────────────────
+  const sportsSeen = new Set<string>();
+  for (const activity of activities) {
+    if (activity.isOpenGym) continue;
+    const startMin = parseActivityMinutes(activity.start);
+    if (startMin === null) continue;
+    const diff = startMin - nowMinutes;
+    if (diff < THIRTY_MIN_WINDOW_MIN || diff > THIRTY_MIN_WINDOW_MAX) continue;
+
+    for (const pattern of SPORT_PATTERNS) {
+      if (!pattern.test(activity.name)) continue;
+      if (sportsSeen.has(pattern.id)) continue; // one notification per sport per window
+      sportsSeen.add(pattern.id);
+
+      const notifData: NotificationData = {
+        title: `${pattern.label} starting soon`,
+        body: `${pattern.label} starts at ${activity.start} · ${dayName}`,
+        tag: `flcc-sport-${pattern.id}-${activity.start}`,
+        url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports?sport=${pattern.id}`,
+      };
+      const idKey = idempotencyKey(isoDate, pattern.id, activity.start, 'thirtyMin');
+      const result = await fanOut(env, notifData, 'thirtyMin', idKey, pattern.id);
+      console.log(`30-min ${pattern.label} (${activity.start}): sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`);
+    }
+  }
+}
+
+async function handleScheduled(event: ScheduledEvent, env: Env): Promise<void> {
+  if (event.cron === '*/30 * * * *') {
+    await handleThirtyMinNotifications(env);
+  } else {
+    // Daily briefing: cron "0 11,12,13,14,15 * * *"
+    await handleDailyBriefing(env);
+  }
+}
+
 // ─── Main fetch handler ──────────────────────────────────────────────────────
 
 export default {
@@ -473,7 +597,7 @@ export default {
     return json({ error: 'Not found' }, 404);
   },
 
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(handleScheduled(env));
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(handleScheduled(event, env));
   },
 };
