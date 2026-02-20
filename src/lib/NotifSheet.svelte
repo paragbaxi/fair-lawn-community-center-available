@@ -118,7 +118,9 @@
         </div>
       {:else if notifStore.state === 'denied'}
         <div class="sheet-empty-state">
-          🔕 Notifications blocked — enable in browser Settings
+          <div class="sheet-empty-icon">🔕</div>
+          <h3>Notifications blocked</h3>
+          <p>Enable in your browser Settings to receive activity alerts.</p>
         </div>
       {:else if notifStore.state === 'subscribed'}
         <!-- Sports section — always rendered; Open Gym row first, then per-sport rows -->
@@ -180,13 +182,12 @@
             </button>
           </label>
           {#if notifStore.prefs.dailyBriefing}
-            <div class="sheet-time-row" role="group" aria-label="Briefing notification time">
+            <div class="sheet-time-row" role="radiogroup" aria-label="Briefing hour">
               <span class="sheet-time-label">Notify me at</span>
               <div
                 class="sheet-time-chips"
-                role="radiogroup"
-                aria-label="Hour"
                 onkeydown={(e) => {
+                  if (e.repeat) return;
                   const hours = [7, 8, 9, 10];
                   const cur = notifStore.prefs.dailyBriefingHour ?? 8;
                   const idx = hours.indexOf(cur);

@@ -123,6 +123,10 @@ function parseActivityMinutes(timeStr: string): number | null {
   return h * 60 + min;
 }
 
+function truncateBody(s: string, max = 100): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + '…';
+}
+
 // ─── Fan-out ─────────────────────────────────────────────────────────────────
 
 async function fanOut(
@@ -327,7 +331,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     const act = activities[0];  // one representative activity (deduped by script)
     const notifData: NotificationData = {
       title: `${label} in ~30 min`,
-      body: `Starts at ${act.start} — ${act.end}`,
+      body: truncateBody(`Starts at ${act.start} — ${act.end}`),
       tag: `flcc-sport-${body.sportId}`,
       url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports`,
     };
@@ -350,7 +354,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
   for (const act of activities) {
     const notifData: NotificationData = {
       title: 'Open Gym in ~30 min',
-      body: `Starts at ${act.start} — ${act.end}`,
+      body: truncateBody(`Starts at ${act.start} — ${act.end}`),
       tag: 'flcc-30min',
       url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#status`,
     };
@@ -435,11 +439,11 @@ async function handleDailyBriefing(env: Env): Promise<void> {
   let body: string;
   if (openGymSlots.length > 0) {
     const gymTimes = openGymSlots.map((a) => a.start).join(' & ');
-    body = `Open Gym: ${gymTimes}`;
+    body = truncateBody(`Open Gym: ${gymTimes}`);
     if (otherActs.length > 0) {
       // Abbreviate to first word of activity name; show up to 2
       const names = otherActs.slice(0, 2).map((a) => a.name.split(/\s+/)[0]).join(', ');
-      body += ` · ${names}`;
+      body = truncateBody(body + ` · ${names}`);
     }
   } else {
     body = 'No open gym today';
@@ -447,7 +451,7 @@ async function handleDailyBriefing(env: Env): Promise<void> {
       const acts = otherActs.slice(0, 2)
         .map((a) => `${a.name.split(/\s+/)[0]}: ${a.start}`)
         .join(' · ');
-      body += ` · ${acts}`;
+      body = truncateBody(body + ` · ${acts}`);
     }
   }
 
@@ -514,7 +518,7 @@ async function handleThirtyMinNotifications(env: Env): Promise<void> {
     const slot = openGymUpcoming[0]; // earliest only, prevent duplicates
     const notifData: NotificationData = {
       title: 'Open Gym starting soon',
-      body: `Open Gym starts at ${slot.start} · ${dayName}`,
+      body: truncateBody(`Open Gym starts at ${slot.start} · ${dayName}`),
       tag: `flcc-opengym-${slot.start}`,
       url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports?sport=open-gym`,
     };
@@ -539,7 +543,7 @@ async function handleThirtyMinNotifications(env: Env): Promise<void> {
 
       const notifData: NotificationData = {
         title: `${pattern.label} starting soon`,
-        body: `${pattern.label} starts at ${activity.start} · ${dayName}`,
+        body: truncateBody(`${pattern.label} starts at ${activity.start} · ${dayName}`),
         tag: `flcc-sport-${pattern.id}-${activity.start}`,
         url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports?sport=${pattern.id}`,
       };

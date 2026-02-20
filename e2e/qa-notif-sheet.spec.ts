@@ -119,8 +119,6 @@ test('My Alerts sheet shows correct section structure', async ({ page }) => {
   await expect(dialog).toBeVisible({ timeout: 3000 });
   await page.waitForTimeout(ANIM_MS);   // let fly-in animation settle
 
-  await page.screenshot({ path: shot('06-sheet-any-state.png') });
-
   // ── Branch on which state the sheet is in ──────────────────────────────────
   // NotifSheet has 4 states: loading / denied / subscribed / unsubscribed
   // Headless Chromium defaults to 'denied', so we must handle all branches.
@@ -157,27 +155,27 @@ test('My Alerts sheet shows correct section structure', async ({ page }) => {
     const dailySect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^daily$/i }) });
     await expect(dailySect.locator('.sheet-section-sub')).toHaveText("Today's schedule summary");
 
-    await page.screenshot({ path: shot('07-sheet-subscribed-sections.png') });
+    await page.screenshot({ path: shot('06-sheet-subscribed-sections.png') });
 
   } else if (await enableBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
     // ── Unsubscribed: enable CTA present ──
     await expect(enableBtn).toBeVisible();
-    await page.screenshot({ path: shot('07-sheet-unsubscribed.png') });
+    await page.screenshot({ path: shot('06-sheet-unsubscribed.png') });
 
   } else if (await deniedMsg.isVisible({ timeout: 1000 }).catch(() => false)) {
     // ── Denied: blocked-notifications message present ──
     // Valid production behavior in headless CI — sections not shown (correct).
     await expect(deniedMsg).toBeVisible();
-    await page.screenshot({ path: shot('07-sheet-denied.png') });
+    await page.screenshot({ path: shot('06-sheet-denied.png') });
     console.log('ℹ️  Notification permission denied (headless default) — section structure test skipped');
 
   } else if (await loadingEl.isVisible({ timeout: 500 }).catch(() => false)) {
-    await page.screenshot({ path: shot('07-sheet-loading.png') });
+    await page.screenshot({ path: shot('06-sheet-loading.png') });
     console.log('ℹ️  notifStore still loading — section structure test skipped');
 
   } else {
-    await page.screenshot({ path: shot('07-sheet-unknown.png') });
-    throw new Error('Sheet opened but no known state detected — see 07-sheet-unknown.png');
+    await page.screenshot({ path: shot('06-sheet-unknown.png') });
+    throw new Error('Sheet opened but no known state detected — see 06-sheet-unknown.png');
   }
 });
 
