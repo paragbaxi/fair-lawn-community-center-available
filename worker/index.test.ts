@@ -1045,3 +1045,61 @@ describe('sport-30min', () => {
     expect(bballCalls.length).toBe(1);
   });
 });
+
+describe('/subscribe dailyBriefingHour validation', () => {
+  it('returns 400 when dailyBriefingHour is 6 (below range)', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: 'https://push.example.com/sub-bad-hour',
+        keys: { p256dh: 'dGVzdA==', auth: 'dGVzdA==' },
+        prefs: { thirtyMin: true, dailyBriefing: true, sports: [], dailyBriefingHour: 6 },
+      }),
+    });
+
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(400);
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('dailyBriefingHour must be 7, 8, 9, or 10');
+  });
+});
+
+describe('/subscription (updatePrefs) dailyBriefingHour validation', () => {
+  it('returns 400 when dailyBriefingHour is 11 (above range)', async () => {
+    const endpoint = 'https://push.example.com/sub-update-bad-hour';
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    // Subscribe first so the subscription exists
+    const subReq = new Request('https://example.com/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint,
+        keys: { p256dh: 'dGVzdA==', auth: 'dGVzdA==' },
+        prefs: { thirtyMin: true, dailyBriefing: true, sports: [], dailyBriefingHour: 8 },
+      }),
+    });
+    const subRes = await worker.fetch(subReq, env as never);
+    expect(subRes.status).toBe(201);
+
+    // Now attempt to update with an out-of-range hour
+    const patchReq = new Request('https://example.com/subscription', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint,
+        prefs: { dailyBriefingHour: 11 },
+      }),
+    });
+
+    const res = await worker.fetch(patchReq, env as never);
+    expect(res.status).toBe(400);
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('dailyBriefingHour must be 7, 8, 9, or 10');
+  });
+});

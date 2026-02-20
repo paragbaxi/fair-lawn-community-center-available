@@ -69,6 +69,14 @@
     if (!selectedSport) return null;
     return computeSportStatus(data.schedule, selectedSport.match, clock.now, todayName);
   });
+
+  const openGymIsActive = $derived.by(() => {
+    const todaySchedule = data.schedule[todayName];
+    if (!todaySchedule) return false;
+    return todaySchedule.activities.some(
+      (act) => act.isOpenGym && isActivityCurrent(act.start, act.end, clock.now, true)
+    );
+  });
 </script>
 
 {#if availableSports.length > 0}
@@ -89,7 +97,7 @@
             aria-pressed={selectedSport?.id === sport.id}
             onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
           >
-            {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}{#if count} <span class="chip-count" aria-hidden="true">· {count}</span><span class="sr-only">, {count} sessions this week</span>{/if}
+            {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}{#if count} <span class="chip-count" aria-hidden="true">· {count}</span><span class="sr-only">, {count} sessions this week</span>{/if}{#if sport.id === 'open-gym' && openGymIsActive}<span class="now-badge" aria-label="Open Gym is on now">NOW</span>{/if}
           </button>
         {/each}
       </div>
@@ -251,7 +259,7 @@
                   aria-pressed={selectedSport?.id === sport.id}
                   onclick={() => { onSelectSport(selectedSport?.id === sport.id ? null : sport); }}
                 >
-                  {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}{#if count} <span class="chip-count" aria-hidden="true">· {count}</span><span class="sr-only">, {count} sessions this week</span>{/if}
+                  {#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{sport.label}{#if count} <span class="chip-count" aria-hidden="true">· {count}</span><span class="sr-only">, {count} sessions this week</span>{/if}{#if sport.id === 'open-gym' && openGymIsActive}<span class="now-badge" aria-label="Open Gym is on now">NOW</span>{/if}
                 </button>
               {/each}
             </div>

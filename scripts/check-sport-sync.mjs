@@ -3,7 +3,7 @@
  *
  * Verifies that sport IDs in src/lib/filters.ts (FILTER_CATEGORIES, excluding
  * 'all' and 'open-gym') stay in sync with SPORT_PATTERNS in
- * scripts/check-and-notify.mjs.
+ * worker/index.ts.
  *
  * Exit 0 — IDs match.
  * Exit 1 — mismatch found; prints details.
@@ -21,7 +21,7 @@ const root = join(__dirname, '..');
 // ─── Read files ───────────────────────────────────────────────────────────────
 
 const filtersTs = readFileSync(join(root, 'src', 'lib', 'filters.ts'), 'utf-8');
-const notifyMjs = readFileSync(join(root, 'scripts', 'check-and-notify.mjs'), 'utf-8');
+const notifyMjs = readFileSync(join(root, 'worker', 'index.ts'), 'utf-8');
 
 // ─── Extract IDs ──────────────────────────────────────────────────────────────
 
@@ -64,18 +64,18 @@ let hasError = false;
 
 if (missingFromNotify.length > 0) {
   console.error(
-    `ERROR: Sport IDs in src/lib/filters.ts but missing from scripts/check-and-notify.mjs SPORT_PATTERNS:\n` +
+    `ERROR: Sport IDs in src/lib/filters.ts but missing from scripts/worker/index.ts SPORT_PATTERNS:\n` +
       missingFromNotify.map((id) => `  - '${id}'`).join('\n'),
   );
   console.error(
-    `  Fix: add matching entries to SPORT_PATTERNS in scripts/check-and-notify.mjs`,
+    `  Fix: add matching entries to SPORT_PATTERNS in worker/index.ts`,
   );
   hasError = true;
 }
 
 if (missingFromFilters.length > 0) {
   console.error(
-    `ERROR: Sport IDs in scripts/check-and-notify.mjs SPORT_PATTERNS but missing from src/lib/filters.ts FILTER_CATEGORIES:\n` +
+    `ERROR: Sport IDs in scripts/worker/index.ts SPORT_PATTERNS but missing from src/lib/filters.ts FILTER_CATEGORIES:\n` +
       missingFromFilters.map((id) => `  - '${id}'`).join('\n'),
   );
   console.error(
