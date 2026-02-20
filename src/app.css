@@ -15,6 +15,8 @@
   --color-border: #e5e7eb;
   --color-timeline-past: #d1d5db;
   --color-timeline-scheduled: #9ca3af;
+  --color-accent: #3182ce;
+  --color-accent-hover: #2b6cb0;
   --radius: 12px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
