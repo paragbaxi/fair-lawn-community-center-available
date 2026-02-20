@@ -323,44 +323,51 @@ Script was silently broken since the worker migration. Updated to read `worker/i
 ### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
 The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison. Note: the Open Gym NOW badge may also require a baseline refresh next time visual tests are run locally.
 
-### P2: Context-aware bell button — offer single-subject alert from current view
+### ~~P2: Context-aware bell button — offer single-subject alert from current view~~
+140px contextual mini-sheet (`ContextualAlertSheet.svelte`) + auto-dismiss snackbar (`Snackbar.svelte`). Bell on Sports tab with chip selected and alert OFF shows mini-sheet; all other states fall through to full sheet. `isSportAlertOn()` helper centralises the `thirtyMin` vs `sports[]` asymmetry. `--color-accent`/`--color-accent-hover` promoted to `app.css` `:root` tokens. Focus trap, swipe-down, `env(safe-area-inset-bottom)` for home-indicator clearance. 14 QA tests in `e2e/qa-contextual-bell.spec.ts`. Merged 2026-02-20.
 
-**Idea:** When the user taps the bell with a sport chip selected, instead of always opening the full alerts sheet, show a focused 140px mini-sheet offering to turn on that one alert.
+---
 
-**Decision tree (UX agent reviewed):**
+### P3: Error-path QA test for contextual bell — inline retry flow is untested ⚠️
+**Urgent** — the inline error + retry flow in `ContextualAlertSheet` is production code with no test coverage. `savePrefs` and `toggleSport` don't throw; they set `notifStore.error` instead. The happy path is tested (snackbar fires when pref is set), but the failure path (network offline → error message visible, snackbar NOT fired, sheet stays open for retry) has no automated test.
 
-| State | Alert OFF | Alert ON | Push denied | Not yet subscribed |
-|---|---|---|---|---|
-| Sports tab, sport chip selected | Show contextual mini-sheet | Open full sheet | Open full sheet (blocked state) | Open full sheet (onboarding) |
-| Sports tab, Open Gym chip selected | Show contextual mini-sheet | Open full sheet | Open full sheet | Open full sheet |
-| Sports tab, no chip selected | Open full sheet | — | Open full sheet | Open full sheet |
-| Status tab | Open full sheet | — | Open full sheet | Open full sheet |
-| Schedule tab | Open full sheet | — | Open full sheet | Open full sheet |
-| Daily briefing | Never contextual (time pref, not subject pref) | — | — | — |
+Test to add in `e2e/qa-contextual-bell.spec.ts`:
+```typescript
+test('network error shows inline error and keeps sheet open', async ({ page }) => {
+  await mockSubscribed(page, { sports: [] });
+  await page.route('**/push/**', r => r.abort('failed'));  // simulate offline
+  await page.goto(BASE_URL + '#sports?sport=basketball');
+  await waitForBell(page);
+  await page.locator('.bell-btn').click();
+  await page.locator('button.ctx-cta').click();
+  await expect(page.locator('.ctx-error[role="alert"]')).toBeVisible();
+  await expect(page.locator('.snackbar')).not.toBeVisible();
+  await expect(page.locator('.ctx-panel')).toBeVisible(); // sheet stays open
+});
+```
 
-**Contextual mini-sheet copy:**
-> **Get notified before Table Tennis**
-> Tap to receive a 30-minute heads-up when Table Tennis is scheduled.
->
-> [Turn on alerts] · [View all alerts]
+### P4: Shift+Tab focus trap direction not tested in `qa-contextual-bell.spec.ts`
+The focus-trap test in `e2e/qa-contextual-bell.spec.ts` only exercises forward Tab (CTA → "View all alerts" → wraps back to CTA). Shift+Tab (reverse wrap from CTA → "View all alerts") is untested. Add a second keyboard assertion in the existing `focus trap cycles between two buttons` test.
 
-- Bottom-anchored, 140px tall, dismisses on backdrop tap or swipe down
-- "Turn on alerts" — filled primary button; toggles the sport pref ON, shows snackbar "Table Tennis alerts on", dismisses
-- "View all alerts" — text link; opens full sheet
-- Open Gym variant: "Get notified before Open Gym / You'll get a 30-minute heads-up on Open Gym days."
+### P4: Active toggle ordering in full NotifSheet SPORTS section
+Pre-existing UX concern: enabled sport toggles are not sorted to the top of the SPORTS list. When a user has Basketball and Tennis enabled but is looking for Pickleball, they must scan the full unsorted list. Sort enabled sports first or auto-scroll to the first active toggle on sheet open. Low-effort win — `notifiableSports` is already a `$derived` in `NotifSheet.svelte`.
 
-**Fallbacks:**
-- Push denied → skip mini-sheet, open full sheet (blocked state shown there)
-- Not subscribed → open full sheet (onboarding must complete before per-sport can be set)
-- Alert already ON → open full sheet (re-prompting an already-on alert is confusing)
-- Multiple chips (if ever allowed) → open full sheet (ambiguous subject)
-- Daily briefing never contextually triggered
+### P5: `handleContextViewAll` 300ms magic number should reference animation duration
+`src/App.svelte` `handleContextViewAll` hard-codes `300` as the wait for the mini-sheet fly-out to complete before opening the full sheet:
+```typescript
+const animDur = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300;
+```
+This must match `ContextualAlertSheet.svelte`'s `fly({ duration: dur(300) })`. If that duration ever changes, the two will silently diverge. Add a comment linking the two, or extract a shared constant.
 
-**Implementation notes:**
-- `App.svelte` bell `onclick` needs to read `selectedSport` (already lifted state) and check `notifStore.prefs.sports.includes(sportId)` before deciding which sheet to show
-- Add a new `ContextualAlertSheet.svelte` component (or extend `NotifSheet` with a `contextSport` prop) for the mini-sheet
-- `savePrefs` call on "Turn on alerts" is identical to the toggle in `NotifSheet` — reuse `notifStore.toggleSport()`
-- Snackbar confirmation is a new UI primitive (none exists yet); a simple fixed-bottom toast with auto-dismiss after 2.5s suffices
+### P5: Redundant `notifStore.error = null` in `$effect` `if (!open)` guard
+`ContextualAlertSheet.svelte` `$effect` block has an early-return guard:
+```typescript
+if (!open) {
+  notifStore.error = null;  // ← redundant
+  return;
+}
+```
+The cleanup function (returned by the same `$effect`) already runs `notifStore.error = null` when `open` becomes false. The early-return clear was added defensively but is never reached on the `open → false` transition because the effect re-runs with the cleanup first. Safe to remove.
 
 ---
 
