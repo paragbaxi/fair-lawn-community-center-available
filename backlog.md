@@ -318,11 +318,6 @@ Script was silently broken since the worker migration. Updated to read `worker/i
 
 ---
 
-## Open
-
-### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
-The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison. Note: the Open Gym NOW badge may also require a baseline refresh next time visual tests are run locally.
-
 ### ~~P2: Context-aware bell button — offer single-subject alert from current view~~
 140px contextual mini-sheet (`ContextualAlertSheet.svelte`) + auto-dismiss snackbar (`Snackbar.svelte`). Bell on Sports tab with chip selected and alert OFF shows mini-sheet; all other states fall through to full sheet. `isSportAlertOn()` helper centralises the `thirtyMin` vs `sports[]` asymmetry. `--color-accent`/`--color-accent-hover` promoted to `app.css` `:root` tokens. Focus trap, swipe-down, `env(safe-area-inset-bottom)` for home-indicator clearance. 14 QA tests in `e2e/qa-contextual-bell.spec.ts`. Merged 2026-02-20.
 
@@ -352,6 +347,12 @@ Deleted `const BASE = 'http://localhost:4174'` from both QA spec files. All `pag
 
 ### ~~P4: Two `qa-notif-sheet.spec.ts` tests use `.sport-week-expanded` as ready signal on `/#sports` (no chip pre-selected)~~
 All 5 `waitForSelector('.sport-week-expanded', { timeout: 8000 })` calls replaced with `waitForSelector('#panel-sports .sport-chip', { timeout: 8000 })`. The two broken tests ("Open Gym chip visible and selectable", "Alert button absent") no longer burn 8s each — the chip selector is available immediately on page load regardless of selection state. The three `/#sports?sport=open-gym` tests also updated for consistency (they worked before but the new signal is faster). Done 2026-02-20.
+
+### P4: No QA test for `sortedSports` ordering in NotifSheet
+PR #27 added `sortedSports` derived to float enabled sports above disabled ones in the SPORTS section, but no automated test verifies the DOM order. A `qa-notif-sheet.spec.ts` test should mock subscribed state with one specific sport enabled (e.g. `sports: ['basketball']`), open the sheet, query all `.sheet-toggle-row` toggle buttons inside the Sports section, and assert the `aria-checked="true"` button appears before all `aria-checked="false"` buttons. This would catch a regression in the sort comparator or `{#each}` target.
+
+### P4: `NotifSheet.svelte` error-path not covered by QA
+`qa-contextual-bell.spec.ts` has a network-failure test (worker 500 → inline error visible, snackbar absent, sheet stays open). `qa-notif-sheet.spec.ts` has no equivalent for the full sheet. Should add a test that: mocks subscribed state, opens the sheet, overrides the worker route to 500, toggles a sport, asserts `.sheet-error[role="alert"]` appears and the toggle reverts to its previous `aria-checked` state (optimistic rollback). Parity with the contextual bell error coverage.
 
 ### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
 The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison. Note: the Open Gym NOW badge may also require a baseline refresh next time visual tests are run locally.
