@@ -7,7 +7,7 @@
  * Videos go to .qa-runs/artifacts/<test-name>/video.webm
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
@@ -16,6 +16,34 @@ const SHOTS = path.join(process.cwd(), '.qa-runs', 'screenshots');
 function shot(name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
   return path.join(SHOTS, name);
+}
+
+/**
+ * Sets up the page to appear in subscribed state.
+ * - Mocks Notification.permission = 'granted'
+ * - Mocks PushManager.prototype.getSubscription to return a fake subscription
+ * - Sets localStorage with endpoint + prefs
+ * - Routes worker API calls to succeed (so savePrefs/toggleSport don't throw)
+ */
+async function mockSubscribed(page: Page, prefs = {
+  thirtyMin: false, dailyBriefing: true, sports: [] as string[], dailyBriefingHour: 8,
+}) {
+  await page.addInitScript((prefsJson: string) => {
+    Object.defineProperty(Notification, 'permission', {
+      get: () => 'granted',
+      configurable: true,
+    });
+    if (typeof PushManager !== 'undefined') {
+      const fakeSubscription = { endpoint: 'https://fake.push.example.com/sub' };
+      PushManager.prototype.getSubscription = () => Promise.resolve(fakeSubscription as PushSubscription);
+    }
+    localStorage.setItem('flcc-push-endpoint', 'https://fake.push.example.com/sub');
+    localStorage.setItem('flcc-notif-prefs', prefsJson);
+  }, JSON.stringify(prefs));
+
+  await page.route('**/flcc-push.trueto.workers.dev/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+  );
 }
 
 // Allow sheet fly-in animation (300ms) to settle before screenshotting
@@ -223,4 +251,100 @@ test('Deselecting Open Gym chip restores hint text', async ({ page }) => {
   await expect(page.locator('.sport-notif-btn')).not.toBeVisible();
 
   await page.screenshot({ path: shot('09-chip-deselected.png') });
+});
+
+// ─── Happy Path 5: Enabled sports sort before disabled in SPORTS section ─────
+
+test('Enabled sports sort before disabled in NotifSheet SPORTS section', async ({ page }) => {
+  await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: ['basketball'], dailyBriefingHour: 8 });
+  await page.goto('/');
+  await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 10000 });
+  await page.locator('[aria-label="Notification settings"]').click();
+
+  const dialog = page.locator('[role="dialog"]');
+  await expect(dialog).toBeVisible({ timeout: 3000 });
+  await page.waitForSelector('[data-notif-initialized]', { timeout: 6000 });
+  await page.waitForTimeout(ANIM_MS);
+
+  // Must be in subscribed state for the SPORTS section to appear
+  const sportsSect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^sports$/i }) });
+  if (!await sportsSect.isVisible({ timeout: 1000 }).catch(() => false)) {
+    test.skip(true, 'Not in subscribed state — cannot verify sort order');
+    return;
+  }
+
+  // All per-sport toggles (excludes Open Gym, which has a distinct aria-label)
+  const sportToggles = sportsSect.locator('button[role="switch"]:not([aria-label="Open Gym 30-min heads-up"])');
+  const count = await sportToggles.count();
+  if (count < 2) {
+    test.skip(true, 'Fewer than 2 sports scheduled this week — cannot verify sort order');
+    return;
+  }
+
+  // Basketball must appear in the list to be the enabled sport for this test
+  const hasBasketball = await sportsSect
+    .locator('button[role="switch"][aria-label="Basketball"]')
+    .isVisible({ timeout: 500 }).catch(() => false);
+  if (!hasBasketball) {
+    test.skip(true, 'Basketball not scheduled this week — cannot verify enabled sport sorts first');
+    return;
+  }
+
+  // First toggle must be the enabled one (Basketball); all subsequent must be disabled
+  await expect(sportToggles.first()).toHaveAttribute('aria-checked', 'true');
+  await expect(sportToggles.first()).toHaveAttribute('aria-label', 'Basketball');
+  for (let i = 1; i < count; i++) {
+    await expect(sportToggles.nth(i)).toHaveAttribute('aria-checked', 'false');
+  }
+
+  await page.screenshot({ path: shot('10-sort-enabled-first.png') });
+});
+
+// ─── Unhappy Path 3: Network error on sport toggle ───────────────────────────
+
+test('network error on sport toggle: inline error shown, toggle reverts, sheet stays open', async ({ page }) => {
+  await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
+  // Override to 500 after mockSubscribed — LIFO order ensures this handler fires first
+  await page.route('**/flcc-push.trueto.workers.dev/**', route =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"internal"}' })
+  );
+  await page.goto('/');
+  await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 10000 });
+  await page.locator('[aria-label="Notification settings"]').click();
+
+  const dialog = page.locator('[role="dialog"]');
+  await expect(dialog).toBeVisible({ timeout: 3000 });
+  await page.waitForSelector('[data-notif-initialized]', { timeout: 6000 });
+  await page.waitForTimeout(ANIM_MS);
+
+  // Must be in subscribed state
+  const sportsSect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^sports$/i }) });
+  if (!await sportsSect.isVisible({ timeout: 1000 }).catch(() => false)) {
+    test.skip(true, 'Not in subscribed state — cannot test error path');
+    return;
+  }
+
+  // Find first per-sport toggle (excludes Open Gym)
+  const sportToggles = sportsSect.locator('button[role="switch"]:not([aria-label="Open Gym 30-min heads-up"])');
+  if (await sportToggles.count() === 0) {
+    test.skip(true, 'No sports scheduled this week — cannot test toggle error path');
+    return;
+  }
+
+  const firstToggle = sportToggles.first();
+  await expect(firstToggle).toHaveAttribute('aria-checked', 'false');
+
+  // Click toggle — worker returns 500 → notifStore sets error, rolls back optimistic update
+  await firstToggle.click();
+
+  // Inline error alert must appear inside the sheet
+  await expect(dialog.locator('.sheet-error[role="alert"]')).toBeVisible({ timeout: 3000 });
+
+  // Toggle must revert to unchecked (optimistic rollback)
+  await expect(firstToggle).toHaveAttribute('aria-checked', 'false');
+
+  // Sheet stays open so user can retry
+  await expect(dialog).toBeVisible();
+
+  await page.screenshot({ path: shot('11-error-toggle-reverts.png') });
 });
