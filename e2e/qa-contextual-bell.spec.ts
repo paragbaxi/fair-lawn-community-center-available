@@ -15,7 +15,6 @@ import { test, expect, type Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
-const BASE = 'http://localhost:4174';
 const SHOTS = path.join(process.cwd(), '.qa-runs', 'screenshots');
 
 // Allow sheet fly-in animation (300ms) to settle before screenshotting
@@ -66,7 +65,7 @@ async function waitForBell(page: Page) {
 // ─── Headless defaults (no mini-sheet) ───────────────────────────────────────
 
 test('Status tab: bell opens full NotifSheet, no mini-sheet', async ({ page }) => {
-  await page.goto(`${BASE}/`);
+  await page.goto('/');
   await waitForBell(page);
 
   const bell = page.locator('[aria-label="Notification settings"]');
@@ -83,7 +82,7 @@ test('Status tab: bell opens full NotifSheet, no mini-sheet', async ({ page }) =
 });
 
 test('Sports tab, no chip selected: bell opens full NotifSheet', async ({ page }) => {
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const bell = page.locator('[aria-label="Notification settings"]');
@@ -97,7 +96,7 @@ test('Sports tab, no chip selected: bell opens full NotifSheet', async ({ page }
 });
 
 test('Sports tab, chip selected, push denied: bell opens full NotifSheet (blocked state)', async ({ page }) => {
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   // Select first chip
@@ -124,7 +123,7 @@ test('Sports tab, chip selected, push denied: bell opens full NotifSheet (blocke
 
 test('Chip selected + alert OFF + subscribed: mini-sheet slides up', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -159,7 +158,7 @@ test('Chip selected + alert OFF + subscribed: mini-sheet slides up', async ({ pa
 
 test('Open Gym chip + thirtyMin:false: headline reads "Get notified before Open Gym"', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('.sport-chip-opengym');
@@ -183,7 +182,7 @@ test('Open Gym chip + thirtyMin:false: headline reads "Get notified before Open 
 
 test('"Turn on alerts" → snackbar appears, mini-sheet closes', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -215,7 +214,7 @@ test('"Turn on alerts" → snackbar appears, mini-sheet closes', async ({ page }
 
 test('"View all alerts" → mini-sheet closes, full NotifSheet opens', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -245,7 +244,7 @@ test('"View all alerts" → mini-sheet closes, full NotifSheet opens', async ({ 
 
 test('Backdrop click → mini-sheet dismisses', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -269,7 +268,7 @@ test('Backdrop click → mini-sheet dismisses', async ({ page }) => {
 
 test('Escape key → mini-sheet closes, focus returns to bell', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -298,7 +297,7 @@ test('Escape key → mini-sheet closes, focus returns to bell', async ({ page })
 
 test('Tab key cycles focus within mini-sheet (focus trap)', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -334,10 +333,45 @@ test('Tab key cycles focus within mini-sheet (focus trap)', async ({ page }) => 
   expect(wrappedToCtaFocused).toBe(true);
 });
 
+test('Shift+Tab key cycles focus backwards within mini-sheet (focus trap)', async ({ page }) => {
+  await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
+  await page.goto('/#sports');
+  await waitForBell(page);
+
+  const chip = page.locator('#panel-sports .sport-chip').first();
+  if (!await chip.isVisible({ timeout: 3000 }).catch(() => false)) {
+    test.skip(true, 'No sport chips available');
+    return;
+  }
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('[aria-label="Notification settings"]').click();
+  await expect(page.locator('#ctx-title')).toBeVisible({ timeout: 3000 });
+  await page.waitForTimeout(ANIM_MS);
+
+  // Initial focus is on CTA (first focusable element)
+  expect(await page.evaluate(() =>
+    document.activeElement?.classList.contains('ctx-cta')
+  )).toBe(true);
+
+  // Shift+Tab from first → trap intercepts → wraps to last (View all)
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() =>
+    document.activeElement?.classList.contains('ctx-view-all')
+  )).toBe(true);
+
+  // Shift+Tab from last → no trap → browser goes to prev DOM element = CTA
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() =>
+    document.activeElement?.classList.contains('ctx-cta')
+  )).toBe(true);
+});
+
 test('Sport alert already ON: bell opens full NotifSheet, no mini-sheet', async ({ page }) => {
   // basketball alert is ON
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: ['basketball'], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports?sport=basketball`);
+  await page.goto('/#sports?sport=basketball');
   await waitForBell(page);
 
   // Wait for sport chip to be selected
@@ -360,7 +394,7 @@ test('Sport alert already ON: bell opens full NotifSheet, no mini-sheet', async 
 test('Snackbar auto-dismisses after 2.5s (clock fast-forward)', async ({ page }) => {
   await page.clock.install();
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -392,7 +426,7 @@ test('Snackbar auto-dismisses after 2.5s (clock fast-forward)', async ({ page })
 
 test('Snackbar has correct ARIA role="status" and aria-live="polite"', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();
@@ -419,7 +453,7 @@ test('Snackbar has correct ARIA role="status" and aria-live="polite"', async ({ 
 
 test('Chip change while mini-sheet open → mini-sheet auto-closes', async ({ page }) => {
   await mockSubscribed(page, { thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8 });
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chips = page.locator('#panel-sports .sport-chip');
@@ -458,7 +492,7 @@ test('network error: inline error shown, snackbar NOT fired, sheet stays open fo
     route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"internal"}' })
   );
 
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await waitForBell(page);
 
   const chip = page.locator('#panel-sports .sport-chip').first();

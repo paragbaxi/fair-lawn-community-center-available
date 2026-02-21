@@ -11,7 +11,6 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
-const BASE = 'http://localhost:4174';
 const SHOTS = path.join(process.cwd(), '.qa-runs', 'screenshots');
 
 function shot(name: string) {
@@ -25,7 +24,7 @@ const ANIM_MS = 350;
 // ─── Happy Path 1: Open Gym chip visible and selectable ──────────────────────
 
 test('Sports tab: Open Gym chip is visible and selectable', async ({ page }) => {
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await page.waitForSelector('.sport-week-expanded', { timeout: 8000 });
 
   const chip = page.locator('.sport-chip-opengym');
@@ -56,7 +55,7 @@ test('Sports tab: Open Gym chip is visible and selectable', async ({ page }) => 
 // ─── Happy Path 2: Deep link pre-selects chip ───────────────────────────────
 
 test('Deep link #sports?sport=open-gym pre-selects Open Gym chip', async ({ page }) => {
-  await page.goto(`${BASE}/#sports?sport=open-gym`);
+  await page.goto('/#sports?sport=open-gym');
   await page.waitForSelector('.sport-week-expanded', { timeout: 8000 });
 
   const chip = page.locator('.sport-chip-opengym');
@@ -72,7 +71,7 @@ test('Deep link #sports?sport=open-gym pre-selects Open Gym chip', async ({ page
 // ─── Happy Path 3: Alert CTA opens sheet ────────────────────────────────────
 
 test('"Alert me before Open Gym" button opens My Alerts sheet', async ({ page }) => {
-  await page.goto(`${BASE}/#sports?sport=open-gym`);
+  await page.goto('/#sports?sport=open-gym');
   await page.waitForSelector('.sport-week-expanded', { timeout: 8000 });
 
   const chip = page.locator('.sport-chip-opengym');
@@ -103,7 +102,7 @@ test('"Alert me before Open Gym" button opens My Alerts sheet', async ({ page })
 // ─── Happy Path 4: My Alerts sheet section structure ────────────────────────
 
 test('My Alerts sheet shows correct section structure', async ({ page }) => {
-  await page.goto(`${BASE}/`);
+  await page.goto('/');
   await page.waitForSelector('#tab-sports', { timeout: 8000 });
 
   // Locate bell / notification settings button
@@ -182,7 +181,7 @@ test('My Alerts sheet shows correct section structure', async ({ page }) => {
 // ─── Unhappy Path 1: No chip selected → button absent ───────────────────────
 
 test('Alert button absent when no Open Gym chip selected', async ({ page }) => {
-  await page.goto(`${BASE}/#sports`);
+  await page.goto('/#sports');
   await page.waitForSelector('.sport-week-expanded', { timeout: 8000 });
 
   const chip = page.locator('.sport-chip-opengym');
@@ -202,7 +201,7 @@ test('Alert button absent when no Open Gym chip selected', async ({ page }) => {
 // ─── Unhappy Path 2: Chip deselect restores hint ────────────────────────────
 
 test('Deselecting Open Gym chip restores hint text', async ({ page }) => {
-  await page.goto(`${BASE}/#sports?sport=open-gym`);
+  await page.goto('/#sports?sport=open-gym');
   await page.waitForSelector('.sport-week-expanded', { timeout: 8000 });
 
   const chip = page.locator('.sport-chip-opengym');
