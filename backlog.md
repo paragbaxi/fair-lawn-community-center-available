@@ -354,6 +354,9 @@ if (!open) {
 ```
 The cleanup function (returned by the same `$effect`) already runs `notifStore.error = null` when `open` becomes false. The early-return clear was added defensively but is never reached on the `open → false` transition because the effect re-runs with the cleanup first. Safe to remove.
 
+### P5: `BASE` URL hardcoded in both `qa-contextual-bell.spec.ts` and `playwright.qa.config.ts`
+Both files hardcode `http://localhost:4174`. Changing the QA port requires editing two files. The spec file should use Playwright's `baseURL` from config via relative `page.goto('/#sports')` calls instead of `${BASE}/#sports` — then `playwright.qa.config.ts` becomes the single source of truth for the port.
+
 ---
 
 ## Deferred / Future
