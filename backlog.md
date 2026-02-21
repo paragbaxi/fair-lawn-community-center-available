@@ -348,6 +348,18 @@ Deleted `const BASE = 'http://localhost:4174'` from both QA spec files. All `pag
 
 ---
 
+## Open
+
+### P4: Two `qa-notif-sheet.spec.ts` tests use `.sport-week-expanded` as ready signal on `/#sports` (no chip pre-selected)
+`qa-notif-sheet.spec.ts` has 5 `waitForSelector('.sport-week-expanded', { timeout: 8000 })` calls. The class only renders when a chip is already selected (via `SportWeekCard` expand logic). For the two tests that navigate to `/#sports` without a sport param ("Open Gym chip visible and selectable", "Alert button absent"), the selector never appears and Playwright silently burns the full 8s on every QA run (≈16s wasted total). The three tests navigating to `/#sports?sport=open-gym` are fine — the URL pre-selects the chip, triggering expansion.
+
+Fix: replace the two offending `waitForSelector('.sport-week-expanded')` calls with `waitForSelector('#panel-sports .sport-chip')` — available as soon as chips render, regardless of chip selection state. (Same fix applied to `smoke.spec.ts` in the P3 ready-signal pass.)
+
+### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
+The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison. Note: the Open Gym NOW badge may also require a baseline refresh next time visual tests are run locally.
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
