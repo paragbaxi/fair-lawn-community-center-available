@@ -29,7 +29,6 @@
   // Body scroll lock + focus trap + Escape key
   $effect(() => {
     if (!open) {
-      notifStore.error = null;  // clear error when sheet closes
       return;
     }
     document.body.style.overflow = 'hidden';

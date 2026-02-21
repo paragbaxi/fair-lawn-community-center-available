@@ -331,31 +331,20 @@ The sports dark-mode baseline includes the chip row and `hint-text`. If a sport 
 ### ~~P3: Error-path QA test for contextual bell — inline retry flow is untested~~
 Worker route overridden to 500 (registered after `mockSubscribed` so Playwright LIFO order ensures it fires first). Asserts: `.ctx-error[role="alert"]` visible, `.snackbar` not visible, mini-sheet stays open. 1 test added to `e2e/qa-contextual-bell.spec.ts` (15 total). Merged 2026-02-20.
 
-### P4: Shift+Tab focus trap direction not tested in `qa-contextual-bell.spec.ts`
-The focus-trap test in `e2e/qa-contextual-bell.spec.ts` only exercises forward Tab (CTA → "View all alerts" → wraps back to CTA). Shift+Tab (reverse wrap from CTA → "View all alerts") is untested. Add a second keyboard assertion in the existing `focus trap cycles between two buttons` test.
+### ~~P4: Shift+Tab focus trap direction not tested in `qa-contextual-bell.spec.ts`~~
+New standalone test added: Shift+Tab from CTA (first) → trap intercepts → wraps to "View all" (last); Shift+Tab from last → browser native → lands on CTA. Both assertions use `classList.contains()` via `page.evaluate()`. 22 QA tests (21 existing + 1 new). Done 2026-02-20.
 
-### P4: Active toggle ordering in full NotifSheet SPORTS section
-Pre-existing UX concern: enabled sport toggles are not sorted to the top of the SPORTS list. When a user has Basketball and Tennis enabled but is looking for Pickleball, they must scan the full unsorted list. Sort enabled sports first or auto-scroll to the first active toggle on sheet open. Low-effort win — `notifiableSports` is already a `$derived` in `NotifSheet.svelte`.
+### ~~P4: Active toggle ordering in full NotifSheet SPORTS section~~
+Added `sortedSports = $derived([...notifiableSports].sort(...))` — enabled sports (prefs match) sort first (key 0), disabled last (key 1); V8 stable sort preserves original order within each tier. `{#each sortedSports}` replaces `{#each notifiableSports}`. Divider visibility check still uses `notifiableSports.length` (unaffected). Done 2026-02-20.
 
-### P5: `handleContextViewAll` 300ms magic number should reference animation duration
-`src/App.svelte` `handleContextViewAll` hard-codes `300` as the wait for the mini-sheet fly-out to complete before opening the full sheet:
-```typescript
-const animDur = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300;
-```
-This must match `ContextualAlertSheet.svelte`'s `fly({ duration: dur(300) })`. If that duration ever changes, the two will silently diverge. Add a comment linking the two, or extract a shared constant.
+### ~~P5: `handleContextViewAll` 300ms magic number should reference animation duration~~
+Added inline comment `// 300ms must match ContextualAlertSheet.svelte fly transition: dur(300)` immediately before the `animDur` constant in `src/App.svelte`. Zero behavioral change. Done 2026-02-20.
 
-### P5: Redundant `notifStore.error = null` in `$effect` `if (!open)` guard
-`ContextualAlertSheet.svelte` `$effect` block has an early-return guard:
-```typescript
-if (!open) {
-  notifStore.error = null;  // ← redundant
-  return;
-}
-```
-The cleanup function (returned by the same `$effect`) already runs `notifStore.error = null` when `open` becomes false. The early-return clear was added defensively but is never reached on the `open → false` transition because the effect re-runs with the cleanup first. Safe to remove.
+### ~~P5: Redundant `notifStore.error = null` in `$effect` `if (!open)` guard~~
+Removed the dead `notifStore.error = null` line from the early-return guard in `ContextualAlertSheet.svelte`. The `$effect` cleanup function already clears the error on `open → false`; the early-return path was never reached on that transition. Done 2026-02-20.
 
-### P5: `BASE` URL hardcoded in both `qa-contextual-bell.spec.ts` and `playwright.qa.config.ts`
-Both files hardcode `http://localhost:4174`. Changing the QA port requires editing two files. The spec file should use Playwright's `baseURL` from config via relative `page.goto('/#sports')` calls instead of `${BASE}/#sports` — then `playwright.qa.config.ts` becomes the single source of truth for the port.
+### ~~P5: `BASE` URL hardcoded in both `qa-contextual-bell.spec.ts` and `playwright.qa.config.ts`~~
+Deleted `const BASE = 'http://localhost:4174'` from both QA spec files. All `page.goto()` calls converted to relative paths (`'/'`, `'/#sports'`, `'/#sports?sport=basketball'`, `'/#sports?sport=open-gym'`) — Playwright resolves these against `baseURL` in `playwright.qa.config.ts`, which remains the single source of truth. Done 2026-02-20.
 
 ---
 

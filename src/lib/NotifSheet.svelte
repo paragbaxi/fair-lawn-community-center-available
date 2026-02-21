@@ -22,6 +22,14 @@
   // Only show sports with sessions this week (matches SportWeekCard behavior)
   const notifiableSports = $derived(data ? getAvailableSports(data.schedule) : []);
 
+  const sortedSports = $derived(
+    [...notifiableSports].sort((a, b) => {
+      const aOn = (notifStore.prefs.sports ?? []).includes(a.id) ? 0 : 1;
+      const bOn = (notifStore.prefs.sports ?? []).includes(b.id) ? 0 : 1;
+      return aOn - bOn;
+    })
+  );
+
   // Returns 0 when user prefers reduced motion, so transitions are instant
   function dur(ms: number): number {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms;
@@ -144,7 +152,7 @@
           {#if notifiableSports.length > 0}
             <div class="sheet-sport-divider" aria-hidden="true"></div>
           {/if}
-          {#each notifiableSports as sport}
+          {#each sortedSports as sport}
             {@const emoji = activityEmoji(sport.label)}
             {@const on = (notifStore.prefs.sports ?? []).includes(sport.id)}
             <label class="sheet-toggle-row">

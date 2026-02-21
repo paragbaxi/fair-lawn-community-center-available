@@ -71,6 +71,7 @@
   async function handleContextViewAll() {
     contextSheetOpen = false;
     await tick();
+    // 300ms must match ContextualAlertSheet.svelte fly transition: dur(300)
     const animDur = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300;
     if (animDur > 0) await new Promise(r => setTimeout(r, animDur));
     openMyAlerts();
