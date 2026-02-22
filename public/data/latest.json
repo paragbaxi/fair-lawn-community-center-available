@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-02-21T05:37:09.044Z",
+  "scrapedAt": "2026-02-22T05:45:53.337Z",
   "schedule": {
     "Monday": {
       "open": "7:00 AM",
@@ -192,8 +192,14 @@
           "isOpenGym": false
         },
         {
-          "name": "Open Gym",
+          "name": "FLHS Basketball",
           "start": "12:00 PM",
+          "end": "1:00 PM",
+          "isOpenGym": false
+        },
+        {
+          "name": "Open Gym",
+          "start": "1:00 PM",
           "end": "5:00 PM",
           "isOpenGym": true
         },
