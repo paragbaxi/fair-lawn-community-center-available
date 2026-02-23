@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-02-22T05:45:53.337Z",
+  "scrapedAt": "2026-02-23T06:01:08.897Z",
   "schedule": {
     "Monday": {
       "open": "7:00 AM",
@@ -183,7 +183,7 @@
     },
     "Sunday": {
       "open": "9:00 AM",
-      "close": "9:00 PM",
+      "close": "5:00 PM",
       "activities": [
         {
           "name": "Badminton",
@@ -202,15 +202,14 @@
           "start": "1:00 PM",
           "end": "5:00 PM",
           "isOpenGym": true
-        },
-        {
-          "name": "Table Tennis",
-          "start": "5:00 PM",
-          "end": "9:00 PM",
-          "isOpenGym": false
         }
       ]
     }
   },
-  "notices": []
+  "notices": [
+    {
+      "text": "Table Tennis: CANCELLED",
+      "date": "2026-02-22"
+    }
+  ]
 }
