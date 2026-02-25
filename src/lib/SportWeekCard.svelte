@@ -6,6 +6,7 @@
   import { activityEmoji } from './emoji.js';
   import { clock } from './clock.svelte.js';
   import { notifStore, toggleSport } from './notifStore.svelte.js';
+  import { generateICS } from './ical.js';
 
   let {
     data,
@@ -77,6 +78,28 @@
       (act) => act.isOpenGym && isActivityCurrent(act.start, act.end, clock.now, true)
     );
   });
+
+  function downloadICS() {
+    if (!selectedSport || weekSummary.length === 0) return
+    const sessions = weekSummary.flatMap((entry) =>
+      entry.activities.map((act) => ({
+        day: entry.day,
+        startTime: act.start,
+        endTime: act.end,
+        activity: act.name,
+      }))
+    )
+    const ics = generateICS(selectedSport.label, sessions)
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selectedSport.id}-flcc.ics`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 </script>
 
 {#if availableSports.length > 0}
@@ -185,6 +208,9 @@
               {/each}
             {/each}
           </div>
+          <button class="add-to-calendar-btn" onclick={downloadICS}>
+            📅 Add to Calendar
+          </button>
         {/if}
       {:else}
         <p class="hint-text">Tap a sport to see this week's times</p>
@@ -247,6 +273,9 @@
                   {/each}
                 {/each}
               </div>
+              <button class="add-to-calendar-btn" onclick={downloadICS}>
+                📅 Add to Calendar
+              </button>
             {/if}
           {:else}
             <div class="sport-chips" role="group" aria-label="Select sport">
@@ -665,6 +694,40 @@
 
   @media (prefers-reduced-motion: reduce) {
     .sport-notif-btn {
+      transition: none;
+    }
+  }
+
+  .add-to-calendar-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  @media (hover: hover) {
+    .add-to-calendar-btn:hover {
+      background: var(--color-border);
+      color: var(--color-text);
+    }
+  }
+
+  .add-to-calendar-btn:active {
+    opacity: 0.8;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .add-to-calendar-btn {
       transition: none;
     }
   }
