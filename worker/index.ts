@@ -13,6 +13,15 @@ interface Env {
   PAGES_DATA_URL: string;
 }
 
+// Occupancy types
+type OccupancyLevel = 'light' | 'moderate' | 'packed';
+
+interface OccupancyData {
+  level: OccupancyLevel;
+  reportedAt: string;
+  expiresAt: string;
+}
+
 interface StoredSubscription {
   endpoint: string;
   keys: { p256dh: string; auth: string };
@@ -367,6 +376,61 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, results });
 }
 
+async function handleCheckin(request: Request, env: Env): Promise<Response> {
+  const VALID_LEVELS: OccupancyLevel[] = ['light', 'moderate', 'packed'];
+  const OCCUPANCY_TTL = 900; // 15 minutes in seconds
+
+  const body = await request.json().catch(() => ({})) as { level?: unknown };
+  if (!body.level || !VALID_LEVELS.includes(body.level as OccupancyLevel)) {
+    return json({ error: 'Invalid level. Must be light, moderate, or packed' }, 400);
+  }
+  const level = body.level as OccupancyLevel;
+
+  // Rate limiting: one report per IP per 15 minutes
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const ipHash = await sha256hex(ip);
+  const ipKey = `occupancy:ip:${ipHash}`;
+  const existing = await env.SUBSCRIPTIONS.get(ipKey);
+  if (existing) {
+    return json({ error: 'Already reported recently. Please wait before reporting again.' }, 429);
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + OCCUPANCY_TTL * 1000).toISOString();
+  const reportedAt = now.toISOString();
+
+  const data: OccupancyData = { level, reportedAt, expiresAt };
+
+  // Write occupancy record and IP rate-limit key concurrently
+  await Promise.all([
+    env.SUBSCRIPTIONS.put('occupancy:current', JSON.stringify(data), { expirationTtl: OCCUPANCY_TTL }),
+    env.SUBSCRIPTIONS.put(ipKey, '1', { expirationTtl: OCCUPANCY_TTL }),
+  ]);
+
+  return json({ ok: true, level, expiresAt });
+}
+
+async function handleOccupancy(_request: Request, env: Env): Promise<Response> {
+  const raw = await env.SUBSCRIPTIONS.get('occupancy:current');
+  if (!raw) {
+    return json({ level: null, reportedAt: null, expiresAt: null });
+  }
+
+  let data: OccupancyData;
+  try {
+    data = JSON.parse(raw) as OccupancyData;
+  } catch {
+    return json({ level: null, reportedAt: null, expiresAt: null });
+  }
+
+  // Belt-and-suspenders: also check expiresAt in the value
+  if (data.expiresAt && new Date(data.expiresAt) <= new Date()) {
+    return json({ level: null, reportedAt: null, expiresAt: null });
+  }
+
+  return json({ level: data.level, reportedAt: data.reportedAt, expiresAt: data.expiresAt });
+}
+
 async function handleStats(request: Request, env: Env): Promise<Response> {
   // Auth check — GET request, no body, header only
   const apiKey = request.headers.get('X-Api-Key') ?? '';
@@ -596,6 +660,14 @@ export default {
 
     if (request.method === 'GET' && url.pathname === '/stats') {
       return handleStats(request, env);
+    }
+
+    if (request.method === 'POST' && url.pathname === '/checkin') {
+      return handleCheckin(request, env);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/occupancy') {
+      return handleOccupancy(request, env);
     }
 
     return json({ error: 'Not found' }, 404);

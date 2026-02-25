@@ -2,6 +2,7 @@
   import type { GymState, ScheduleData } from './types.js';
   import StatusCard from './StatusCard.svelte';
   import NotificationSettings from './NotificationSettings.svelte';
+  import OccupancyWidget from './OccupancyWidget.svelte';
   import { formatEasternDate } from './time.js';
 
   let { gymState, data, onManageAlerts = () => {} }: {
@@ -12,6 +13,8 @@
 </script>
 
 <StatusCard {gymState} />
+
+<OccupancyWidget />
 
 <NotificationSettings {gymState} {onManageAlerts} />
 
