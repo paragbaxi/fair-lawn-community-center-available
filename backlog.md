@@ -354,8 +354,8 @@ Added `mockSubscribed` helper to `qa-notif-sheet.spec.ts`. New test mocks `sport
 ### ~~P4: `NotifSheet.svelte` error-path not covered by QA~~
 New test in `qa-notif-sheet.spec.ts`: mocks subscribed with `sports: []`, overrides worker route to 500 (LIFO after the success route), opens full NotifSheet, clicks first per-sport toggle, waits for `.sheet-error[role="alert"]` to appear, then asserts toggle reverts to `aria-checked="false"` (optimistic rollback) and dialog stays visible. Parity with the contextual bell error-path test. Done 2026-02-20.
 
-### P5: `sports-dark.png` visual baseline includes the Sports tab chip row
-The sports dark-mode baseline includes the chip row and `hint-text`. If a sport chip label changes (e.g. a new sport is scraped), the baseline will drift silently. Consider asserting chip labels separately in a non-visual test rather than relying on pixel comparison. Note: the Open Gym NOW badge may also require a baseline refresh next time visual tests are run locally.
+### ~~P5: Visual regression baselines stale — all 3 dark-mode snapshots~~
+`status-dark.png`, `today-dark.png`, and `sports-dark.png` were all >2% different from the stored baselines (accumulated drift from the contextual bell, NotifSheet restructure, Open Gym chip, and NOW badge changes). Regenerated all three with `--update-snapshots`; 3/3 pass. Merged 2026-02-25.
 
 ---
 
