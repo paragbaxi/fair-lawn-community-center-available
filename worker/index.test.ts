@@ -1103,3 +1103,136 @@ describe('/subscription (updatePrefs) dailyBriefingHour validation', () => {
     expect(data.error).toBe('dailyBriefingHour must be 7, 8, 9, or 10');
   });
 });
+
+// ─── Occupancy tests ──────────────────────────────────────────────────────────
+
+describe('POST /checkin', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  function checkinRequest(body: unknown, ip = '1.2.3.4') {
+    return new Request('https://example.com/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('returns 200 and writes occupancy:current on valid level', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const res = await worker.fetch(checkinRequest({ level: 'light' }), env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { ok: boolean; level: string; expiresAt: string };
+    expect(data.ok).toBe(true);
+    expect(data.level).toBe('light');
+    expect(typeof data.expiresAt).toBe('string');
+
+    // Verify KV was written
+    const stored = await kv.get('occupancy:current');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!) as { level: string; reportedAt: string; expiresAt: string };
+    expect(parsed.level).toBe('light');
+    expect(typeof parsed.reportedAt).toBe('string');
+    expect(typeof parsed.expiresAt).toBe('string');
+  });
+
+  it('returns 400 for invalid level', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const res = await worker.fetch(checkinRequest({ level: 'empty' }), env as never);
+    expect(res.status).toBe(400);
+
+    const data = await res.json() as { error: string };
+    expect(data.error).toContain('Invalid level');
+  });
+
+  it('returns 429 when same IP has already reported', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    // First report
+    const res1 = await worker.fetch(checkinRequest({ level: 'moderate' }, '10.0.0.1'), env as never);
+    expect(res1.status).toBe(200);
+
+    // Second report from same IP
+    const res2 = await worker.fetch(checkinRequest({ level: 'packed' }, '10.0.0.1'), env as never);
+    expect(res2.status).toBe(429);
+
+    const data = await res2.json() as { error: string };
+    expect(typeof data.error).toBe('string');
+  });
+
+  it('allows different IPs to each report', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const res1 = await worker.fetch(checkinRequest({ level: 'light' }, '10.0.0.1'), env as never);
+    expect(res1.status).toBe(200);
+
+    const res2 = await worker.fetch(checkinRequest({ level: 'packed' }, '10.0.0.2'), env as never);
+    expect(res2.status).toBe(200);
+  });
+});
+
+describe('GET /occupancy', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns { level: null } when no data in KV', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/occupancy', { method: 'GET' });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { level: string | null };
+    expect(data.level).toBeNull();
+  });
+
+  it('returns stored level when data exists and is not expired', async () => {
+    const futureExpiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const kv = createKVMock({
+      'occupancy:current': JSON.stringify({
+        level: 'packed',
+        reportedAt: new Date().toISOString(),
+        expiresAt: futureExpiry,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/occupancy', { method: 'GET' });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { level: string; reportedAt: string; expiresAt: string };
+    expect(data.level).toBe('packed');
+    expect(typeof data.reportedAt).toBe('string');
+    expect(data.expiresAt).toBe(futureExpiry);
+  });
+
+  it('returns { level: null } when data is expired (expiresAt in the past)', async () => {
+    const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const kv = createKVMock({
+      'occupancy:current': JSON.stringify({
+        level: 'moderate',
+        reportedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+        expiresAt: pastExpiry,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/occupancy', { method: 'GET' });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as { level: string | null };
+    expect(data.level).toBeNull();
+  });
+});

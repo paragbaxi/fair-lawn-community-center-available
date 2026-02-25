@@ -54,3 +54,11 @@ export type SportStatus =
   | { kind: 'upcoming-today'; activity: Activity; day: null;   time: string }
   | { kind: 'upcoming-week';  activity: Activity; day: string; time: string }
   | { kind: 'none';           activity: null;     day: null;   time: null   };
+
+export type OccupancyLevel = 'light' | 'moderate' | 'packed';
+
+export interface OccupancyReport {
+  level: OccupancyLevel | null;
+  reportedAt: string | null;
+  expiresAt: string | null;
+}
