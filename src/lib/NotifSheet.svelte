@@ -194,6 +194,7 @@
               <span class="sheet-time-label">Notify me at</span>
               <div
                 class="sheet-time-chips"
+                role="none"
                 onkeydown={(e) => {
                   if (e.repeat) return;
                   const hours = [7, 8, 9, 10];

@@ -359,6 +359,25 @@ New test in `qa-notif-sheet.spec.ts`: mocks subscribed with `sports: []`, overri
 
 ---
 
+## Open
+
+### ~~P3: `NotifSheet.svelte` build a11y warning — `sheet-time-chips` missing ARIA role~~
+`<div class="sheet-time-chips">` had an `onkeydown` handler but no ARIA role. Added `role="none"` — the parent `sheet-time-row` carries `role="radiogroup"`; this container is purely presentational. Build emits zero warnings. Done 2026-02-25.
+
+### P4: Visual test masking — Sports tab chip session counts cause spurious baseline drift
+`sports-dark.png` has no `mask` applied. The chip session-count badges (`Basketball · 4`) change whenever the scraped schedule changes, causing >2% pixel diff and false failures. Add `.sport-chip` (or `.sport-chip-count`) to the mask list, or switch to a structural non-visual assertion for session counts.
+
+### P2: iCal / Google Calendar export for sport sessions
+The Sports tab already surfaces per-sport weekly schedules. A "Add to Calendar" button generating a `.ics` file (VEVENT per session, RRULE for weekly recurrence) lets users commit to their gym routine without manual entry. Needs: `ics` generation helper, download-blob UX, sport chip CTA.
+
+### P2: "Notify me when a slot opens" — real-time cancellation alerts
+Leverage the existing push infra. Scraper delta-diff: compare current schedule against the previous `latest.json` snapshot; push when a previously-scheduled slot disappears (cancelled → free). Requires: storing previous snapshot in `public/data/`, diffing in `scrape-and-deploy.yml`, a new `slot-freed` notification type in the Worker.
+
+### P2: Occupancy / busyness indicator
+StatusCard knows the gym is open but not how busy. A visitor-submitted occupancy report ("Light / Moderate / Packed", 15-min TTL in Cloudflare KV) would make the app useful as a real-time planner. Requires: new `/checkin` Worker endpoint, simple tap-to-report UI in StatusView, decay logic (auto-expire after 15 min).
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
