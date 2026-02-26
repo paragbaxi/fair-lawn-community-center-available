@@ -44,6 +44,12 @@
     <span>Source: <a href="https://www.fairlawn.org/park-rec" target="_blank" rel="noopener">fairlawn.org</a></span>
   </p>
   <p class="footer-notice">Schedule may change without notice.</p>
+  {#if data.skippedActivities}
+    <p class="footer-notice footer-notice--warn">
+      Schedule may be missing some activities —
+      <a href="https://www.fairlawn.org/park-rec" target="_blank" rel="noopener">check the borough website</a> for full details.
+    </p>
+  {/if}
   <p class="footer-meta">
     <a href="https://github.com/paragbaxi/fair-lawn-community-center-available/issues" target="_blank" rel="noopener">Feedback &amp; suggestions</a> welcome.
   </p>
@@ -117,6 +123,10 @@
     border: 1px solid var(--color-border);
     padding: 2px 10px;
     border-radius: 8px;
+  }
+
+  .footer-notice--warn {
+    border-color: var(--color-text-secondary);
   }
 
   @media (hover: hover) {

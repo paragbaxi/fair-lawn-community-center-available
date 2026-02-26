@@ -3,7 +3,7 @@ import type { Page } from 'playwright';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSchedule } from './parse.js';
+import { parseSchedule, isValidTime, parseTimeMinutes } from './parse.js';
 import { validateSchedule } from './validate.js';
 import { diffSchedules } from './diff.js';
 import type { FreedSlotsFile } from './diff.js';
@@ -124,10 +124,34 @@ async function scrape(): Promise<void> {
 
   const { schedule, notices } = parseSchedule(pageText);
 
+  // ── Sanitize: drop individual activities with bad times before validation ──
+  let skippedActivities = 0;
+  const sanitizedSchedule: typeof schedule = {};
+  for (const [day, ds] of Object.entries(schedule)) {
+    const validActivities = ds.activities.filter(act => {
+      if (!isValidTime(act.start) || !isValidTime(act.end)) {
+        console.warn(`[scraper] Skipping "${act.name}" on ${day}: invalid time format (${act.start}–${act.end})`);
+        skippedActivities++;
+        return false;
+      }
+      if (parseTimeMinutes(act.start) >= parseTimeMinutes(act.end)) {
+        console.warn(`[scraper] Skipping "${act.name}" on ${day}: start (${act.start}) not before end (${act.end})`);
+        skippedActivities++;
+        return false;
+      }
+      return true;
+    });
+    sanitizedSchedule[day] = { ...ds, activities: validActivities };
+  }
+  if (skippedActivities > 0) {
+    console.warn(`[scraper] Dropped ${skippedActivities} activity/activities with malformed times`);
+  }
+
   const data: ScheduleData = {
     scrapedAt: new Date().toISOString(),
-    schedule,
+    schedule: sanitizedSchedule,
     notices,
+    ...(skippedActivities > 0 && { skippedActivities }),
   };
 
   const validation = validateSchedule(data);

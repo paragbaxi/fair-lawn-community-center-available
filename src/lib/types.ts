@@ -20,6 +20,7 @@ export interface ScheduleData {
   scrapedAt: string;
   schedule: Record<string, DaySchedule>;
   notices: Notice[];
+  skippedActivities?: number; // activities dropped due to malformed times on source site
 }
 
 export type GymStatus = 'available' | 'in-use' | 'closed';
