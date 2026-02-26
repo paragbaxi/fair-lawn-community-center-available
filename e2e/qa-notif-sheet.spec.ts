@@ -263,7 +263,7 @@ test('Enabled sports sort before disabled in NotifSheet SPORTS section', async (
 
   const dialog = page.locator('[role="dialog"]');
   await expect(dialog).toBeVisible({ timeout: 3000 });
-  await page.waitForSelector('[data-notif-initialized]', { timeout: 6000 });
+  await page.waitForSelector('[role="dialog"] [data-notif-initialized]', { timeout: 6000 });
   await page.waitForTimeout(ANIM_MS);
 
   // Must be in subscribed state for the SPORTS section to appear
@@ -274,7 +274,7 @@ test('Enabled sports sort before disabled in NotifSheet SPORTS section', async (
   }
 
   // All per-sport toggles (excludes Open Gym, which has a distinct aria-label)
-  const sportToggles = sportsSect.locator('button[role="switch"]:not([aria-label="Open Gym 30-min heads-up"])');
+  const sportToggles = sportsSect.locator('button[role="switch"]:not([aria-label="Open Gym 30-min heads-up"]):not([aria-label="Cancelled session alerts"])');
   const count = await sportToggles.count();
   if (count < 2) {
     test.skip(true, 'Fewer than 2 sports scheduled this week — cannot verify sort order');
@@ -300,6 +300,40 @@ test('Enabled sports sort before disabled in NotifSheet SPORTS section', async (
   await page.screenshot({ path: shot('10-sort-enabled-first.png') });
 });
 
+// ─── Happy Path 6: cancelAlerts toggle row present in SPORTS section ─────────
+
+test('cancelAlerts toggle row is present in NotifSheet SPORTS section', async ({ page }) => {
+  await mockSubscribed(page);
+  await page.goto('/');
+  await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 10000 });
+  await page.locator('[aria-label="Notification settings"]').click();
+
+  const dialog = page.locator('[role="dialog"]');
+  await expect(dialog).toBeVisible({ timeout: 3000 });
+  await page.waitForSelector('[role="dialog"] [data-notif-initialized]', { timeout: 6000 });
+  await page.waitForTimeout(ANIM_MS);
+
+  // Guard: must be in subscribed state for the SPORTS section to appear
+  const sportsSect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^sports$/i }) });
+  if (!await sportsSect.isVisible({ timeout: 1000 }).catch(() => false)) {
+    test.skip(true, 'Not in subscribed state — permission denied or store not initialized');
+    return;
+  }
+
+  // The cancelAlerts toggle row must be visible inside the SPORTS section
+  const cancelRow = sportsSect.locator('.sheet-toggle-row').filter({ hasText: /Alert me if a session is cancelled/i });
+  await expect(cancelRow).toBeVisible();
+
+  // The toggle button must have role="switch"
+  const cancelToggle = cancelRow.locator('button[role="switch"][aria-label="Cancelled session alerts"]');
+  await expect(cancelToggle).toBeVisible();
+
+  // Default state is off (cancelAlerts is not set in default prefs → aria-checked="false")
+  await expect(cancelToggle).toHaveAttribute('aria-checked', 'false');
+
+  await page.screenshot({ path: shot('12-cancel-alerts-toggle.png') });
+});
+
 // ─── Unhappy Path 3: Network error on sport toggle ───────────────────────────
 
 test('network error on sport toggle: inline error shown, toggle reverts, sheet stays open', async ({ page }) => {
@@ -314,7 +348,7 @@ test('network error on sport toggle: inline error shown, toggle reverts, sheet s
 
   const dialog = page.locator('[role="dialog"]');
   await expect(dialog).toBeVisible({ timeout: 3000 });
-  await page.waitForSelector('[data-notif-initialized]', { timeout: 6000 });
+  await page.waitForSelector('[role="dialog"] [data-notif-initialized]', { timeout: 6000 });
   await page.waitForTimeout(ANIM_MS);
 
   // Must be in subscribed state
@@ -324,8 +358,8 @@ test('network error on sport toggle: inline error shown, toggle reverts, sheet s
     return;
   }
 
-  // Find first per-sport toggle (excludes Open Gym)
-  const sportToggles = sportsSect.locator('button[role="switch"]:not([aria-label="Open Gym 30-min heads-up"])');
+  // Find first per-sport toggle (excludes Open Gym and cancelAlerts)
+  const sportToggles = sportsSect.locator('button[role="switch"]:not([aria-label="Open Gym 30-min heads-up"]):not([aria-label="Cancelled session alerts"])');
   if (await sportToggles.count() === 0) {
     test.skip(true, 'No sports scheduled this week — cannot test toggle error path');
     return;
