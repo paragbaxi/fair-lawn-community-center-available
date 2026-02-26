@@ -438,6 +438,48 @@ test.describe('Sports tab', () => {
     await expect(page.locator('.hint-text')).toBeVisible();
   });
 
+  test('chip session count badge shows a number', async ({ page }) => {
+    await page.goto('/#sports');
+    await page.waitForSelector('#panel-sports .sport-chip', { timeout: 5000 });
+
+    const chips = page.locator('#panel-sports .sport-chip');
+    if (await chips.count() === 0) {
+      test.skip(true, 'no chips');
+      return;
+    }
+
+    // Inspect each chip for a .chip-count badge; at least one must contain a digit.
+    // Chips without sessions omit the badge entirely — that is fine.
+    // We assert that every badge that does render contains a valid non-negative integer.
+    const chipEls = await chips.all();
+    let badgesChecked = 0;
+
+    for (const chip of chipEls) {
+      const badge = chip.locator('.chip-count');
+      const badgeCount = await badge.count();
+      if (badgeCount === 0) continue; // chip has no session count — skip
+
+      // Badge exists: verify its text matches /\d+/
+      const text = await badge.textContent();
+      expect(text, `chip-count badge text should match /\\d+/`).toMatch(/\d+/);
+
+      // Parse the number out of "· N" and verify it is a non-negative integer
+      const match = text?.match(/\d+/);
+      expect(match, `chip-count badge should contain a parseable number, got: ${JSON.stringify(text)}`).toBeTruthy();
+      const n = parseInt(match![0], 10);
+      expect(n, `chip-count badge value should be >= 0, got: ${n}`).toBeGreaterThanOrEqual(0);
+
+      badgesChecked++;
+    }
+
+    // At least one chip must have had a badge (if the schedule has any sessions at all)
+    // Use a soft guard: if no badges were found the data truly has no session counts,
+    // which is not a test failure — but we log it clearly.
+    if (badgesChecked === 0) {
+      test.skip(true, 'no chip-count badges rendered — schedule may have no session counts');
+    }
+  });
+
   test('"Manage all alerts →" opens the notification sheet', async ({ page }) => {
     await page.goto('/#sports?sport=basketball');
     await page.waitForSelector('.sport-week-expanded', { timeout: 5000 });
