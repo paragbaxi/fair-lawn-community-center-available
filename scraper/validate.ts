@@ -52,6 +52,9 @@ export function validateSchedule(data: ScheduleData): ValidationResult {
 
     for (const act of ds.activities) {
       // Rule 7: activity start/end pass isValidTime()
+      // NOTE: sanitizeSchedule() drops invalid-format activities before this runs,
+      // so this rule should never fire on sanitized data. Keep it as a safety net
+      // in case validateSchedule() is ever called without sanitization.
       if (!isValidTime(act.start)) {
         errors.push(`${day}: activity "${act.name}" has invalid start time "${act.start}"`);
       }
@@ -60,6 +63,9 @@ export function validateSchedule(data: ScheduleData): ValidationResult {
       }
 
       // Rule 8: activity start < end
+      // NOTE: sanitizeSchedule() auto-swaps reversed-but-safe times and drops ambiguous
+      // reversed times before this runs, so this rule should never fire on sanitized data.
+      // Keep it as a safety net in case validateSchedule() is ever called without sanitization.
       if (isValidTime(act.start) && isValidTime(act.end)) {
         if (parseTimeMinutes(act.start) >= parseTimeMinutes(act.end)) {
           errors.push(`${day}: activity "${act.name}" start (${act.start}) is not before end (${act.end})`);

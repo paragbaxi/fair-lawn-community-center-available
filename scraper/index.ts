@@ -3,7 +3,8 @@ import type { Page } from 'playwright';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseSchedule, isValidTime, parseTimeMinutes } from './parse.js';
+import { parseSchedule } from './parse.js';
+import { sanitizeSchedule } from './sanitize.js';
 import { validateSchedule } from './validate.js';
 import { diffSchedules } from './diff.js';
 import type { FreedSlotsFile } from './diff.js';
@@ -124,27 +125,13 @@ async function scrape(): Promise<void> {
 
   const { schedule, notices } = parseSchedule(pageText);
 
-  // ── Sanitize: drop individual activities with bad times before validation ──
-  let skippedActivities = 0;
-  const sanitizedSchedule: typeof schedule = {};
-  for (const [day, ds] of Object.entries(schedule)) {
-    const validActivities = ds.activities.filter(act => {
-      if (!isValidTime(act.start) || !isValidTime(act.end)) {
-        console.warn(`[scraper] Skipping "${act.name}" on ${day}: invalid time format (${act.start}–${act.end})`);
-        skippedActivities++;
-        return false;
-      }
-      if (parseTimeMinutes(act.start) >= parseTimeMinutes(act.end)) {
-        console.warn(`[scraper] Skipping "${act.name}" on ${day}: start (${act.start}) not before end (${act.end})`);
-        skippedActivities++;
-        return false;
-      }
-      return true;
-    });
-    sanitizedSchedule[day] = { ...ds, activities: validActivities };
-  }
+  // ── Sanitize: fix or drop activities with bad/reversed times before validation ──
+  const { schedule: sanitizedSchedule, skipped: skippedActivities, corrected: correctedActivities } = sanitizeSchedule(schedule);
   if (skippedActivities > 0) {
     console.warn(`[scraper] Dropped ${skippedActivities} activity/activities with malformed times`);
+  }
+  if (correctedActivities > 0) {
+    console.warn(`[scraper] Auto-corrected ${correctedActivities} activity/activities with reversed times`);
   }
 
   const data: ScheduleData = {
@@ -152,6 +139,7 @@ async function scrape(): Promise<void> {
     schedule: sanitizedSchedule,
     notices,
     ...(skippedActivities > 0 && { skippedActivities }),
+    ...(correctedActivities > 0 && { correctedActivities }),
   };
 
   const validation = validateSchedule(data);
@@ -166,6 +154,8 @@ async function scrape(): Promise<void> {
     }
     console.log(`[dry-run] Days: ${Object.keys(data.schedule).length} parsed, ${daysWithActivities} with activities`);
     console.log(`[dry-run] Total activities: ${totalActivities}`);
+    if (skippedActivities > 0) console.log(`[dry-run] Skipped activities (malformed times): ${skippedActivities}`);
+    if (correctedActivities > 0) console.log(`[dry-run] Auto-corrected activities (reversed times): ${correctedActivities}`);
     if (!validation.valid) process.exit(1);
     console.log('[dry-run] Skipping write to public/data/latest.json');
     return;
