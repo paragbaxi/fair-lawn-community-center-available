@@ -403,6 +403,28 @@ Verified all three new endpoints live via curl: `GET /occupancy` → `{"level":n
 
 ---
 
+## Open
+
+### ⚠️ P1: Verify 30-min push notifications end-to-end
+The cron was broken from launch until 2026-02-26. Now that it's fixed, **no real notification has ever reached a subscriber**. Manual test needed: subscribe on the app → wait for a gym session to be 20–45 min away → confirm push arrives on device. Cannot be automated. Also verify the Worker's `GYM_OPEN_HOUR`/`GYM_CLOSE_HOUR` gate fires correctly with the new cron — there is a known ~30 min gap around 6:30–7:00 PM ET where neither cron entry fires (`12-23` UTC ends at 6:30 PM ET, `0-3` UTC starts at 7:00 PM ET). Sessions starting between 7:00–7:30 PM ET may miss their 30-min alert.
+
+### ⚠️ P1: Verify slot-freed pipeline end-to-end
+The full pipeline (scraper delta-diff → `freed-slots.json` → `check-and-notify.mjs` → Worker `/notify` slot-freed → subscriber push) has never fired in production. Manual trigger: use the real `NOTIFY_API_KEY` (retrieve from Cloudflare dashboard) to `POST /notify` with `type: slot-freed` and a real subscriber in KV; or wait for a live scrape to detect a removed session. Also note a subtle stale-file risk: if `freed-slots.json` is committed to the repo but the scraper fails to delete it before midnight, `push-notify.yml` will attempt to re-send on the following day (different ISO date → different idempotency key → notification actually reaches subscribers again). Low probability but should be addressed.
+
+### P2: Delete freed-slots.json from repo after notification is sent
+Currently `freed-slots.json` is written by the scraper and committed to `public/data/`. It is only deleted on the *next* scraper run when no new freed slots are found. If `push-notify.yml` fires multiple times before the next scrape (including across midnight), the slot-freed notification could be re-sent on day 2. Fix: have `check-and-notify.mjs` delete `freed-slots.json` via the GitHub API (or add a post-notify step in `scrape-and-deploy.yml`) immediately after a successful `/notify` call. Alternatively, scope the Worker idempotency key to the slot content hash only (not the date).
+
+### P2: Unit tests for check-and-notify.mjs
+The notification dispatch script (`scripts/check-and-notify.mjs`) has no tests. It contains branching logic — time-gate check, Open Gym detection, per-sport filtering, freed-slots path — that could silently regress. Extract the pure logic into a testable module and add vitest unit tests. This is the most-called script in the push pipeline and currently has zero automated coverage.
+
+### P3: E2E test for occupancy level button click
+The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
+
+### P3: Cron gap — 30-min ET window around 6:30–7:00 PM
+`*/30 12-23 * * *` ends at 23:30 UTC (6:30 PM ET winter). `*/30 0-3 * * *` starts at 0:00 UTC (7:00 PM ET winter). This leaves a 30-min window with no cron fire. Activities starting between 7:00–7:30 PM ET will not receive a 30-min notification. Fix: add a third entry `- cron: '*/30 23 * * *'` to cover the gap (23:00 and 23:30 UTC = 6–7 PM ET in winter), or switch to Cloudflare's own scheduled Workers (which handle this in a single cron without the two-entry workaround).
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
