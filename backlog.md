@@ -376,6 +376,31 @@ Worker: `POST /checkin` (IP-hash rate-limit, KV TTL 900s), `GET /occupancy` (bel
 ### ~~P4: Visual test masking — Sports tab chip session counts cause spurious baseline drift~~
 Two-pronged fix: (1) `e2e/visual.spec.ts` Sports tab test now masks `.chip-count` and `.sport-status-banner` (both contain schedule-driven dynamic text) via a `SPORTS_MASK` const that spreads the existing `MASK`. Baseline regenerated. (2) New structural E2E test in `smoke.spec.ts` — `'chip session count badge shows a number'` — asserts each `.chip-count` span matches `/\d+/` and parses to `≥0`; survives schedule changes without baseline regeneration. 30 E2E tests (1 pre-existing skip). Merged 2026-02-25.
 
+### ~~P2: Auto-correct reversed activity times~~
+`scraper/sanitize.ts`: pure `sanitizeSchedule()` with 3 rules — invalid format → skip; reversed both in [6AM–11:59PM] → swap + `corrected: true`; reversed outside range → skip (ambiguous overnight). `Activity.corrected?: boolean` and `ScheduleData.correctedActivities?: number` added to `types.ts`. Inline loop in `scraper/index.ts` replaced with single `sanitizeSchedule()` call. 8 tests in `scraper/sanitize.test.ts`. UI: `corrected` badge in `Timeline.svelte` + `WeeklySchedule.svelte`; footer notice in `TodayView.svelte` when `data.correctedActivities` is set. Merged 2026-02-26.
+
+### ~~P3/P4: E2E coverage for iCal export, occupancy widget, cancelAlerts toggle~~
+`smoke.spec.ts`: "Add to Calendar" button visible when sport with sessions selected; occupancy widget renders with level buttons (mocked GET /occupancy). `qa-notif-sheet.spec.ts`: cancelAlerts toggle present in SPORTS section; fixed ambiguous `[data-notif-initialized]` selector (scoped to dialog); extended per-sport toggle count exclusion to include cancelAlerts row. Merged 2026-02-26.
+
+---
+
+## Open
+
+### ⚠️ P1 URGENT: Restore Worker deploy automation + deploy new endpoints
+`deploy-worker.yml` was accidentally deleted on 2026-02-20. Worker has been stuck at the Feb 19 build — the occupancy `/checkin`/`/occupancy` and `slot-freed` notification endpoints added Feb 25 are 404 in production. Workflow recreated; deploying now via `workflow_dispatch` since `worker/**` wasn't changed in this commit. After deploy, end-to-end verify: `POST /checkin`, `GET /occupancy`, `POST /notify` with `type: slot-freed`.
+
+### ⚠️ P1 URGENT: Fix push-notify.yml cron syntax — 30-min notifications were never firing
+Cron `*/30 12-02 * * *` is invalid POSIX (range wraps midnight). Every push triggered a "workflow file issue" failure. Fixed to two entries (`*/30 12-23 * * *` + `*/30 0-3 * * *`). Deployed 2026-02-26.
+
+### P1: Fix Dependabot high-severity rollup CVEs
+2x GHSA for rollup "Arbitrary File Write via Path Traversal" (main + worker `node_modules`). Only affects build-time toolchain (Vite uses rollup internally) — no runtime exposure. Still should be patched. Check `npm audit` and update Vite/rollup via `npm update` or `dependabot` PR.
+
+### P3: E2E test for corrected-times badge
+No test exercises the `Activity.corrected` path yet — needs a fixture or mock `latest.json` with a corrected activity to assert the badge renders in Timeline and WeeklySchedule. Low urgency until a real scrape produces corrected data.
+
+### P4: Worker end-to-end re-verification after deploy
+After the Worker is redeployed: manually verify `POST /checkin`, `GET /occupancy`, and `POST /notify` (type: slot-freed) via curl or the deployed app. Occupancy widget should show live level; freed-slots notifications should route correctly.
+
 ---
 
 ## Deferred / Future

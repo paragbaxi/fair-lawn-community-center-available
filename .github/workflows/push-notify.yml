@@ -2,9 +2,11 @@ name: Push Notify
 
 on:
   schedule:
-    # Every 30 minutes from 8 AM to 10 PM UTC (covers 8 AM–10 PM ET + buffer)
-    # The script itself enforces the 8 AM–10 PM ET gate
-    - cron: '*/30 12-02 * * *'
+    # Every 30 minutes — covers 8 AM–10 PM ET year-round (EST=UTC-5, EDT=UTC-4)
+    # Two entries because POSIX cron can't wrap midnight in a single range.
+    # The script itself enforces the 8 AM–10 PM ET gate.
+    - cron: '*/30 12-23 * * *'
+    - cron: '*/30 0-3 * * *'
   workflow_dispatch:
 
 permissions:
