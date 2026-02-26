@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-02-26T00:29:27.021Z",
+  "slots": [
+    {
+      "day": "Monday",
+      "startTime": "9:00 AM",
+      "endTime": "12:00 PM",
+      "activity": "Pickleball (Half Gym)"
+    },
+    {
+      "day": "Monday",
+      "startTime": "12:00 PM",
+      "endTime": "1:30 PM",
+      "activity": "FLHS Basketball"
+    },
+    {
+      "day": "Monday",
+      "startTime": "5:00 PM",
+      "endTime": "7:00 PM",
+      "activity": "FLAS Basketball"
+    },
+    {
+      "day": "Monday",
+      "startTime": "7:00 PM",
+      "endTime": "9:00 PM",
+      "activity": "Men's Basketball"
+    },
+    {
+      "day": "Thursday",
+      "startTime": "5:00 PM",
+      "endTime": "7:00 PM",
+      "activity": "FLAS Basketball"
+    },
+    {
+      "day": "Saturday",
+      "startTime": "3:00 PM",
+      "endTime": "4:30 PM",
+      "activity": "FLAS Pee Wee/Stars Basketball"
+    },
+    {
+      "day": "Sunday",
+      "startTime": "12:00 PM",
+      "endTime": "1:00 PM",
+      "activity": "FLHS Basketball"
+    }
+  ]
+}

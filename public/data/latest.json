@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-02-24T05:55:08.006Z",
+  "scrapedAt": "2026-02-26T00:29:27.021Z",
   "schedule": {
     "Monday": {
       "open": "7:00 AM",
@@ -7,33 +7,9 @@
       "activities": [
         {
           "name": "Open Gym",
-          "start": "7:00 AM",
-          "end": "9:00 AM",
+          "start": "10:00 AM",
+          "end": "4:30 PM",
           "isOpenGym": true
-        },
-        {
-          "name": "Pickleball (Half Gym)",
-          "start": "9:00 AM",
-          "end": "12:00 PM",
-          "isOpenGym": false
-        },
-        {
-          "name": "FLHS Basketball",
-          "start": "12:00 PM",
-          "end": "1:30 PM",
-          "isOpenGym": false
-        },
-        {
-          "name": "FLAS Basketball",
-          "start": "5:00 PM",
-          "end": "7:00 PM",
-          "isOpenGym": false
-        },
-        {
-          "name": "Men's Basketball",
-          "start": "7:00 PM",
-          "end": "9:00 PM",
-          "isOpenGym": false
         }
       ]
     },
@@ -116,12 +92,12 @@
         {
           "name": "Open Gym",
           "start": "12:00 PM",
-          "end": "5:00 PM",
+          "end": "4:00 PM",
           "isOpenGym": true
         },
         {
           "name": "FLAS Basketball",
-          "start": "5:00 PM",
+          "start": "4:00 PM",
           "end": "7:00 PM",
           "isOpenGym": false
         },
@@ -162,12 +138,6 @@
       "close": "9:30 PM",
       "activities": [
         {
-          "name": "FLAS Pee Wee/Stars Basketball",
-          "start": "3:00 PM",
-          "end": "4:30 PM",
-          "isOpenGym": false
-        },
-        {
           "name": "Open Gym",
           "start": "5:00 PM",
           "end": "6:30 PM",
@@ -183,7 +153,7 @@
     },
     "Sunday": {
       "open": "9:00 AM",
-      "close": "5:00 PM",
+      "close": "9:00 PM",
       "activities": [
         {
           "name": "Badminton",
@@ -192,24 +162,33 @@
           "isOpenGym": false
         },
         {
-          "name": "FLHS Basketball",
-          "start": "12:00 PM",
-          "end": "1:00 PM",
-          "isOpenGym": false
-        },
-        {
           "name": "Open Gym",
-          "start": "1:00 PM",
+          "start": "12:00 PM",
           "end": "5:00 PM",
           "isOpenGym": true
+        },
+        {
+          "name": "Table Tennis",
+          "start": "5:00 PM",
+          "end": "9:00 PM",
+          "isOpenGym": false
         }
       ]
     }
   },
   "notices": [
     {
-      "text": "Table Tennis: CANCELLED",
-      "date": "2026-02-22"
+      "text": "Pickleball (Half Gym): Canceled",
+      "date": "2026-02-23"
+    },
+    {
+      "text": "FLAS Basketball: Canceled",
+      "date": "2026-02-23"
+    },
+    {
+      "text": "Men's Basketball: Canceled",
+      "date": "2026-02-23"
     }
-  ]
+  ],
+  "skippedActivities": 1
 }
