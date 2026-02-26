@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { ScheduleData } from '../src/lib/types.js';
 
 test('page loads with correct title', async ({ page }) => {
   await page.goto('/');
@@ -704,4 +705,69 @@ test('back navigation restores previous tab and filter state', async ({ page }) 
   await expect(page.locator('#panel-sports')).not.toHaveAttribute('hidden', '');
   await expect(page.locator('#panel-sports .sport-chip[aria-pressed="true"]').first()).toBeVisible();
   await expect(page).toHaveURL(/sport=/); // URL also reflects restored state
+});
+
+// --- Corrected times badge ---
+
+// Build mock data with all 7 days so the test is day-agnostic.
+// Every day has one corrected Basketball activity to guarantee both Timeline
+// (selected day) and WeeklySchedule (remaining days) render corrected-badge.
+const correctedMockData: ScheduleData = (() => {
+  const correctedActivity = { name: 'Basketball', start: '6:00 PM', end: '8:00 PM', isOpenGym: false, corrected: true };
+  const day = { open: '7:00 AM', close: '9:00 PM', activities: [correctedActivity] };
+  return {
+    scrapedAt: new Date().toISOString(),
+    correctedActivities: 1,
+    notices: [],
+    schedule: {
+      Monday: day, Tuesday: day, Wednesday: day, Thursday: day,
+      Friday: day, Saturday: day, Sunday: day,
+    },
+  };
+})();
+
+test.describe('Corrected times badge', () => {
+  test('corrected badge visible in Timeline (Today tab)', async ({ page }) => {
+    await page.route('**/data/latest.json', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
+    );
+    await page.goto('/#today');
+    await expect(page.locator('.status-card')).toBeVisible();
+
+    const badge = page.locator('.corrected-badge').first();
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText('corrected');
+    await expect(badge).toHaveAttribute('title', /Times were listed in reverse/);
+  });
+
+  test('footer notice visible when corrected activities present (Today tab)', async ({ page }) => {
+    await page.route('**/data/latest.json', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
+    );
+    await page.goto('/#today');
+    await expect(page.locator('.status-card')).toBeVisible();
+
+    await expect(
+      page.locator('.footer-notice', { hasText: /Some activity times were listed in reverse/ })
+    ).toBeVisible();
+  });
+
+  test('corrected badge visible in WeeklySchedule after expanding an accordion item', async ({ page }) => {
+    await page.route('**/data/latest.json', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
+    );
+    await page.goto('/#today');
+    await expect(page.locator('.status-card')).toBeVisible();
+
+    // WeeklySchedule accordion items are collapsed by default (today's day is skipDay so it
+    // doesn't appear there). Expand the first visible accordion header to reveal its activities.
+    const firstAccordionHeader = page.locator('.schedule-accordion .accordion-header').first();
+    await expect(firstAccordionHeader).toBeVisible();
+    await firstAccordionHeader.click();
+
+    // After expanding, the corrected badge should be visible inside the accordion content
+    const accordionBadge = page.locator('.schedule-accordion .accordion-content .corrected-badge').first();
+    await expect(accordionBadge).toBeVisible();
+    await expect(accordionBadge).toHaveText('corrected');
+  });
 });

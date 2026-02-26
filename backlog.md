@@ -395,11 +395,11 @@ Cron `*/30 12-02 * * *` is invalid POSIX (range wraps midnight). Every push trig
 ### ~~P1: Fix Dependabot high-severity rollup CVEs~~
 Added `"overrides": {"rollup": "^4.59.0"}` to both root and `worker/package.json`. Root: rollup 4.57.1 → 4.59.0 (via vite). Worker: clean reinstall also updated vitest 2.1.9 → 4.0.18 and vite 5 → 7 transitively. `npm audit` reports 0 vulnerabilities in both. Dependabot alerts #8 + #9 auto-close after re-scan. Done 2026-02-26.
 
-### P3: E2E test for corrected-times badge
-No test exercises the `Activity.corrected` path yet — needs a fixture or mock `latest.json` with a corrected activity to assert the badge renders in Timeline and WeeklySchedule. Low urgency until a real scrape produces corrected data.
+### ~~P3: E2E test for corrected-times badge~~
+Added `test.describe('Corrected times badge')` in `e2e/smoke.spec.ts` (3 tests). Uses `page.route('**/data/latest.json', ...)` to inject mock data with all 7 days having `corrected: true`. Asserts: badge visible + title text in Timeline, footer-notice visible, badge visible after expanding a WeeklySchedule accordion item. Done 2026-02-26.
 
-### P4: Worker end-to-end re-verification after deploy
-After the Worker is redeployed: manually verify `POST /checkin`, `GET /occupancy`, and `POST /notify` (type: slot-freed) via curl or the deployed app. Occupancy widget should show live level; freed-slots notifications should route correctly.
+### ~~P4: Worker end-to-end re-verification after deploy~~
+Verified all three new endpoints live via curl: `GET /occupancy` → `{"level":null,...}`, `POST /checkin` with `"level":"moderate"` → `{"ok":true,...}`, `POST /notify` with slot-freed type → `{"error":"Unauthorized"}` (correct 401, not 404). Also exported `buildSlotFreedBody` from `worker/index.ts` and added 3 direct unit tests (single slot, multi same activity, mixed activities). Worker tests now 50 total. Done 2026-02-26.
 
 ---
 

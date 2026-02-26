@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import worker from './index.js';
+import worker, { buildSlotFreedBody } from './index.js';
 
 // ─── Mock @block65/webcrypto-web-push ─────────────────────────────────────────
 
@@ -1406,5 +1406,33 @@ describe('slot-freed', () => {
 
     expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/yes').length).toBe(1);
     expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/no').length).toBe(0);
+  });
+});
+
+// ─── buildSlotFreedBody unit tests ───────────────────────────────────────────
+
+describe('buildSlotFreedBody', () => {
+  it('single slot: names activity and time', () => {
+    const result = buildSlotFreedBody([
+      { day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' },
+    ]);
+    expect(result).toBe("Basketball at 2:00 PM was removed from today's schedule");
+  });
+
+  it('multiple slots same activity: uses count + activity name', () => {
+    const result = buildSlotFreedBody([
+      { day: 'Monday',    startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' },
+      { day: 'Tuesday',   startTime: '3:00 PM', endTime: '5:00 PM', activity: 'Basketball' },
+      { day: 'Wednesday', startTime: '4:00 PM', endTime: '6:00 PM', activity: 'Basketball' },
+    ]);
+    expect(result).toBe('3 Basketball sessions were removed from the schedule');
+  });
+
+  it('mixed activities: uses generic count message', () => {
+    const result = buildSlotFreedBody([
+      { day: 'Monday',  startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' },
+      { day: 'Tuesday', startTime: '3:00 PM', endTime: '5:00 PM', activity: 'Volleyball' },
+    ]);
+    expect(result).toBe("2 sessions removed from this week's schedule");
   });
 });

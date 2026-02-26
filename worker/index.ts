@@ -150,7 +150,7 @@ function truncateBody(s: string, max = 100): string {
  * - Multiple slots from same sport: "3 Basketball sessions were removed from the schedule"
  * - Mixed sports: "2 sessions removed from this week's schedule"
  */
-function buildSlotFreedBody(slots: FreedSlot[]): string {
+export function buildSlotFreedBody(slots: FreedSlot[]): string {
   if (slots.length === 1) {
     const slot = slots[0];
     return `${slot.activity} at ${slot.startTime} was removed from today's schedule`;
