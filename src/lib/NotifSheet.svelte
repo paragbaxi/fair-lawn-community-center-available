@@ -149,6 +149,23 @@
               <span class="toggle-thumb"></span>
             </button>
           </label>
+          <label class="sheet-toggle-row">
+            <span>
+              Alert me if a session is cancelled
+              <span class="sheet-toggle-sub">Get notified when a booked slot is removed</span>
+            </span>
+            <button
+              class="toggle"
+              class:on={notifStore.prefs.cancelAlerts}
+              role="switch"
+              aria-label="Cancelled session alerts"
+              aria-checked={notifStore.prefs.cancelAlerts}
+              onclick={() => savePrefs({ ...notifStore.prefs, cancelAlerts: !notifStore.prefs.cancelAlerts })}
+              disabled={notifStore.loading}
+            >
+              <span class="toggle-thumb"></span>
+            </button>
+          </label>
           {#if notifiableSports.length > 0}
             <div class="sheet-sport-divider" aria-hidden="true"></div>
           {/if}
@@ -457,6 +474,14 @@
     font-size: 0.75rem;
     color: var(--color-text-secondary);
     margin: -4px 0 8px;
+  }
+
+  .sheet-toggle-sub {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+    font-weight: 400;
   }
 
   .sheet-sport-divider {

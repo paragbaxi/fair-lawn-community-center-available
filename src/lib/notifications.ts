@@ -128,8 +128,8 @@ export function getStoredPrefs(): NotifPrefs | null {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Spread ensures `sports` always present even if absent in stored JSON (legacy records)
-    return { sports: [], dailyBriefingHour: 8, ...parsed } as NotifPrefs;
+    // Spread ensures optional fields are always present even if absent in stored JSON (legacy records)
+    return { sports: [], dailyBriefingHour: 8, cancelAlerts: false, ...parsed } as NotifPrefs;
   } catch (err) {
     console.error('[notifications] Failed to parse stored prefs, resetting:', err);
     localStorage.removeItem(PREFS_KEY);

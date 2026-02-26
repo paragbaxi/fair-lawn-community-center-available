@@ -6,7 +6,7 @@ import type { NotifState } from './notifications.js';
 // Mutate properties (not reassign the variable). Arrays must be replaced by reference.
 export const notifStore = $state({
   state: 'prompt' as NotifState,   // default 'prompt' until initNotifStore resolves
-  prefs: { thirtyMin: true, dailyBriefing: true, sports: [] } as NotifPrefs,
+  prefs: { thirtyMin: true, dailyBriefing: true, sports: [], cancelAlerts: false } as NotifPrefs,
   loading: false,
   isIos: false,
   isStandalone: false,
@@ -55,7 +55,7 @@ export async function handleDisable(): Promise<void> {
   try {
     await notifications.unsubscribe();
     notifStore.state = 'prompt';
-    notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [] };
+    notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [], cancelAlerts: false };
   } catch {
     notifStore.error = 'Failed to unsubscribe — please try again.';
   } finally {

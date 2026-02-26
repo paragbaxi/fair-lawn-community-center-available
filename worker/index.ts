@@ -25,6 +25,14 @@ interface NotifPrefs {
   dailyBriefing: boolean;
   sports?: string[];
   dailyBriefingHour?: number;  // 7–10 AM ET; defaults to 8
+  cancelAlerts?: boolean;  // alert when a booked slot is removed; defaults to false
+}
+
+interface FreedSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+  activity: string;
 }
 
 interface Activity {
@@ -127,12 +135,34 @@ function truncateBody(s: string, max = 100): string {
   return s.length <= max ? s : s.slice(0, max - 1) + '…';
 }
 
+/**
+ * Build a human-readable notification body for freed slots.
+ * - Single slot: "Basketball at 2:00 PM was removed from today's schedule"
+ * - Multiple slots from same sport: "3 Basketball sessions were removed from the schedule"
+ * - Mixed sports: "2 sessions removed from this week's schedule"
+ */
+function buildSlotFreedBody(slots: FreedSlot[]): string {
+  if (slots.length === 1) {
+    const slot = slots[0];
+    return `${slot.activity} at ${slot.startTime} was removed from today's schedule`;
+  }
+
+  // Check if all slots share the same activity name
+  const activities = new Set(slots.map(s => s.activity));
+  if (activities.size === 1) {
+    const name = slots[0].activity;
+    return `${slots.length} ${name} sessions were removed from the schedule`;
+  }
+
+  return `${slots.length} sessions removed from this week's schedule`;
+}
+
 // ─── Fan-out ─────────────────────────────────────────────────────────────────
 
 async function fanOut(
   env: Env,
   notifData: NotificationData,
-  type: 'thirtyMin' | 'dailyBriefing',
+  type: 'thirtyMin' | 'dailyBriefing' | 'cancelAlerts',
   idempotencyKeyStr: string,
   sportId?: string,
   etHour?: number,
@@ -171,9 +201,11 @@ async function fanOut(
 
         const allowed = sportId
           ? (sub.prefs.sports ?? []).includes(sportId)
-          : Boolean(sub.prefs[type]) && (
-              etHour === undefined || (sub.prefs.dailyBriefingHour ?? 8) === etHour
-            );
+          : type === 'cancelAlerts'
+            ? Boolean(sub.prefs.cancelAlerts)
+            : Boolean(sub.prefs[type]) && (
+                etHour === undefined || (sub.prefs.dailyBriefingHour ?? 8) === etHour
+              );
         if (!allowed) {
           skipped++;
           return;
@@ -245,6 +277,7 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
       dailyBriefing: body.prefs?.dailyBriefing ?? true,
       sports: body.prefs?.sports ?? [],
       dailyBriefingHour: incomingHour ?? 8,
+      cancelAlerts: body.prefs?.cancelAlerts ?? false,
     },
     subscribedAt: new Date().toISOString(),
   };
@@ -268,6 +301,7 @@ async function handleUpdatePrefs(request: Request, env: Env): Promise<Response> 
   if (body.prefs?.thirtyMin !== undefined) sub.prefs.thirtyMin = body.prefs.thirtyMin;
   if (body.prefs?.dailyBriefing !== undefined) sub.prefs.dailyBriefing = body.prefs.dailyBriefing;
   if (body.prefs?.sports !== undefined) sub.prefs.sports = body.prefs.sports;
+  if (body.prefs?.cancelAlerts !== undefined) sub.prefs.cancelAlerts = body.prefs.cancelAlerts;
   if (body.prefs?.dailyBriefingHour !== undefined) {
     const h = body.prefs.dailyBriefingHour;
     if (!Number.isInteger(h) || h < 7 || h > 10) return json({ error: 'dailyBriefingHour must be 7, 8, 9, or 10' }, 400);
@@ -314,6 +348,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     activities?: Array<{ start: string; end: string; dayName: string }>;
     sportId?: string;
     sportLabel?: string;
+    slots?: FreedSlot[];
   };
 
   const headerKey = request.headers.get('X-Api-Key') ?? '';
@@ -338,6 +373,25 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     const idKey = `idempotent:${isoDate}:${act.dayName}:sport-${body.sportId}`;
     // 'thirtyMin' is unused when sportId is provided — fanOut branches on sportId presence
     const result = await fanOut(env, notifData, 'thirtyMin', idKey, body.sportId);
+    return json({ ok: true, result });
+  }
+
+  if (body.type === 'slot-freed') {
+    const slots = body.slots;
+    if (!slots || !Array.isArray(slots) || slots.length === 0) {
+      return json({ error: 'Missing or empty slots' }, 400);
+    }
+
+    const notifBody = buildSlotFreedBody(slots);
+    const notifData: NotificationData = {
+      title: 'Session removed from schedule',
+      body: truncateBody(notifBody),
+      tag: 'flcc-slot-freed',
+      url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#today`,
+    };
+
+    const idKey = `idempotent:${isoDate}:slot-freed:${slots.map(s => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
+    const result = await fanOut(env, notifData, 'cancelAlerts', idKey);
     return json({ ok: true, result });
   }
 

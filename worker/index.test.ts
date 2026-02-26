@@ -45,6 +45,7 @@ function makeSub(overrides: {
   dailyBriefing?: boolean;
   sports?: string[];
   dailyBriefingHour?: number;
+  cancelAlerts?: boolean;
 } = {}) {
   return JSON.stringify({
     endpoint: overrides.endpoint ?? 'https://push.example.com/sub1',
@@ -54,6 +55,7 @@ function makeSub(overrides: {
       dailyBriefing: overrides.dailyBriefing ?? true,
       sports: overrides.sports ?? [],
       dailyBriefingHour: overrides.dailyBriefingHour ?? 8,
+      cancelAlerts: overrides.cancelAlerts ?? false,
     },
     subscribedAt: '2026-01-01T00:00:00.000Z',
   });
@@ -1101,5 +1103,175 @@ describe('/subscription (updatePrefs) dailyBriefingHour validation', () => {
     expect(res.status).toBe(400);
     const data = await res.json() as { error: string };
     expect(data.error).toBe('dailyBriefingHour must be 7, 8, 9, or 10');
+  });
+});
+
+// ─── slot-freed ───────────────────────────────────────────────────────────────
+
+describe('slot-freed', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const sampleSlots = [
+    { day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' },
+  ];
+
+  it('sends to subscriber with cancelAlerts=true', async () => {
+    const kv = createKVMock({
+      'sub-cancel': makeSub({
+        endpoint: 'https://push.example.com/cancel',
+        cancelAlerts: true,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ type: 'slot-freed', slots: sampleSlots });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.result.sent).toBe(1);
+    expect(data.result.skipped).toBe(0);
+
+    const cancelCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/cancel',
+    );
+    expect(cancelCalls.length).toBe(1);
+  });
+
+  it('skips subscriber with cancelAlerts=false', async () => {
+    const kv = createKVMock({
+      'sub-no-cancel': makeSub({
+        endpoint: 'https://push.example.com/no-cancel',
+        cancelAlerts: false,
+      }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ type: 'slot-freed', slots: sampleSlots });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(1);
+
+    const noCancelCalls = mockFetch.mock.calls.filter(
+      ([url]: [string]) => url === 'https://push.example.com/no-cancel',
+    );
+    expect(noCancelCalls.length).toBe(0);
+  });
+
+  it('skips subscriber whose cancelAlerts pref is absent (defaults false)', async () => {
+    // makeSub with no cancelAlerts override → cancelAlerts: false in prefs
+    const kv = createKVMock({
+      'sub-default': makeSub({ endpoint: 'https://push.example.com/default' }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ type: 'slot-freed', slots: sampleSlots });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(1);
+  });
+
+  it('returns { sent: 0, skipped: N, failed: 0 } when no subscribers have cancelAlerts=true', async () => {
+    const kv = createKVMock({
+      'sub-a': makeSub({ endpoint: 'https://push.example.com/a', cancelAlerts: false }),
+      'sub-b': makeSub({ endpoint: 'https://push.example.com/b', cancelAlerts: false }),
+      'sub-c': makeSub({ endpoint: 'https://push.example.com/c', cancelAlerts: false }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ type: 'slot-freed', slots: sampleSlots });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number; failed: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(3);
+    expect(data.result.failed).toBe(0);
+  });
+
+  it('returns 400 when slots array is empty', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = notifyRequest({ type: 'slot-freed', slots: [] });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(400);
+
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('Missing or empty slots');
+  });
+
+  it('returns 400 when slots field is missing', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = notifyRequest({ type: 'slot-freed' });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(400);
+
+    const data = await res.json() as { error: string };
+    expect(data.error).toBe('Missing or empty slots');
+  });
+
+  it('handles zero subscribers in KV without error', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ type: 'slot-freed', slots: sampleSlots });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number; failed: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(0);
+    expect(data.result.failed).toBe(0);
+  });
+
+  it('sends to cancelAlerts=true subscriber, skips cancelAlerts=false subscriber', async () => {
+    const kv = createKVMock({
+      'sub-yes': makeSub({ endpoint: 'https://push.example.com/yes', cancelAlerts: true }),
+      'sub-no': makeSub({ endpoint: 'https://push.example.com/no', cancelAlerts: false }),
+    });
+    const env = makeEnv(kv);
+
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ type: 'slot-freed', slots: sampleSlots });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(1);
+    expect(data.result.skipped).toBe(1);
+
+    expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/yes').length).toBe(1);
+    expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/no').length).toBe(0);
   });
 });

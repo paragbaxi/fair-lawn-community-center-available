@@ -5,6 +5,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSchedule } from './parse.js';
 import { validateSchedule } from './validate.js';
+import { diffSchedules } from './diff.js';
+import type { FreedSlotsFile } from './diff.js';
 import type { ScheduleData } from '../src/lib/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -155,7 +157,43 @@ async function scrape(): Promise<void> {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'latest.json'), JSON.stringify(data, null, 2));
+  // ── Compute freed-slots diff before overwriting latest.json ──────────────
+  const freedSlotsPath = path.join(OUTPUT_DIR, 'freed-slots.json');
+  const latestPath = path.join(OUTPUT_DIR, 'latest.json');
+
+  try {
+    if (fs.existsSync(latestPath)) {
+      const prevRaw = fs.readFileSync(latestPath, 'utf-8');
+      const prev = JSON.parse(prevRaw) as ScheduleData;
+      const freed = diffSchedules(prev, data);
+
+      if (freed.length > 0) {
+        const freedFile: FreedSlotsFile = {
+          generatedAt: new Date().toISOString(),
+          slots: freed,
+        };
+        fs.writeFileSync(freedSlotsPath, JSON.stringify(freedFile, null, 2));
+        console.log(`Wrote public/data/freed-slots.json (${freed.length} slot(s) freed)`);
+      } else {
+        // No freed slots — delete any stale freed-slots.json from a previous run
+        if (fs.existsSync(freedSlotsPath)) {
+          fs.unlinkSync(freedSlotsPath);
+          console.log('Deleted stale public/data/freed-slots.json (no freed slots this run)');
+        }
+      }
+    } else {
+      console.log('No previous latest.json found — skipping freed-slots diff (first run)');
+      // Clean up any stale freed-slots.json left from a prior run
+      if (fs.existsSync(freedSlotsPath)) {
+        fs.unlinkSync(freedSlotsPath);
+      }
+    }
+  } catch (err) {
+    // Diff is best-effort: a failure here must not prevent writing latest.json
+    console.error('[scraper] freed-slots diff failed (non-fatal):', err);
+  }
+
+  fs.writeFileSync(latestPath, JSON.stringify(data, null, 2));
   console.log('Wrote public/data/latest.json');
 }
 
