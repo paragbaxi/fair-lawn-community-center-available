@@ -18,6 +18,14 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
+import {
+  SPORT_PATTERNS,
+  THIRTY_MIN_WINDOW_MIN,
+  THIRTY_MIN_WINDOW_MAX,
+  parseMinutes,
+  findOpenGymSlot,
+  findSportSlots,
+} from './check-and-notify-logic.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -99,38 +107,17 @@ async function postNotify(body) {
   return res.json();
 }
 
-function parseMinutes(timeStr) {
-  const m = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!m) return null;
-  let h = parseInt(m[1], 10);
-  const min = parseInt(m[2], 10);
-  const ampm = m[3].toUpperCase();
-  if (ampm === 'PM' && h !== 12) h += 12;
-  if (ampm === 'AM' && h === 12) h = 0;
-  return h * 60 + min;
-}
-
-const THIRTY_MIN_WINDOW_MIN = 20;
-const THIRTY_MIN_WINDOW_MAX = 45;
-
 // ─── 30-min Open Gym notifications ────────────────────────────────────────────
 
-const openGymUpcoming = activities.filter(a => {
-  if (!a.isOpenGym) return false;
-  const startMin = parseMinutes(a.start);
-  if (startMin === null) return false;
-  const diff = startMin - nowMinutes;
-  return diff >= THIRTY_MIN_WINDOW_MIN && diff <= THIRTY_MIN_WINDOW_MAX;
-});
+const openGymSlot = findOpenGymSlot(activities, nowMinutes);
 
-if (openGymUpcoming.length > 0) {
-  const slot = openGymUpcoming[0];
+if (openGymSlot) {
   try {
     const result = await postNotify({
       type: '30min',
-      activities: [{ start: slot.start, end: slot.end, dayName }],
+      activities: [{ start: openGymSlot.start, end: openGymSlot.end, dayName }],
     });
-    console.log(`[check-and-notify] 30-min Open Gym (${slot.start}):`, result);
+    console.log(`[check-and-notify] 30-min Open Gym (${openGymSlot.start}):`, result);
   } catch (err) {
     console.error('[check-and-notify] 30-min Open Gym notify failed:', err);
   }
@@ -141,44 +128,23 @@ if (openGymUpcoming.length > 0) {
 // ─── 30-min per-sport notifications ───────────────────────────────────────────
 // Note: SPORT_PATTERNS must stay in sync with worker/index.ts — see scripts/check-sport-sync.mjs
 
-const SPORT_PATTERNS = [
-  { id: 'basketball',   label: 'Basketball',   test: (n) => /basketball/i.test(n) },
-  { id: 'pickleball',   label: 'Pickleball',   test: (n) => /pickleball/i.test(n) },
-  { id: 'table-tennis', label: 'Table Tennis', test: (n) => /table\s+tennis/i.test(n) },
-  { id: 'volleyball',   label: 'Volleyball',   test: (n) => /volleyball/i.test(n) },
-  { id: 'badminton',    label: 'Badminton',    test: (n) => /badminton/i.test(n) },
-  { id: 'tennis',       label: 'Tennis',       test: (n) => /tennis/i.test(n) && !/table\s+tennis/i.test(n) },
-  { id: 'youth',        label: 'Youth',        test: (n) => /youth center/i.test(n) },
-];
+const sportSlots = findSportSlots(activities, nowMinutes);
 
-const sportsSeen = new Set();
-for (const activity of activities) {
-  if (activity.isOpenGym) continue;
-  const startMin = parseMinutes(activity.start);
-  if (startMin === null) continue;
-  const diff = startMin - nowMinutes;
-  if (diff < THIRTY_MIN_WINDOW_MIN || diff > THIRTY_MIN_WINDOW_MAX) continue;
-
-  for (const pattern of SPORT_PATTERNS) {
-    if (!pattern.test(activity.name)) continue;
-    if (sportsSeen.has(pattern.id)) continue;
-    sportsSeen.add(pattern.id);
-
-    try {
-      const result = await postNotify({
-        type: 'sport-30min',
-        sportId: pattern.id,
-        sportLabel: pattern.label,
-        activities: [{ start: activity.start, end: activity.end, dayName }],
-      });
-      console.log(`[check-and-notify] sport-30min ${pattern.label} (${activity.start}):`, result);
-    } catch (err) {
-      console.error(`[check-and-notify] sport-30min ${pattern.label} notify failed:`, err);
-    }
+for (const { pattern, activity } of sportSlots) {
+  try {
+    const result = await postNotify({
+      type: 'sport-30min',
+      sportId: pattern.id,
+      sportLabel: pattern.label,
+      activities: [{ start: activity.start, end: activity.end, dayName }],
+    });
+    console.log(`[check-and-notify] sport-30min ${pattern.label} (${activity.start}):`, result);
+  } catch (err) {
+    console.error(`[check-and-notify] sport-30min ${pattern.label} notify failed:`, err);
   }
 }
 
-if (sportsSeen.size === 0) {
+if (sportSlots.length === 0) {
   console.log('[check-and-notify] No sports in 20–45 min window.');
 }
 
