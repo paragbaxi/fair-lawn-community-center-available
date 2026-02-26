@@ -200,6 +200,7 @@ if (existsSync(freedSlotsPath)) {
       const result = await postNotify({
         type: 'slot-freed',
         slots: freedSlotsData.slots,
+        generatedAt: freedSlotsData.generatedAt,
       });
       console.log(`[check-and-notify] slot-freed (${freedSlotsData.slots.length} slot(s)):`, result);
     } catch (err) {

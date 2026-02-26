@@ -175,13 +175,14 @@ async function fanOut(
   idempotencyKeyStr: string,
   sportId?: string,
   etHour?: number,
+  idempotencyTtl = 7200,
 ): Promise<{ sent: number; skipped: number; cleaned: number; failed: number }> {
   // Idempotency check
   const existing = await env.SUBSCRIPTIONS.get(idempotencyKeyStr);
   if (existing) return { sent: 0, skipped: 0, cleaned: 0, failed: 0 };
 
-  // Write idempotency key before sending (TTL: 2h)
-  await env.SUBSCRIPTIONS.put(idempotencyKeyStr, '1', { expirationTtl: 7200 });
+  // Write idempotency key before sending
+  await env.SUBSCRIPTIONS.put(idempotencyKeyStr, '1', { expirationTtl: idempotencyTtl });
 
   const vapidKeys = getVapidKeys(env);
   let cursor: string | undefined;
@@ -358,6 +359,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     sportId?: string;
     sportLabel?: string;
     slots?: FreedSlot[];
+    generatedAt?: string;
   };
 
   const headerKey = request.headers.get('X-Api-Key') ?? '';
@@ -399,8 +401,12 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
       url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#today`,
     };
 
-    const idKey = `idempotent:${isoDate}:slot-freed:${slots.map(s => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
-    const result = await fanOut(env, notifData, 'cancelAlerts', idKey);
+    // Use generatedAt (from freed-slots.json) as the idempotency scope so the
+    // same file seen across midnight doesn't re-send. TTL 48h outlasts the
+    // scraper's daily cycle.
+    const scope = (typeof body.generatedAt === 'string' && body.generatedAt) ? body.generatedAt : isoDate;
+    const idKey = `idempotent:slot-freed:${scope}:${slots.map(s => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
+    const result = await fanOut(env, notifData, 'cancelAlerts', idKey, undefined, undefined, 172800);
     return json({ ok: true, result });
   }
 

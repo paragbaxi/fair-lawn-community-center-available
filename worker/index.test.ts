@@ -1407,6 +1407,47 @@ describe('slot-freed', () => {
     expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/yes').length).toBe(1);
     expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/no').length).toBe(0);
   });
+
+  it('deduplicates on same generatedAt across midnight (stale-file re-send guard)', async () => {
+    const kv = createKVMock({
+      'sub-a': makeSub({ endpoint: 'https://push.example.com/a', cancelAlerts: true }),
+    });
+    const env = makeEnv(kv);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+
+    const generatedAt = '2026-02-26T14:00:00.000Z';
+
+    // First call on day 1 — should send
+    const req1 = notifyRequest({ type: 'slot-freed', slots: sampleSlots, generatedAt });
+    const res1 = await worker.fetch(req1, env as never);
+    const d1 = await res1.json() as { result: { sent: number } };
+    expect(d1.result.sent).toBe(1);
+
+    // Second call same generatedAt (e.g. next cron fire, or across midnight) — should be deduped
+    const req2 = notifyRequest({ type: 'slot-freed', slots: sampleSlots, generatedAt });
+    const res2 = await worker.fetch(req2, env as never);
+    const d2 = await res2.json() as { result: { sent: number; skipped: number } };
+    expect(d2.result.sent).toBe(0);
+    expect(d2.result.skipped).toBe(0);
+  });
+
+  it('sends again for new generatedAt (new scraper detection event)', async () => {
+    const kv = createKVMock({
+      'sub-a': makeSub({ endpoint: 'https://push.example.com/a', cancelAlerts: true }),
+    });
+    const env = makeEnv(kv);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+
+    // First event
+    const req1 = notifyRequest({ type: 'slot-freed', slots: sampleSlots, generatedAt: '2026-02-26T14:00:00.000Z' });
+    await worker.fetch(req1, env as never);
+
+    // New scraper run detected a different cancellation — new generatedAt → should send
+    const req2 = notifyRequest({ type: 'slot-freed', slots: sampleSlots, generatedAt: '2026-02-27T14:00:00.000Z' });
+    const res2 = await worker.fetch(req2, env as never);
+    const d2 = await res2.json() as { result: { sent: number } };
+    expect(d2.result.sent).toBe(1);
+  });
 });
 
 // ─── buildSlotFreedBody unit tests ───────────────────────────────────────────
