@@ -500,6 +500,23 @@ test.describe('Sports tab', () => {
     await expect(page.locator('[role="dialog"]')).toBeVisible();
     await expect(page.locator('#sheet-title')).toHaveText('My Alerts');
   });
+
+  test('"Add to Calendar" button visible when sport with sessions is selected', async ({ page }) => {
+    await page.goto('/#sports?sport=basketball');
+    await page.waitForSelector('#panel-sports .sport-chip', { timeout: 5000 });
+
+    // Skip if no sessions are loaded for basketball this week
+    const weekResults = page.locator('.week-results');
+    if (!await weekResults.isVisible({ timeout: 3000 }).catch(() => false)) {
+      test.skip(true, 'No basketball sessions this week');
+      return;
+    }
+
+    const calBtn = page.locator('.add-to-calendar-btn');
+    await expect(calBtn).toBeVisible();
+    const btnText = await calBtn.textContent();
+    expect(btnText).toMatch(/Calendar|📅/);
+  });
 });
 
 // --- Notification sheet tests ---
@@ -629,6 +646,32 @@ test.describe('DayPicker keyboard navigation', () => {
     await expect(newActiveBtn).toHaveCount(1);
     const newDayText = await newActiveBtn.textContent();
     expect(newDayText).not.toBe(firstDayText);
+  });
+});
+
+// --- Status tab tests ---
+
+test.describe('Status tab', () => {
+  test('occupancy widget renders with level buttons', async ({ page }) => {
+    // Mock the occupancy endpoint before navigation so the widget boots with empty state
+    await page.route('**/occupancy', route =>
+      route.fulfill({ json: { level: null, reportedAt: null, expiresAt: null } })
+    );
+    await page.goto('/');
+
+    await expect(page.locator('.status-card')).toBeVisible();
+
+    // Occupancy widget root
+    const widget = page.locator('.occupancy-widget');
+    await expect(widget).toBeVisible();
+
+    // All three level buttons must be present
+    await expect(widget.locator('.occupancy-btn').filter({ hasText: 'Light' })).toBeVisible();
+    await expect(widget.locator('.occupancy-btn').filter({ hasText: 'Moderate' })).toBeVisible();
+    await expect(widget.locator('.occupancy-btn').filter({ hasText: 'Packed' })).toBeVisible();
+
+    // No-data label should be visible since level is null
+    await expect(widget.locator('.occupancy-empty')).toBeVisible();
   });
 });
 
