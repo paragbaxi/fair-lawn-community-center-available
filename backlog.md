@@ -426,8 +426,8 @@ The existing E2E test only checks that the occupancy widget renders with three b
 ### ~~P2: check-and-notify.mjs has no observability when nothing is in window~~
 Fixed 2026-02-26. Added `else` branch after open gym check and `if (sportsSeen.size === 0)` after sports loop. All three sections now log explicitly on every run. Confirmed in live `workflow_dispatch` logs: `No Open Gym in 20–45 min window.` / `No sports in 20–45 min window.` / `No freed-slots.json found`. Done 2026-02-26.
 
-### P3: Cron gap — 30-min ET window around 6:30–7:00 PM
-`*/30 12-23 * * *` ends at 23:30 UTC (6:30 PM ET winter). `*/30 0-3 * * *` starts at 0:00 UTC (7:00 PM ET winter). This leaves a 30-min window with no cron fire. Activities starting between 7:00–7:30 PM ET will not receive a 30-min notification. Fix: add a third entry `- cron: '*/30 23 * * *'` to cover the gap (23:00 and 23:30 UTC = 6–7 PM ET in winter), or switch to Cloudflare's own scheduled Workers (which handle this in a single cron without the two-entry workaround).
+### ~~P3: Cron gap — 30-min ET window around 6:30–7:00 PM~~
+Investigated 2026-02-26. The claimed 30-minute fire gap does not exist. `*/30 12-23` fires at 23:00 and **23:30** UTC; `*/30 0-3` fires at **0:00** UTC — the transition is a normal consecutive 30-minute interval. The only gap > 30 min is 3:30–12:00 UTC (intentional overnight quiet period). There is a structural 4-minute coverage gap (`*:16–:19` and `*:46–:49` of each UTC hour) inherent to a 25-minute window on a 30-minute cron, but every FLCC session starts on `:00` or `:30` — none fall in these windows. No fix needed. Closed 2026-02-26.
 
 ---
 
