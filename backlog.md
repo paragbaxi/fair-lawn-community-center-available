@@ -373,8 +373,8 @@ Pure `src/lib/ical.ts` helper (RFC 5545, no deps): VCALENDAR + one VEVENT per se
 ### ~~P2: Crowd-sourced occupancy indicator in Status tab~~
 Worker: `POST /checkin` (IP-hash rate-limit, KV TTL 900s), `GET /occupancy` (belt-and-suspenders expiresAt check). `OccupancyWidget.svelte`: polls every 5 min, optimistic updates, 15-min client-side cooldown via localStorage, Light/Moderate/Packed pill. Mounted in StatusView between StatusCard and NotifSettings. 10 new worker tests (47 total). Merged 2026-02-25.
 
-### P4: Visual test masking — Sports tab chip session counts cause spurious baseline drift
-`sports-dark.png` has no `mask` applied. The chip session-count badges (`Basketball · 4`) change whenever the scraped schedule changes, causing >2% pixel diff and false failures. Add `.sport-chip` (or `.sport-chip-count`) to the mask list, or switch to a structural non-visual assertion for session counts.
+### ~~P4: Visual test masking — Sports tab chip session counts cause spurious baseline drift~~
+Two-pronged fix: (1) `e2e/visual.spec.ts` Sports tab test now masks `.chip-count` and `.sport-status-banner` (both contain schedule-driven dynamic text) via a `SPORTS_MASK` const that spreads the existing `MASK`. Baseline regenerated. (2) New structural E2E test in `smoke.spec.ts` — `'chip session count badge shows a number'` — asserts each `.chip-count` span matches `/\d+/` and parses to `≥0`; survives schedule changes without baseline regeneration. 30 E2E tests (1 pre-existing skip). Merged 2026-02-25.
 
 ---
 
