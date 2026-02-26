@@ -386,10 +386,10 @@ Two-pronged fix: (1) `e2e/visual.spec.ts` Sports tab test now masks `.chip-count
 
 ## Open
 
-### ⚠️ P1 URGENT: Restore Worker deploy automation + deploy new endpoints
-`deploy-worker.yml` was accidentally deleted on 2026-02-20. Worker has been stuck at the Feb 19 build — the occupancy `/checkin`/`/occupancy` and `slot-freed` notification endpoints added Feb 25 are 404 in production. Workflow recreated; deploying now via `workflow_dispatch` since `worker/**` wasn't changed in this commit. After deploy, end-to-end verify: `POST /checkin`, `GET /occupancy`, `POST /notify` with `type: slot-freed`.
+### ~~⚠️ P1 URGENT: Restore Worker deploy automation + deploy new endpoints~~
+`deploy-worker.yml` was accidentally deleted on 2026-02-20. Worker has been stuck at the Feb 19 build — the occupancy `/checkin`/`/occupancy` and `slot-freed` notification endpoints added Feb 25 are 404 in production. Workflow recreated; Worker redeployed via `workflow_dispatch`. `/occupancy` verified live: `{"level":null,"reportedAt":null,"expiresAt":null}`. Done 2026-02-26.
 
-### ⚠️ P1 URGENT: Fix push-notify.yml cron syntax — 30-min notifications were never firing
+### ~~⚠️ P1 URGENT: Fix push-notify.yml cron syntax — 30-min notifications were never firing~~
 Cron `*/30 12-02 * * *` is invalid POSIX (range wraps midnight). Every push triggered a "workflow file issue" failure. Fixed to two entries (`*/30 12-23 * * *` + `*/30 0-3 * * *`). Deployed 2026-02-26.
 
 ### P1: Fix Dependabot high-severity rollup CVEs
