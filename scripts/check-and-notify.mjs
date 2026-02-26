@@ -134,6 +134,8 @@ if (openGymUpcoming.length > 0) {
   } catch (err) {
     console.error('[check-and-notify] 30-min Open Gym notify failed:', err);
   }
+} else {
+  console.log('[check-and-notify] No Open Gym in 20–45 min window.');
 }
 
 // ─── 30-min per-sport notifications ───────────────────────────────────────────
@@ -174,6 +176,10 @@ for (const activity of activities) {
       console.error(`[check-and-notify] sport-30min ${pattern.label} notify failed:`, err);
     }
   }
+}
+
+if (sportsSeen.size === 0) {
+  console.log('[check-and-notify] No sports in 20–45 min window.');
 }
 
 // ─── Slot-freed (cancelled session) notifications ─────────────────────────────
