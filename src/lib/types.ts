@@ -3,6 +3,7 @@ export interface Activity {
   start: string;
   end: string;
   isOpenGym: boolean;
+  corrected?: boolean; // true if start/end were reversed by the scraper and auto-swapped
 }
 
 export interface DaySchedule {
@@ -21,6 +22,7 @@ export interface ScheduleData {
   schedule: Record<string, DaySchedule>;
   notices: Notice[];
   skippedActivities?: number; // activities dropped due to malformed times on source site
+  correctedActivities?: number; // activities whose start/end were reversed and auto-swapped
 }
 
 export type GymStatus = 'available' | 'in-use' | 'closed';
