@@ -392,8 +392,8 @@ Two-pronged fix: (1) `e2e/visual.spec.ts` Sports tab test now masks `.chip-count
 ### ~~⚠️ P1 URGENT: Fix push-notify.yml cron syntax — 30-min notifications were never firing~~
 Cron `*/30 12-02 * * *` is invalid POSIX (range wraps midnight). Every push triggered a "workflow file issue" failure. Fixed to two entries (`*/30 12-23 * * *` + `*/30 0-3 * * *`). Deployed 2026-02-26.
 
-### P1: Fix Dependabot high-severity rollup CVEs
-2x GHSA for rollup "Arbitrary File Write via Path Traversal" (main + worker `node_modules`). Only affects build-time toolchain (Vite uses rollup internally) — no runtime exposure. Still should be patched. Check `npm audit` and update Vite/rollup via `npm update` or `dependabot` PR.
+### ~~P1: Fix Dependabot high-severity rollup CVEs~~
+Added `"overrides": {"rollup": "^4.59.0"}` to both root and `worker/package.json`. Root: rollup 4.57.1 → 4.59.0 (via vite). Worker: clean reinstall also updated vitest 2.1.9 → 4.0.18 and vite 5 → 7 transitively. `npm audit` reports 0 vulnerabilities in both. Dependabot alerts #8 + #9 auto-close after re-scan. Done 2026-02-26.
 
 ### P3: E2E test for corrected-times badge
 No test exercises the `Activity.corrected` path yet — needs a fixture or mock `latest.json` with a corrected activity to assert the badge renders in Timeline and WeeklySchedule. Low urgency until a real scrape produces corrected data.
