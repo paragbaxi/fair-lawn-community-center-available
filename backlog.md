@@ -414,8 +414,8 @@ Verified 2026-02-26. Committed a test `freed-slots.json` (Basketball Thursday 2�
 ### ~~P2: Delete freed-slots.json from repo after notification is sent~~
 Fixed 2026-02-26 via idempotency redesign. Instead of deleting the file, the Worker now scopes the slot-freed idempotency key to `generatedAt` (the scraper-set timestamp from `freed-slots.json`) with a 48h TTL. Same file across midnight → same key → deduped. New scraper detection event → new `generatedAt` → sends. `check-and-notify.mjs` passes `generatedAt` in the POST body. 2 regression tests added (same `generatedAt` deduplicates; different `generatedAt` sends). Worker redeployed. Done 2026-02-26.
 
-### P2: Unit tests for check-and-notify.mjs
-The notification dispatch script (`scripts/check-and-notify.mjs`) has no tests. It contains branching logic — time-gate check, Open Gym detection, per-sport filtering, freed-slots path — that could silently regress. Extract the pure logic into a testable module and add vitest unit tests. This is the most-called script in the push pipeline and currently has zero automated coverage.
+### ~~P2: Unit tests for check-and-notify.mjs~~
+Fixed 2026-02-26. Extracted pure logic into `scripts/check-and-notify-logic.mjs` (`parseMinutes`, `findOpenGymSlot`, `findSportSlots`, `SPORT_PATTERNS`, window constants). 35 unit tests in `scripts/check-and-notify-logic.test.ts` covering window boundaries, sport pattern matching, table-tennis/tennis disambiguation, deduplication, and noon/midnight edge cases. `vitest.config.ts` include gains `scripts/**/*.test.ts`. `check-and-notify.mjs` updated to import from the logic module. Done 2026-02-26.
 
 ### P3: E2E test for occupancy level button click
 The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
