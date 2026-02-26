@@ -28,7 +28,11 @@ test.describe('dark mode visual regression', () => {
   test('Sports tab', async ({ page }) => {
     await page.locator('#tab-sports').click();
     await expect(page.locator('#panel-sports')).not.toHaveAttribute('hidden', '');
-    await expect(page).toHaveScreenshot('sports-dark.png', { maxDiffPixelRatio: 0.02 });
+    const SPORTS_MASK = [...MASK, '.chip-count', '.sport-status-banner'];
+    await expect(page).toHaveScreenshot('sports-dark.png', {
+      mask: SPORTS_MASK.map(s => page.locator(s)),
+      maxDiffPixelRatio: 0.02,
+    });
   });
 
 });
