@@ -78,7 +78,7 @@
                 {@const emoji = activityEmoji(act.name)}
                 <li class:open-gym={act.isOpenGym}>
                   <span class="act-time">{act.start} &ndash; {act.end}</span>
-                  <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
+                  <span class="act-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}{#if act.corrected}<span class="corrected-badge" title="Times were listed in reverse on the borough website and have been corrected">corrected</span>{/if}</span>
                 </li>
               {/each}
             </ul>
@@ -219,5 +219,11 @@
 
   .act-name {
     font-weight: 500;
+  }
+
+  .corrected-badge {
+    margin-left: 6px;
+    font-size: 0.72rem;
+    color: var(--color-text-secondary);
   }
 </style>

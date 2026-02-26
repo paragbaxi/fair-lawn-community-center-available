@@ -50,6 +50,11 @@
       <a href="https://www.fairlawn.org/park-rec" target="_blank" rel="noopener">check the borough website</a> for full details.
     </p>
   {/if}
+  {#if data.correctedActivities}
+    <p class="footer-notice">
+      Some activity times were listed in reverse on the borough website and have been corrected.
+    </p>
+  {/if}
   <p class="footer-meta">
     <a href="https://github.com/paragbaxi/fair-lawn-community-center-available/issues" target="_blank" rel="noopener">Feedback &amp; suggestions</a> welcome.
   </p>
