@@ -41,7 +41,7 @@
           role="listitem"
         >
           <span class="list-time">{act.start}&ndash;{act.end}</span>
-          <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}</span>
+          <span class="list-name">{#if emoji}<span class="activity-emoji" aria-hidden="true">{emoji}</span> {/if}{act.name}{#if act.corrected}<span class="corrected-badge" title="Times were listed in reverse on the borough website and have been corrected">corrected</span>{/if}</span>
           {#if act.isCurrent}
             <span class="list-badge">NOW</span>
           {/if}
@@ -148,5 +148,11 @@
   .activity-emoji {
     font-size: 1.1em;
     margin-right: 3px;
+  }
+
+  .corrected-badge {
+    margin-left: 6px;
+    font-size: 0.72rem;
+    color: var(--color-text-secondary);
   }
 </style>
