@@ -423,8 +423,8 @@ Fixed 2026-02-27. `check-sport-sync.mjs` now reads all three sources (`src/lib/f
 ### ~~P3: `check-sport-sync.mjs` not wired into CI~~
 Already wired — `ci.yml` test job runs `node scripts/check-sport-sync.mjs` before `npm run test`. Step name updated to reflect the three-source check. Done 2026-02-27.
 
-### P3: 2 moderate Dependabot vulnerabilities on main branch
-GitHub reported 2 moderate-severity vulnerabilities as of 2026-02-27 (shown in push output). The P1 high-severity rollup CVEs were resolved on 2026-02-26; these moderate ones may be pre-existing or newly flagged. Check: `gh api repos/paragbaxi/fair-lawn-community-center-available/dependabot/alerts --jq '.[] | select(.state=="open") | {pkg: .dependency.package.name, sev: .security_advisory.severity, summary: .security_advisory.summary}'`. Resolve by bumping affected package(s) via `overrides` or direct upgrade, then re-run `npm audit` to confirm.
+### ~~P3: 2 moderate Dependabot vulnerabilities on main branch~~
+Both were in `svelte`: XSS via HTML comment injection in SSR error boundary hydration markers, and XSS during SSR with `contenteditable bind:innerText/textContent`. Fixed in svelte 5.53.5. Resolved via `npm update svelte` (5.53.0 → 5.53.5); `npm audit` reports 0 vulnerabilities. 277 unit tests + build pass. Done 2026-02-27.
 
 ### P2: Device receipt of push notifications unconfirmed
 `POST /notify` returned `sent: 3` on 2026-02-26 (Worker confirmed delivery to push service), but no subscriber confirmed a notification appeared on-screen. This is the last unverified link in the push chain. Send a test with a unique start time (to bypass 2h idempotency key) while watching a subscribed device: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Friday"}]}'`. If push arrives: done. If not: check browser notification permissions and Service Worker registration in DevTools → Application.
