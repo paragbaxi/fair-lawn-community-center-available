@@ -426,8 +426,8 @@ Already wired — `ci.yml` test job runs `node scripts/check-sport-sync.mjs` bef
 ### ~~P3: 2 moderate Dependabot vulnerabilities on main branch~~
 Both were in `svelte`: XSS via HTML comment injection in SSR error boundary hydration markers, and XSS during SSR with `contenteditable bind:innerText/textContent`. Fixed in svelte 5.53.5. Resolved via `npm update svelte` (5.53.0 → 5.53.5); `npm audit` reports 0 vulnerabilities. 277 unit tests + build pass. Done 2026-02-27.
 
-### P2: Device receipt of push notifications unconfirmed
-`POST /notify` returned `sent: 3` on 2026-02-26 (Worker confirmed delivery to push service), but no subscriber confirmed a notification appeared on-screen. This is the last unverified link in the push chain. Send a test with a unique start time (to bypass 2h idempotency key) while watching a subscribed device: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Friday"}]}'`. If push arrives: done. If not: check browser notification permissions and Service Worker registration in DevTools → Application.
+### ~~P2: Device receipt of push notifications unconfirmed~~
+Confirmed 2026-02-27. Test curl `POST /notify type=30min` → `sent: 3` → notification appeared on subscribed device with correct title ("Open Gym in ~30 min") and body ("Starts at 10:07 AM — 12:00 PM · Thursday"). Full push pipeline verified end-to-end: Worker → push service → device. Done.
 
 ### ~~P3: E2E test for occupancy level button click~~
 Added 2 tests to `test.describe('Status tab')` in `e2e/smoke.spec.ts`: (1) mocks `/checkin` → `{ok, level:'moderate', expiresAt}`, clicks "Moderate", asserts `.occupancy-pill--moderate` visible and button `aria-pressed="true"`; (2) seeds `flcc:occupancy:lastReport` via `page.addInitScript` before page boot, asserts all three buttons `disabled` and `.occupancy-ratelimit` visible. All 3 Status tab tests pass. Done 2026-02-27.
