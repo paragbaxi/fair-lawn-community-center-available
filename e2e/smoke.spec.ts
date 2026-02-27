@@ -674,6 +674,50 @@ test.describe('Status tab', () => {
     // No-data label should be visible since level is null
     await expect(widget.locator('.occupancy-empty')).toBeVisible();
   });
+
+  test('clicking a level button updates the pill and marks the button active', async ({ page }) => {
+    await page.route('**/occupancy', route =>
+      route.fulfill({ json: { level: null, reportedAt: null, expiresAt: null } })
+    );
+    const futureExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    await page.route('**/checkin', route =>
+      route.fulfill({ json: { ok: true, level: 'moderate', expiresAt: futureExpiry } })
+    );
+
+    await page.goto('/');
+    await expect(page.locator('.status-card')).toBeVisible();
+
+    const widget = page.locator('.occupancy-widget');
+    const moderateBtn = widget.locator('.occupancy-btn').filter({ hasText: 'Moderate' });
+
+    await moderateBtn.click();
+
+    // Pill should update to show the reported level
+    await expect(widget.locator('.occupancy-pill--moderate')).toBeVisible();
+    // Button should reflect active state
+    await expect(moderateBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('localStorage cooldown disables buttons and shows rate-limit message on load', async ({ page }) => {
+    // Seed a recent report timestamp before the page boots so onMount sees it immediately
+    await page.addInitScript(() => {
+      localStorage.setItem('flcc:occupancy:lastReport', String(Date.now()));
+    });
+    await page.route('**/occupancy', route =>
+      route.fulfill({ json: { level: null, reportedAt: null, expiresAt: null } })
+    );
+
+    await page.goto('/');
+    await expect(page.locator('.status-card')).toBeVisible();
+
+    const widget = page.locator('.occupancy-widget');
+    // All buttons should be disabled while rate-limited
+    await expect(widget.locator('.occupancy-btn').filter({ hasText: 'Light' })).toBeDisabled();
+    await expect(widget.locator('.occupancy-btn').filter({ hasText: 'Moderate' })).toBeDisabled();
+    await expect(widget.locator('.occupancy-btn').filter({ hasText: 'Packed' })).toBeDisabled();
+    // Rate-limit notice should be visible
+    await expect(widget.locator('.occupancy-ratelimit')).toBeVisible();
+  });
 });
 
 test('back navigation restores previous tab and filter state', async ({ page }) => {

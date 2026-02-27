@@ -426,8 +426,8 @@ Already wired — `ci.yml` test job runs `node scripts/check-sport-sync.mjs` bef
 ### P2: Device receipt of push notifications unconfirmed
 `POST /notify` returned `sent: 3` on 2026-02-26 (Worker confirmed delivery to push service), but no subscriber confirmed a notification appeared on-screen. This is the last unverified link in the push chain. Send a test with a unique start time (to bypass 2h idempotency key) while watching a subscribed device: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Friday"}]}'`. If push arrives: done. If not: check browser notification permissions and Service Worker registration in DevTools → Application.
 
-### P3: E2E test for occupancy level button click
-The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
+### ~~P3: E2E test for occupancy level button click~~
+Added 2 tests to `test.describe('Status tab')` in `e2e/smoke.spec.ts`: (1) mocks `/checkin` → `{ok, level:'moderate', expiresAt}`, clicks "Moderate", asserts `.occupancy-pill--moderate` visible and button `aria-pressed="true"`; (2) seeds `flcc:occupancy:lastReport` via `page.addInitScript` before page boot, asserts all three buttons `disabled` and `.occupancy-ratelimit` visible. All 3 Status tab tests pass. Done 2026-02-27.
 
 ### P4: `cancelAlerts` never delivered to a real device
 All 4 current subscribers have `cancelAlerts: false`, so the slot-freed fanOut has never actually sent to a device. To gain real coverage: enable `cancelAlerts` in the NotifSheet on a subscribed device, commit a test `freed-slots.json`, trigger `workflow_dispatch`, and confirm delivery. The pipeline is plumbed and unit-tested but end-to-end device delivery is unverified.
