@@ -420,11 +420,20 @@ Fixed 2026-02-26. Extracted pure logic into `scripts/check-and-notify-logic.mjs`
 ### P2: Device receipt of push notifications unconfirmed
 `POST /notify` returned `sent: 3` on 2026-02-26 (Worker confirmed delivery to push service), but no one confirmed a notification appeared on a subscribed device. This is the last unverified link in the push chain. Confirm by sending another test during waking hours with a subscriber actively watching their device: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"X:00 AM","end":"Y:00 AM","dayName":"Friday"}]}'` (use a unique start time to bypass 2h idempotency key). If push arrives: close the loop. If not: check browser notification permissions and Service Worker registration.
 
-### P3: `check-sport-sync.mjs` misses `check-and-notify-logic.mjs` — three-way drift risk
-SPORT_PATTERNS now lives in two places: `worker/index.ts` (Worker fan-out) and `scripts/check-and-notify-logic.mjs` (script time-window filter). `check-sport-sync.mjs` only validates `worker/index.ts` against `src/lib/filters.ts`. If someone adds a sport to `check-and-notify-logic.mjs` but forgets `worker/index.ts` (or vice versa), CI won't catch it. Fix: extend `check-sport-sync.mjs` to also extract and compare IDs from `check-and-notify-logic.mjs`, erroring if any of the three sources diverge.
+### ~~P3: `check-sport-sync.mjs` misses `check-and-notify-logic.mjs` — three-way drift risk~~
+Fixed 2026-02-27. `check-sport-sync.mjs` now reads all three sources (`src/lib/filters.ts`, `worker/index.ts`, `scripts/check-and-notify-logic.mjs`) and uses a union-based loop — for each sport ID in any source, prints which sources have it and which are missing. Error message clearly names every divergent source. Done 2026-02-27.
 
 ### P3: E2E test for occupancy level button click
 The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
+
+### P3: `check-sport-sync.mjs` not wired into CI
+The script runs manually (`node scripts/check-sport-sync.mjs`) but is not in any CI workflow step. A sport added to one source but not the others would only be caught by an explicit manual run. Add a step to the unit-test or lint CI job: `node scripts/check-sport-sync.mjs` — exit 1 fails the job.
+
+### P4: No live device receipt confirmation for push notifications
+`POST /notify` returned `sent: 3` on 2026-02-26, meaning the push service accepted delivery — but no subscriber confirmed a notification appeared on their screen. This is the last unverified link. Send a test notification with a unique start time (to bypass 2h idempotency key) while a subscribed device is in view: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Thursday"}]}'`. If the notification arrives: loop is closed, mark done. If not: check browser notification permissions and Service Worker registration in DevTools.
+
+### P4: `cancelAlerts` subscriber count is zero — no real-world coverage
+All 4 current subscribers have `cancelAlerts: false`, so the slot-freed fanOut has never actually delivered to a device. To gain real coverage: subscribe with `cancelAlerts: true` enabled in the NotifSheet, commit a test `freed-slots.json`, trigger `workflow_dispatch`, and confirm delivery. Otherwise the pipeline is plumbed but untested end-to-end.
 
 ### ~~P2: check-and-notify.mjs has no observability when nothing is in window~~
 Fixed 2026-02-26. Added `else` branch after open gym check and `if (sportsSeen.size === 0)` after sports loop. All three sections now log explicitly on every run. Confirmed in live `workflow_dispatch` logs: `No Open Gym in 20–45 min window.` / `No sports in 20–45 min window.` / `No freed-slots.json found`. Done 2026-02-26.
