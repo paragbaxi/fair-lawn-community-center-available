@@ -443,6 +443,13 @@ Investigated 2026-02-26. The claimed 30-minute fire gap does not exist. `*/30 12
 
 ---
 
+## Open
+
+### P3: Pipeline verification sends fake notifications to real subscribers
+The 2026-02-26 curl test (`POST /notify type=30min`) sent to 3 real subscribers with `sent: 3` — those users received a fake "Open Gym in ~30 min" notification. Future verification should use a dedicated test subscriber (subscribe via an incognito tab, note that subscription's endpoint, then either: (a) target it directly via a Worker admin endpoint, or (b) ensure all other subscribers have the relevant pref turned off before testing). Alternatively, add a `dryRun: true` flag to `/notify` that logs fanOut results without actually pushing.
+
+---
+
 ## Deferred / Future
 
 ### P5: Fair Lawn Public Library availability app
