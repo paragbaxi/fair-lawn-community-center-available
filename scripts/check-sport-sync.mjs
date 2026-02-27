@@ -1,11 +1,12 @@
 /**
  * check-sport-sync.mjs
  *
- * Verifies that sport IDs in src/lib/filters.ts (FILTER_CATEGORIES, excluding
- * 'all' and 'open-gym') stay in sync with SPORT_PATTERNS in
- * worker/index.ts.
+ * Verifies that sport IDs stay in sync across three sources:
+ *   1. src/lib/filters.ts          — FILTER_CATEGORIES (excluding 'all' and 'open-gym')
+ *   2. worker/index.ts             — SPORT_PATTERNS
+ *   3. scripts/check-and-notify-logic.mjs — SPORT_PATTERNS
  *
- * Exit 0 — IDs match.
+ * Exit 0 — IDs match across all three sources.
  * Exit 1 — mismatch found; prints details.
  *
  * Uses only built-in Node.js modules (no npm install needed).
@@ -20,8 +21,9 @@ const root = join(__dirname, '..');
 
 // ─── Read files ───────────────────────────────────────────────────────────────
 
-const filtersTs = readFileSync(join(root, 'src', 'lib', 'filters.ts'), 'utf-8');
-const notifyMjs = readFileSync(join(root, 'worker', 'index.ts'), 'utf-8');
+const filtersTs  = readFileSync(join(root, 'src', 'lib', 'filters.ts'), 'utf-8');
+const workerTs   = readFileSync(join(root, 'worker', 'index.ts'), 'utf-8');
+const logicMjs   = readFileSync(join(root, 'scripts', 'check-and-notify-logic.mjs'), 'utf-8');
 
 // ─── Extract IDs ──────────────────────────────────────────────────────────────
 
@@ -43,50 +45,44 @@ function extractIds(source) {
 const allFilterIds = extractIds(filtersTs);
 
 // Exclude 'all' and 'open-gym' — these are meta-categories, not sports.
-// SPORT_CATEGORIES in filters.ts is defined as FILTER_CATEGORIES minus these two.
 const NON_SPORT_IDS = new Set(['all', 'open-gym']);
 const filterSportIds = allFilterIds.filter((id) => !NON_SPORT_IDS.has(id));
 
-// SPORT_PATTERNS IDs from check-and-notify.mjs
-const notifySportIds = extractIds(notifyMjs);
+const workerSportIds = extractIds(workerTs);
+const logicSportIds  = extractIds(logicMjs);
 
-// ─── Compare ──────────────────────────────────────────────────────────────────
+// ─── Three-way comparison ─────────────────────────────────────────────────────
 
-const filterSet = new Set(filterSportIds);
-const notifySet = new Set(notifySportIds);
+const sources = [
+  { label: 'src/lib/filters.ts (FILTER_CATEGORIES)',               ids: filterSportIds },
+  { label: 'worker/index.ts (SPORT_PATTERNS)',                     ids: workerSportIds },
+  { label: 'scripts/check-and-notify-logic.mjs (SPORT_PATTERNS)', ids: logicSportIds  },
+];
 
-const missingFromNotify = filterSportIds.filter((id) => !notifySet.has(id));
-const missingFromFilters = notifySportIds.filter((id) => !filterSet.has(id));
-
-// ─── Report ───────────────────────────────────────────────────────────────────
+const allIds = new Set(sources.flatMap((s) => s.ids));
 
 let hasError = false;
 
-if (missingFromNotify.length > 0) {
+for (const id of allIds) {
+  const missing = sources.filter((s) => !s.ids.includes(id));
+  if (missing.length === 0) continue;
+
+  const present = sources.filter((s) => s.ids.includes(id));
   console.error(
-    `ERROR: Sport IDs in src/lib/filters.ts but missing from scripts/worker/index.ts SPORT_PATTERNS:\n` +
-      missingFromNotify.map((id) => `  - '${id}'`).join('\n'),
-  );
-  console.error(
-    `  Fix: add matching entries to SPORT_PATTERNS in worker/index.ts`,
+    `ERROR: Sport ID '${id}' is present in:\n` +
+      present.map((s) => `  ✓ ${s.label}`).join('\n') +
+    `\nbut missing from:\n` +
+      missing.map((s) => `  ✗ ${s.label}`).join('\n'),
   );
   hasError = true;
 }
 
-if (missingFromFilters.length > 0) {
-  console.error(
-    `ERROR: Sport IDs in scripts/worker/index.ts SPORT_PATTERNS but missing from src/lib/filters.ts FILTER_CATEGORIES:\n` +
-      missingFromFilters.map((id) => `  - '${id}'`).join('\n'),
-  );
-  console.error(
-    `  Fix: add matching entries to FILTER_CATEGORIES in src/lib/filters.ts`,
-  );
-  hasError = true;
-}
+// ─── Report ───────────────────────────────────────────────────────────────────
 
 if (hasError) {
   process.exit(1);
 }
 
-console.log(`Sport IDs in sync: [${filterSportIds.map((id) => `'${id}'`).join(', ')}]`);
+const ids = sources[0].ids;
+console.log(`Sport IDs in sync across all 3 sources: [${ids.map((id) => `'${id}'`).join(', ')}]`);
 process.exit(0);
