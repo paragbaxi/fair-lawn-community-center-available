@@ -426,8 +426,8 @@ Fixed 2026-02-27. `check-sport-sync.mjs` now reads all three sources (`src/lib/f
 ### P3: E2E test for occupancy level button click
 The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
 
-### P3: `check-sport-sync.mjs` not wired into CI
-The script runs manually (`node scripts/check-sport-sync.mjs`) but is not in any CI workflow step. A sport added to one source but not the others would only be caught by an explicit manual run. Add a step to the unit-test or lint CI job: `node scripts/check-sport-sync.mjs` — exit 1 fails the job.
+### ~~P3: `check-sport-sync.mjs` not wired into CI~~
+Already wired — `ci.yml` test job runs `node scripts/check-sport-sync.mjs` before `npm run test`. Step name updated to reflect the three-source check. Done 2026-02-27.
 
 ### P4: No live device receipt confirmation for push notifications
 `POST /notify` returned `sent: 3` on 2026-02-26, meaning the push service accepted delivery — but no subscriber confirmed a notification appeared on their screen. This is the last unverified link. Send a test notification with a unique start time (to bypass 2h idempotency key) while a subscribed device is in view: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Thursday"}]}'`. If the notification arrives: loop is closed, mark done. If not: check browser notification permissions and Service Worker registration in DevTools.
