@@ -417,23 +417,20 @@ Fixed 2026-02-26 via idempotency redesign. Instead of deleting the file, the Wor
 ### ~~P2: Unit tests for check-and-notify.mjs~~
 Fixed 2026-02-26. Extracted pure logic into `scripts/check-and-notify-logic.mjs` (`parseMinutes`, `findOpenGymSlot`, `findSportSlots`, `SPORT_PATTERNS`, window constants). 35 unit tests in `scripts/check-and-notify-logic.test.ts` covering window boundaries, sport pattern matching, table-tennis/tennis disambiguation, deduplication, and noon/midnight edge cases. `vitest.config.ts` include gains `scripts/**/*.test.ts`. `check-and-notify.mjs` updated to import from the logic module. Done 2026-02-26.
 
-### P2: Device receipt of push notifications unconfirmed
-`POST /notify` returned `sent: 3` on 2026-02-26 (Worker confirmed delivery to push service), but no one confirmed a notification appeared on a subscribed device. This is the last unverified link in the push chain. Confirm by sending another test during waking hours with a subscriber actively watching their device: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"X:00 AM","end":"Y:00 AM","dayName":"Friday"}]}'` (use a unique start time to bypass 2h idempotency key). If push arrives: close the loop. If not: check browser notification permissions and Service Worker registration.
-
 ### ~~P3: `check-sport-sync.mjs` misses `check-and-notify-logic.mjs` — three-way drift risk~~
 Fixed 2026-02-27. `check-sport-sync.mjs` now reads all three sources (`src/lib/filters.ts`, `worker/index.ts`, `scripts/check-and-notify-logic.mjs`) and uses a union-based loop — for each sport ID in any source, prints which sources have it and which are missing. Error message clearly names every divergent source. Done 2026-02-27.
-
-### P3: E2E test for occupancy level button click
-The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
 
 ### ~~P3: `check-sport-sync.mjs` not wired into CI~~
 Already wired — `ci.yml` test job runs `node scripts/check-sport-sync.mjs` before `npm run test`. Step name updated to reflect the three-source check. Done 2026-02-27.
 
-### P4: No live device receipt confirmation for push notifications
-`POST /notify` returned `sent: 3` on 2026-02-26, meaning the push service accepted delivery — but no subscriber confirmed a notification appeared on their screen. This is the last unverified link. Send a test notification with a unique start time (to bypass 2h idempotency key) while a subscribed device is in view: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Thursday"}]}'`. If the notification arrives: loop is closed, mark done. If not: check browser notification permissions and Service Worker registration in DevTools.
+### P2: Device receipt of push notifications unconfirmed
+`POST /notify` returned `sent: 3` on 2026-02-26 (Worker confirmed delivery to push service), but no subscriber confirmed a notification appeared on-screen. This is the last unverified link in the push chain. Send a test with a unique start time (to bypass 2h idempotency key) while watching a subscribed device: `KEY=$(grep "^NOTIFY_API_KEY=" .env.local | cut -d= -f2) && curl -s -X POST https://flcc-push.trueto.workers.dev/notify -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -d '{"type":"30min","activities":[{"start":"10:07 AM","end":"12:00 PM","dayName":"Friday"}]}'`. If push arrives: done. If not: check browser notification permissions and Service Worker registration in DevTools → Application.
 
-### P4: `cancelAlerts` subscriber count is zero — no real-world coverage
-All 4 current subscribers have `cancelAlerts: false`, so the slot-freed fanOut has never actually delivered to a device. To gain real coverage: subscribe with `cancelAlerts: true` enabled in the NotifSheet, commit a test `freed-slots.json`, trigger `workflow_dispatch`, and confirm delivery. Otherwise the pipeline is plumbed but untested end-to-end.
+### P3: E2E test for occupancy level button click
+The existing E2E test only checks that the occupancy widget renders with three buttons. It does not test clicking a button (which fires `POST /checkin`). Add a test that mocks the `/checkin` endpoint, clicks "Moderate", and verifies the widget updates to show the selected level. Also test the 15-min cooldown lockout (localStorage-based).
+
+### P4: `cancelAlerts` never delivered to a real device
+All 4 current subscribers have `cancelAlerts: false`, so the slot-freed fanOut has never actually sent to a device. To gain real coverage: enable `cancelAlerts` in the NotifSheet on a subscribed device, commit a test `freed-slots.json`, trigger `workflow_dispatch`, and confirm delivery. The pipeline is plumbed and unit-tested but end-to-end device delivery is unverified.
 
 ### ~~P2: check-and-notify.mjs has no observability when nothing is in window~~
 Fixed 2026-02-26. Added `else` branch after open gym check and `if (sportsSeen.size === 0)` after sports loop. All three sections now log explicitly on every run. Confirmed in live `workflow_dispatch` logs: `No Open Gym in 20–45 min window.` / `No sports in 20–45 min window.` / `No freed-slots.json found`. Done 2026-02-26.
