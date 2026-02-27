@@ -432,8 +432,8 @@ Confirmed 2026-02-27. Test curl `POST /notify type=30min` → `sent: 3` → noti
 ### ~~P3: E2E test for occupancy level button click~~
 Added 2 tests to `test.describe('Status tab')` in `e2e/smoke.spec.ts`: (1) mocks `/checkin` → `{ok, level:'moderate', expiresAt}`, clicks "Moderate", asserts `.occupancy-pill--moderate` visible and button `aria-pressed="true"`; (2) seeds `flcc:occupancy:lastReport` via `page.addInitScript` before page boot, asserts all three buttons `disabled` and `.occupancy-ratelimit` visible. All 3 Status tab tests pass. Done 2026-02-27.
 
-### P4: `cancelAlerts` never delivered to a real device
-All 4 current subscribers have `cancelAlerts: false`, so the slot-freed fanOut has never actually sent to a device. To gain real coverage: enable `cancelAlerts` in the NotifSheet on a subscribed device, commit a test `freed-slots.json`, trigger `workflow_dispatch`, and confirm delivery. The pipeline is plumbed and unit-tested but end-to-end device delivery is unverified.
+### ~~P4: `cancelAlerts` never delivered to a real device~~
+Confirmed 2026-02-27. Enabled `cancelAlerts` on a subscribed device, committed test `freed-slots.json` (Basketball Friday 7–9 PM), triggered `workflow_dispatch` — logs: `slot-freed (1 slot(s)): { sent: 1, skipped: 4 }`. Notification appeared on device: "Basketball at 7:00 PM was removed from today's schedule". Test file removed. Full slot-freed pipeline verified end-to-end. Done.
 
 ### ~~P2: check-and-notify.mjs has no observability when nothing is in window~~
 Fixed 2026-02-26. Added `else` branch after open gym check and `if (sportsSeen.size === 0)` after sports loop. All three sections now log explicitly on every run. Confirmed in live `workflow_dispatch` logs: `No Open Gym in 20–45 min window.` / `No sports in 20–45 min window.` / `No freed-slots.json found`. Done 2026-02-26.
