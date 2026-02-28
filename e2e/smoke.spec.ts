@@ -808,10 +808,13 @@ test.describe('Corrected times badge', () => {
     // expandedDays = {gymState.dayName}; in opening-soon state dayName can be a future
     // day that IS shown (not equal to skipDay), so the first header in DOM order may
     // already be expanded — clicking it would collapse rather than expand.
+    // The [aria-expanded="false"] predicate re-evaluates on every assertion, so we cannot
+    // assert toHaveAttribute('aria-expanded','true') on this locator — after the click the
+    // selector would just re-resolve to the NEXT collapsed header. The badge check below is
+    // the real assertion; the click is sufficient to open one row.
     const collapsedHeader = page.locator('.schedule-accordion .accordion-header[aria-expanded="false"]').first();
     await expect(collapsedHeader).toBeVisible({ timeout: 5000 });
     await collapsedHeader.click();
-    await expect(collapsedHeader).toHaveAttribute('aria-expanded', 'true');
 
     // After expanding, the corrected badge should be visible inside the accordion content
     const accordionBadge = page.locator('.schedule-accordion .accordion-content .corrected-badge').first();
