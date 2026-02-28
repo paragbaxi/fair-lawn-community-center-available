@@ -804,11 +804,14 @@ test.describe('Corrected times badge', () => {
     await page.goto('/#today');
     await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
 
-    // WeeklySchedule accordion items are collapsed by default (today's day is skipDay so it
-    // doesn't appear there). Expand the first visible accordion header to reveal its activities.
-    const firstAccordionHeader = page.locator('.schedule-accordion .accordion-header').first();
-    await expect(firstAccordionHeader).toBeVisible();
-    await firstAccordionHeader.click();
+    // Find a COLLAPSED accordion header to expand. The WeeklySchedule initialises
+    // expandedDays = {gymState.dayName}; in opening-soon state dayName can be a future
+    // day that IS shown (not equal to skipDay), so the first header in DOM order may
+    // already be expanded — clicking it would collapse rather than expand.
+    const collapsedHeader = page.locator('.schedule-accordion .accordion-header[aria-expanded="false"]').first();
+    await expect(collapsedHeader).toBeVisible({ timeout: 5000 });
+    await collapsedHeader.click();
+    await expect(collapsedHeader).toHaveAttribute('aria-expanded', 'true');
 
     // After expanding, the corrected badge should be visible inside the accordion content
     const accordionBadge = page.locator('.schedule-accordion .accordion-content .corrected-badge').first();
