@@ -71,6 +71,9 @@ const nowMinutes = etHour * 60 + etMinute;
 const GYM_OPEN_HOUR = 8;   // 8 AM ET
 const GYM_CLOSE_HOUR = 22; // 10 PM ET
 
+// In dry-run, bypass the time gate so the pipeline can be tested at any hour.
+// Note: off-hours dry-runs will still return sent=0 because nowMinutes won't
+// match any activity in the 20–45 min window — the run completes normally.
 if (!DRY_RUN && (etHour < GYM_OPEN_HOUR || etHour >= GYM_CLOSE_HOUR)) {
   console.log(`[check-and-notify] Outside 8 AM–10 PM ET window (${etHour}:${String(etMinute).padStart(2, '0')} ET), skipping all notifications.`);
   process.exit(0);

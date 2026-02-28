@@ -168,16 +168,21 @@ export function buildSlotFreedBody(slots: FreedSlot[]): string {
 
 // ─── Fan-out ─────────────────────────────────────────────────────────────────
 
+interface FanOutOptions {
+  sportId?: string;
+  etHour?: number;
+  idempotencyTtl?: number;
+  dryRun?: boolean;
+}
+
 async function fanOut(
   env: Env,
   notifData: NotificationData,
   type: 'thirtyMin' | 'dailyBriefing' | 'cancelAlerts',
   idempotencyKeyStr: string,
-  sportId?: string,
-  etHour?: number,
-  idempotencyTtl = 7200,
-  dryRun = false,
+  opts: FanOutOptions = {},
 ): Promise<{ sent: number; skipped: number; cleaned: number; failed: number }> {
+  const { sportId, etHour, idempotencyTtl = 7200, dryRun = false } = opts;
   // Dry-run skips idempotency read + write so real runs are never blocked by a
   // dry-run and dry-run always reports current subscriber count regardless of
   // whether a real run has already fired today.
@@ -393,7 +398,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     };
     const idKey = `idempotent:${isoDate}:${act.dayName}:sport-${body.sportId}`;
     // 'thirtyMin' is unused when sportId is provided — fanOut branches on sportId presence
-    const result = await fanOut(env, notifData, 'thirtyMin', idKey, body.sportId, undefined, 7200, dryRun);
+    const result = await fanOut(env, notifData, 'thirtyMin', idKey, { sportId: body.sportId, dryRun });
     return json({ ok: true, result });
   }
 
@@ -416,7 +421,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     // scraper's daily cycle.
     const scope = (typeof body.generatedAt === 'string' && body.generatedAt) ? body.generatedAt : isoDate;
     const idKey = `idempotent:slot-freed:${scope}:${slots.map(s => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
-    const result = await fanOut(env, notifData, 'cancelAlerts', idKey, undefined, undefined, 172800, dryRun);
+    const result = await fanOut(env, notifData, 'cancelAlerts', idKey, { idempotencyTtl: 172800, dryRun });
     return json({ ok: true, result });
   }
 
@@ -439,7 +444,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     };
 
     const idKey = idempotencyKey(isoDate, act.dayName, act.start, '30min');
-    const result = await fanOut(env, notifData, 'thirtyMin', idKey, undefined, undefined, 7200, dryRun);
+    const result = await fanOut(env, notifData, 'thirtyMin', idKey, { dryRun });
     results.push(result);
   }
 
@@ -598,7 +603,7 @@ async function handleDailyBriefing(env: Env): Promise<void> {
 
   // Idempotency key scoped to date + hour so each user's chosen hour gets one send per day
   const idKey = idempotencyKey(isoDate, dayName, `${etHour}h`, 'dailyBriefing');
-  const result = await fanOut(env, notifData, 'dailyBriefing', idKey, undefined, etHour);
+  const result = await fanOut(env, notifData, 'dailyBriefing', idKey, { etHour });
   console.log(`Daily briefing (${etHour}h ET, ${dayName}): sent=${result.sent} skipped=${result.skipped} cleaned=${result.cleaned} failed=${result.failed}`);
 }
 
@@ -682,7 +687,7 @@ async function handleThirtyMinNotifications(env: Env): Promise<void> {
         url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#sports?sport=${pattern.id}`,
       };
       const idKey = idempotencyKey(isoDate, pattern.id, activity.start, 'thirtyMin');
-      const result = await fanOut(env, notifData, 'thirtyMin', idKey, pattern.id);
+      const result = await fanOut(env, notifData, 'thirtyMin', idKey, { sportId: pattern.id });
       console.log(`30-min ${pattern.label} (${activity.start}): sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`);
     }
   }

@@ -1453,19 +1453,22 @@ describe('slot-freed', () => {
 // ─── dryRun ───────────────────────────────────────────────────────────────────
 
 describe('dryRun', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
-  // Shared fixtures for sport-30min dry-run tests
+  // sportBody is fully static (no dates) — safe at describe scope
   const sportBody = {
     type: 'sport-30min',
     sportId: 'basketball',
     sportLabel: 'Basketball',
     activities: [{ start: '2:00 PM', end: '4:00 PM', dayName: 'Monday' }],
   };
-  const isoDate = new Date().toISOString().slice(0, 10);
-  const idKey = `idempotent:${isoDate}:Monday:sport-basketball`;
+
+  let isoDate: string;
+  let idKey: string;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    isoDate = new Date().toISOString().slice(0, 10);
+    idKey = `idempotent:${isoDate}:Monday:sport-basketball`;
+  });
 
   it('sport-30min dry-run: counts matching subscriber without sending push', async () => {
     const kv = createKVMock({
@@ -1558,6 +1561,32 @@ describe('dryRun', () => {
     expect(mockFetch.mock.calls.length).toBe(0);
     const { keys } = await kv.list({});
     expect(keys.some(k => k.name.startsWith('idempotent:slot-freed:'))).toBe(false);
+  });
+
+  it('30min open-gym dry-run: counts matching subscriber without sending push', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: '9:00 AM', end: '11:00 AM', dayName: 'Monday' }],
+      dryRun: true,
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.results[0].sent).toBe(1);
+    expect(mockFetch.mock.calls.length).toBe(0);
+
+    // Idempotency key must not be written
+    const openGymIdKey = `idempotent:${isoDate}:Monday:9:00 AM:30min`;
+    expect(await kv.get(openGymIdKey)).toBeNull();
   });
 });
 
