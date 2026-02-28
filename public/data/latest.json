@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-02-28T19:45:11.372Z",
+  "scrapedAt": "2026-02-28T22:53:15.659Z",
   "schedule": {
     "Monday": {
       "open": "7:00 AM",
@@ -151,8 +151,8 @@
         },
         {
           "name": "FLAS Basketball",
-          "start": "4:30 PM",
-          "end": "9:00 PM",
+          "start": "9:00 AM",
+          "end": "4:30 PM",
           "isOpenGym": false,
           "corrected": true
         }
