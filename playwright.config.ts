@@ -9,6 +9,9 @@ export default defineConfig({
     command: 'npm run build && npm run preview -- --port 4173',
     port: 4173,
     reuseExistingServer: !process.env.CI,
+    // VITE_WORKER_URL must be set so WORKER_URL is truthy in the built bundle.
+    // Without it, OccupancyWidget.submitLevel() returns early and the pill never renders.
+    env: { VITE_WORKER_URL: 'https://flcc-push.trueto.workers.dev' },
   },
   projects: [
     {

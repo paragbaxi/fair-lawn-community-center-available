@@ -776,7 +776,8 @@ test.describe('Corrected times badge', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
     );
     await page.goto('/#today');
-    await expect(page.locator('.status-card')).toBeVisible();
+    // Wait for Today tab to be active — .status-card is in the hidden Status panel on this route
+    await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
 
     const badge = page.locator('.corrected-badge').first();
     await expect(badge).toBeVisible();
@@ -789,7 +790,7 @@ test.describe('Corrected times badge', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
     );
     await page.goto('/#today');
-    await expect(page.locator('.status-card')).toBeVisible();
+    await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
 
     await expect(
       page.locator('.footer-notice', { hasText: /Some activity times were listed in reverse/ })
@@ -801,7 +802,7 @@ test.describe('Corrected times badge', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
     );
     await page.goto('/#today');
-    await expect(page.locator('.status-card')).toBeVisible();
+    await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
 
     // WeeklySchedule accordion items are collapsed by default (today's day is skipDay so it
     // doesn't appear there). Expand the first visible accordion header to reveal its activities.
