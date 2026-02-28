@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseTime, formatCountdown, computeGymState, computeSportStatus, getEasternNow, DISPLAY_DAYS } from './time.js';
+import { parseTime, formatCountdown, computeGymState, computeSportStatus, getEasternNow, DISPLAY_DAYS, getStatusConfig } from './time.js';
 import type { ScheduleData, DaySchedule, Activity } from './types.js';
 
 // --- parseTime ---
@@ -701,4 +701,93 @@ describe('computeGymState cross-day open gym', () => {
     expect(state.nextOpenGymDay).toBe('Friday');
     expect(state.nextOpenGym?.name).toBe('Open Gym');
   });
+});
+
+// --- computeGymState path #4a: opening-soon ---
+
+describe('computeGymState opening-soon (path #4a)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  function makeSchedule(overrides: Partial<Record<string, DaySchedule>> = {}): ScheduleData {
+    const defaultDay: DaySchedule = {
+      open: '8:00 AM',
+      close: '10:00 PM',
+      activities: [
+        { name: 'Open Gym', start: '8:00 AM', end: '12:00 PM', isOpenGym: true },
+        { name: 'Basketball', start: '12:00 PM', end: '2:00 PM', isOpenGym: false },
+        { name: 'Open Gym', start: '2:00 PM', end: '6:00 PM', isOpenGym: true },
+      ],
+    };
+    return {
+      scrapedAt: '2026-02-16T00:00:00Z',
+      schedule: {
+        Monday: defaultDay, Tuesday: defaultDay, Wednesday: defaultDay,
+        Thursday: defaultDay, Friday: defaultDay, Saturday: defaultDay, Sunday: defaultDay,
+        ...overrides,
+      },
+      notices: [],
+    };
+  }
+
+  it('returns opening-soon when in gap and next activity is Open Gym', () => {
+    const sched: DaySchedule = {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '11:00 AM', isOpenGym: false },
+        { name: 'Open Gym',   start: '1:00 PM', end: '5:00 PM',  isOpenGym: true  },
+      ],
+    };
+    vi.setSystemTime(new Date(2026, 1, 16, 12, 0, 0)); // noon
+    const state = computeGymState(makeSchedule({ Monday: sched }));
+    expect(state.status).toBe('opening-soon');
+    expect(state.currentActivity).toBeNull();
+    expect(state.nextOpenGym?.start).toBe('1:00 PM');
+    expect(state.countdownMs).toBe(60 * 60_000);
+  });
+
+  it('returns in-use (not opening-soon) when next activity is non-open-gym', () => {
+    const sched: DaySchedule = {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM', end: '11:00 AM', isOpenGym: false },
+        { name: 'Volleyball', start: '1:00 PM', end: '3:00 PM',  isOpenGym: false },
+        { name: 'Open Gym',   start: '3:00 PM', end: '7:00 PM',  isOpenGym: true  },
+      ],
+    };
+    vi.setSystemTime(new Date(2026, 1, 16, 12, 0, 0));
+    const state = computeGymState(makeSchedule({ Monday: sched }));
+    expect(state.status).toBe('in-use');
+    expect(state.currentActivity).toBeNull();
+    expect(state.nextOpenGym?.start).toBe('3:00 PM');
+  });
+
+  it('opening-soon: nextOpenGym populated with the upcoming session', () => {
+    const sched: DaySchedule = {
+      open: '8:00 AM', close: '10:00 PM',
+      activities: [
+        { name: 'Basketball', start: '8:00 AM',  end: '10:00 AM', isOpenGym: false },
+        { name: 'Open Gym',   start: '10:30 AM', end: '3:00 PM',  isOpenGym: true  },
+      ],
+    };
+    vi.setSystemTime(new Date(2026, 1, 16, 10, 15, 0)); // 10:15 AM
+    const state = computeGymState(makeSchedule({ Monday: sched }));
+    expect(state.status).toBe('opening-soon');
+    expect(state.nextOpenGym?.name).toBe('Open Gym');
+    expect(state.nextOpenGymDay).toBeNull();
+    expect(state.countdownMs).toBe(15 * 60_000);
+  });
+});
+
+// --- getStatusConfig ---
+
+describe('getStatusConfig', () => {
+  it('opening-soon → cssClass opening-soon, label OPEN GYM SOON', () => {
+    const c = getStatusConfig('opening-soon');
+    expect(c.cssClass).toBe('opening-soon');
+    expect(c.label).toBe('OPEN GYM SOON');
+  });
+  it('available → cssClass available',  () => expect(getStatusConfig('available').cssClass).toBe('available'));
+  it('in-use → cssClass in-use',        () => expect(getStatusConfig('in-use').cssClass).toBe('in-use'));
+  it('closed → cssClass closed',        () => expect(getStatusConfig('closed').cssClass).toBe('closed'));
 });

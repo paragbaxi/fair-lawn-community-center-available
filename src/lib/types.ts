@@ -25,7 +25,7 @@ export interface ScheduleData {
   correctedActivities?: number; // activities whose start/end were reversed and auto-swapped
 }
 
-export type GymStatus = 'available' | 'in-use' | 'closed';
+export type GymStatus = 'available' | 'opening-soon' | 'in-use' | 'closed';
 
 export type TabId = 'status' | 'today' | 'sports';
 

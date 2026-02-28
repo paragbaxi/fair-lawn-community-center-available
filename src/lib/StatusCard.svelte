@@ -54,8 +54,8 @@
       <span class="live-dot" aria-hidden="true"></span>
       {#if gymState.status === 'available' && gymState.currentActivity}
         {formatCountdown(countdownMs)} left
-      {:else if gymState.status === 'available'}
-        Starts in {formatCountdown(countdownMs)}
+      {:else if gymState.status === 'opening-soon'}
+        Starts in {formatCountdown(countdownMs)} · at {gymState.nextOpenGym!.start}
       {:else if gymState.status === 'in-use' && gymState.nextOpenGym && !gymState.nextOpenGymDay}
         Next up in {formatCountdown(countdownMs)}
       {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay && gymState.currentActivity}
@@ -72,6 +72,8 @@
 
   {#if gymState.status === 'available' && gymState.currentActivity}
     <p class="status-subtext">{gymState.countdownLabel}</p>
+  {:else if gymState.status === 'opening-soon'}
+    <p class="status-subtext">Open Gym until {gymState.nextOpenGym!.end}</p>
   {:else if gymState.status === 'in-use' && gymState.nextOpenGym && gymState.nextOpenGymDay}
     <p class="status-subtext">Next Open Gym: {gymState.nextOpenGymDay} at {gymState.nextOpenGym.start}</p>
   {:else if gymState.status === 'in-use' && gymState.nextOpenGym}
@@ -113,6 +115,11 @@
     border-color: var(--color-closed);
   }
 
+  .status-card.opening-soon {
+    background: var(--color-upcoming-bg);
+    border-color: var(--color-upcoming);
+  }
+
   .status-header {
     display: flex;
     align-items: center;
@@ -126,9 +133,10 @@
     line-height: 1;
   }
 
-  .available .status-icon { color: var(--color-available); }
-  .in-use .status-icon { color: var(--color-inuse); }
-  .closed .status-icon { color: var(--color-closed); }
+  .available .status-icon    { color: var(--color-available); }
+  .opening-soon .status-icon { color: var(--color-upcoming); }
+  .in-use .status-icon       { color: var(--color-inuse); }
+  .closed .status-icon       { color: var(--color-closed); }
 
   .status-label {
     font-size: 1.25rem;
@@ -136,9 +144,10 @@
     letter-spacing: 0.05em;
   }
 
-  .available .status-label { color: var(--color-available); }
-  .in-use .status-label { color: var(--color-inuse); }
-  .closed .status-label { color: var(--color-closed); }
+  .available .status-label    { color: var(--color-available); }
+  .opening-soon .status-label { color: var(--color-upcoming); }
+  .in-use .status-label       { color: var(--color-inuse); }
+  .closed .status-label       { color: var(--color-closed); }
 
   .status-detail {
     color: var(--color-text-secondary);
@@ -195,9 +204,10 @@
     }
   }
 
-  .available .countdown { color: var(--color-available); }
-  .in-use .countdown { color: var(--color-inuse); }
-  .closed .countdown { color: var(--color-closed); }
+  .available .countdown    { color: var(--color-available); }
+  .opening-soon .countdown { color: var(--color-upcoming); }
+  .in-use .countdown       { color: var(--color-inuse); }
+  .closed .countdown       { color: var(--color-closed); }
 
   .status-subtext {
     color: var(--color-text-secondary);
@@ -215,6 +225,13 @@
     .status-subtext,
     .status-subtext-secondary {
       color: rgba(255, 255, 255, 0.85);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .status-card.opening-soon {
+      background: var(--color-upcoming-bg);
+      border-color: var(--color-upcoming);
     }
   }
 </style>

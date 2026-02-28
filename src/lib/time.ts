@@ -1,4 +1,4 @@
-import type { Activity, DaySchedule, GymState, ScheduleData, SportStatus } from './types.js';
+import type { Activity, DaySchedule, GymState, GymStatus, ScheduleData, SportStatus } from './types.js';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -174,7 +174,7 @@ export function computeGymState(data: ScheduleData): GymState {
       const sameDayOpenGym = nextAny.isOpenGym ? nextAny : findNextOpenGym(todaySchedule.activities, now);
       const crossDay = !sameDayOpenGym ? findNextOpenGymAcrossDays(data, dayName) : null;
       return {
-        status: nextAny.isOpenGym ? 'available' : 'in-use',
+        status: nextAny.isOpenGym ? 'opening-soon' : 'in-use',
         currentActivity: null,
         nextOpenGym: sameDayOpenGym ?? crossDay?.activity ?? null,
         nextOpenGymDay: !sameDayOpenGym ? (crossDay?.day ?? null) : null,
@@ -242,14 +242,16 @@ export function shortDayName(full: string): string {
 }
 
 /** Status display configuration for each gym status. */
-export function getStatusConfig(status: 'available' | 'in-use' | 'closed') {
+export function getStatusConfig(status: GymStatus) {
   switch (status) {
     case 'available':
-      return { icon: '\u2713', label: 'GYM AVAILABLE', cssClass: 'available', ariaLabel: 'Gym is available for open play' };
+      return { icon: '\u2713', label: 'GYM AVAILABLE',  cssClass: 'available',     ariaLabel: 'Gym is available for open play' };
+    case 'opening-soon':
+      return { icon: '\u23F3', label: 'OPEN GYM SOON',  cssClass: 'opening-soon',  ariaLabel: 'Open Gym is starting soon' };
     case 'in-use':
-      return { icon: '\u23F3', label: 'GYM IN USE', cssClass: 'in-use', ariaLabel: 'Gym is currently in use for a scheduled activity' };
+      return { icon: '\u23F3', label: 'GYM IN USE',     cssClass: 'in-use',        ariaLabel: 'Gym is currently in use for a scheduled activity' };
     case 'closed':
-      return { icon: '\u2715', label: 'CLOSED', cssClass: 'closed', ariaLabel: 'Community center is currently closed' };
+      return { icon: '\u2715', label: 'CLOSED',         cssClass: 'closed',        ariaLabel: 'Community center is currently closed' };
   }
 }
 

@@ -5,6 +5,9 @@
   --color-inuse: #d97706;
   --color-inuse-bg: #fffbeb;
   --color-inuse-border: #fde68a;
+  --color-upcoming:        #0891b2;
+  --color-upcoming-bg:     #ecfeff;
+  --color-upcoming-border: #a5f3fc;
   --color-closed: #dc2626;
   --color-closed-bg: #fef2f2;
   --color-closed-border: #fecaca;
@@ -31,6 +34,9 @@
     --color-inuse: #fbbf24;
     --color-inuse-bg: #451a03;
     --color-inuse-border: #92400e;
+    --color-upcoming:        #22d3ee;
+    --color-upcoming-bg:     #083344;
+    --color-upcoming-border: #164e63;
     --color-closed: #f87171;
     --color-closed-bg: #450a0a;
     --color-closed-border: #991b1b;

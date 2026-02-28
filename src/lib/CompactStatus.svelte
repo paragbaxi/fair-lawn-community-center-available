@@ -13,6 +13,9 @@
     if (gymState.status === 'available' && gymState.currentActivity) {
       return `Open Gym until ${gymState.currentActivity.end}`;
     }
+    if (gymState.status === 'opening-soon' && gymState.nextOpenGym) {
+      return `Open Gym at ${gymState.nextOpenGym.start}`;
+    }
     if (gymState.status === 'in-use' && gymState.currentActivity) {
       return `${gymState.currentActivity.name} until ${gymState.currentActivity.end}`;
     }
@@ -63,6 +66,11 @@
   .compact-status.closed {
     background: var(--color-closed-bg);
     color: var(--color-closed);
+  }
+
+  .compact-status.opening-soon {
+    background: var(--color-upcoming-bg);
+    color: var(--color-upcoming);
   }
 
   @media (hover: hover) {
