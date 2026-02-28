@@ -801,24 +801,19 @@ test.describe('Corrected times badge', () => {
     await page.route('**/data/latest.json', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
     );
-    await page.goto('/#today');
+    // WeeklySchedule always skips skipDay (= selectedDay) and expands today (= gymState.dayName).
+    // When both are the same (the normal case), no accordion row is expanded — requiring a click
+    // that has proven brittle in CI. Fix: mock the clock to Monday so gymState.dayName='Monday',
+    // then pre-select Saturday via URL so skipDay='Saturday'. Monday is visible in the accordion
+    // AND expanded by default, so the badge is reachable without a click.
+    // Monday 2026-03-02 10:30 AM ET = 15:30 UTC (gym open 7 AM–9 PM in mock data)
+    await page.clock.install({ time: new Date('2026-03-02T15:30:00.000Z') });
+    await page.goto('/#today?day=Saturday');
     await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
 
-    // Find a COLLAPSED accordion header to expand. The WeeklySchedule initialises
-    // expandedDays = {gymState.dayName}; in opening-soon state dayName can be a future
-    // day that IS shown (not equal to skipDay), so the first header in DOM order may
-    // already be expanded — clicking it would collapse rather than expand.
-    // The [aria-expanded="false"] predicate re-evaluates on every assertion, so we cannot
-    // assert toHaveAttribute('aria-expanded','true') on this locator — after the click the
-    // selector would just re-resolve to the NEXT collapsed header. The badge check below is
-    // the real assertion; the click is sufficient to open one row.
-    const collapsedHeader = page.locator('.schedule-accordion .accordion-header[aria-expanded="false"]').first();
-    await expect(collapsedHeader).toBeVisible({ timeout: 5000 });
-    await collapsedHeader.click();
-
-    // After expanding, the corrected badge should be visible inside the accordion content
+    // Monday is expanded by default (today=Monday, skipDay=Saturday → Monday visible & open).
     const accordionBadge = page.locator('.schedule-accordion .accordion-content .corrected-badge').first();
-    await expect(accordionBadge).toBeVisible();
+    await expect(accordionBadge).toBeVisible({ timeout: 5000 });
     await expect(accordionBadge).toHaveText('corrected');
   });
 });
