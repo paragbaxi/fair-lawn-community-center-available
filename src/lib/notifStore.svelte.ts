@@ -6,7 +6,7 @@ import type { NotifState } from './notifications.js';
 // Mutate properties (not reassign the variable). Arrays must be replaced by reference.
 export const notifStore = $state({
   state: 'prompt' as NotifState,   // default 'prompt' until initNotifStore resolves
-  prefs: { thirtyMin: true, dailyBriefing: true, sports: [], cancelAlerts: false } as NotifPrefs,
+  prefs: { thirtyMin: true, dailyBriefing: true, sports: [], cancelAlerts: false, cancelAlertSports: [] } as NotifPrefs,
   loading: false,
   isIos: false,
   isStandalone: false,
@@ -55,7 +55,7 @@ export async function handleDisable(): Promise<void> {
   try {
     await notifications.unsubscribe();
     notifStore.state = 'prompt';
-    notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [], cancelAlerts: false };
+    notifStore.prefs = { thirtyMin: true, dailyBriefing: true, sports: [], cancelAlerts: false, cancelAlertSports: [] };
   } catch {
     notifStore.error = 'Failed to unsubscribe — please try again.';
   } finally {
@@ -70,6 +70,22 @@ export async function savePrefs(prefs: NotifPrefs): Promise<void> {
   notifStore.prefs = prefs;  // optimistic
   try {
     await notifications.updatePrefs(prefs);
+  } catch {
+    notifStore.prefs = previous;  // rollback
+    notifStore.error = 'Failed to save preference. Check your connection.';
+  }
+}
+
+/** Optimistically toggle a sport ID in an array-type pref field and persist. */
+async function updateArrayPref(fieldKey: 'sports' | 'cancelAlertSports', sportId: string): Promise<void> {
+  const current = notifications.getStoredPrefs() ?? { thirtyMin: false, dailyBriefing: false, sports: [] };
+  const arr = (current[fieldKey] as string[] | undefined) ?? [];
+  const next = arr.includes(sportId) ? arr.filter((id) => id !== sportId) : [...arr, sportId];
+  const updated = { ...current, [fieldKey]: next };
+  const previous = notifStore.prefs;
+  notifStore.prefs = updated;  // optimistic
+  try {
+    await notifications.updatePrefs(updated);
   } catch {
     notifStore.prefs = previous;  // rollback
     notifStore.error = 'Failed to save preference. Check your connection.';
@@ -99,21 +115,16 @@ export async function toggleSport(sportId: string): Promise<void> {
       notifStore.error = 'Failed to subscribe — please try again';
     }
   } else {
-    const current = notifications.getStoredPrefs() ?? { thirtyMin: false, dailyBriefing: false, sports: [] };
-    const currentSports = current.sports ?? [];
-    const next = currentSports.includes(sportId)
-      ? currentSports.filter(id => id !== sportId)
-      : [...currentSports, sportId];
-    const updated = { ...current, sports: next };
-    const previous = notifStore.prefs;
-    notifStore.prefs = updated;    // optimistic
-    try {
-      await notifications.updatePrefs(updated);
-    } catch {
-      notifStore.prefs = previous;  // rollback
-      notifStore.error = 'Failed to save preference. Check your connection.';
-    }
+    await updateArrayPref('sports', sportId);
   }
+  notifStore.loading = false;
+}
+
+/** Toggle a sport in the cancelAlertSports filter (must already be subscribed). */
+export async function toggleCancelSport(sportId: string): Promise<void> {
+  notifStore.loading = true;
+  notifStore.error = null;
+  await updateArrayPref('cancelAlertSports', sportId);
   notifStore.loading = false;
 }
 

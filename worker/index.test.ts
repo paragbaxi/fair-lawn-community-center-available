@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import worker, { buildSlotFreedBody, isSubscriberAllowed } from './index.js';
+import worker, { buildSlotFreedBody, isSubscriberAllowed, DEFAULT_DAILY_BRIEFING_HOUR } from './index.js';
 
 // ─── Mock @block65/webcrypto-web-push ─────────────────────────────────────────
 
@@ -46,6 +46,7 @@ function makeSub(overrides: {
   sports?: string[];
   dailyBriefingHour?: number;
   cancelAlerts?: boolean;
+  cancelAlertSports?: string[];
 } = {}) {
   return JSON.stringify({
     endpoint: overrides.endpoint ?? 'https://push.example.com/sub1',
@@ -54,8 +55,9 @@ function makeSub(overrides: {
       thirtyMin: overrides.thirtyMin ?? true,
       dailyBriefing: overrides.dailyBriefing ?? true,
       sports: overrides.sports ?? [],
-      dailyBriefingHour: overrides.dailyBriefingHour ?? 8,
+      dailyBriefingHour: overrides.dailyBriefingHour ?? DEFAULT_DAILY_BRIEFING_HOUR,
       cancelAlerts: overrides.cancelAlerts ?? false,
+      cancelAlertSports: overrides.cancelAlertSports ?? [],
     },
     subscribedAt: '2026-01-01T00:00:00.000Z',
   });
@@ -601,6 +603,61 @@ describe('/stats counting', () => {
     const data = await res.json() as { ok: boolean; subscribers: number; idempotencyKeys: number };
     expect(data.subscribers).toBe(0);
     expect(data.idempotencyKeys).toBe(1);
+  });
+});
+
+describe('/stats pref breakdown', () => {
+  it('returns byPref counts for 3 subs with varying prefs', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/1', thirtyMin: true,  dailyBriefing: true,  cancelAlerts: true,  sports: ['basketball', 'volleyball'] }),
+      'sub-2': makeSub({ endpoint: 'https://push.example.com/2', thirtyMin: true,  dailyBriefing: false, cancelAlerts: false, sports: ['basketball'] }),
+      'sub-3': makeSub({ endpoint: 'https://push.example.com/3', thirtyMin: false, dailyBriefing: true,  cancelAlerts: true,  sports: [] }),
+      'idempotent:test-key': '1',
+    });
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', { method: 'GET', headers: { 'X-Api-Key': 'test-key' } });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(200);
+
+    const data = await res.json() as {
+      ok: boolean;
+      subscribers: number;
+      idempotencyKeys: number;
+      byPref: { thirtyMin: number; dailyBriefing: number; cancelAlerts: number; sports: Record<string, number> };
+    };
+    expect(data.ok).toBe(true);
+    expect(data.subscribers).toBe(3);
+    expect(data.idempotencyKeys).toBe(1);
+    expect(data.byPref.thirtyMin).toBe(2);
+    expect(data.byPref.dailyBriefing).toBe(2);
+    expect(data.byPref.cancelAlerts).toBe(2);
+    expect(data.byPref.sports).toEqual({ basketball: 2, volleyball: 1 });
+  });
+
+  it('returns empty byPref when KV is empty', async () => {
+    const kv = createKVMock({});
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', { method: 'GET', headers: { 'X-Api-Key': 'test-key' } });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { byPref: { thirtyMin: number; sports: Record<string, number> } };
+    expect(data.byPref.thirtyMin).toBe(0);
+    expect(data.byPref.sports).toEqual({});
+  });
+
+  it('skips parse errors gracefully and still counts subscriber', async () => {
+    const kv = createKVMock({
+      'sub-bad': 'not-valid-json',
+      'sub-good': makeSub({ endpoint: 'https://push.example.com/good', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+
+    const req = new Request('https://example.com/stats', { method: 'GET', headers: { 'X-Api-Key': 'test-key' } });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { subscribers: number; byPref: { thirtyMin: number } };
+    expect(data.subscribers).toBe(2);
+    expect(data.byPref.thirtyMin).toBe(1);  // only good sub counted in byPref
   });
 });
 
@@ -1664,5 +1721,115 @@ describe('isSubscriberAllowed', () => {
   it('dailyBriefing: allows sub when etHour is undefined (any hour)', () => {
     const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
     expect(isSubscriberAllowed(sub, 'dailyBriefing', {})).toBe(true);
+  });
+});
+
+// ─── cancelAlerts sport filtering ────────────────────────────────────────────
+
+describe('cancelAlerts sport filtering — isSubscriberAllowed', () => {
+  it('cancelAlerts=true, cancelAlertSports=[] → allowed for any sportId', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: [] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(true);
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'volleyball' })).toBe(true);
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(true);
+  });
+
+  it('cancelAlerts=true, cancelAlertSports=undefined → all sports (legacy compat)', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true }));
+    // Simulate legacy record without the field
+    delete (sub as { prefs: { cancelAlertSports?: string[] } }).prefs.cancelAlertSports;
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(true);
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(true);
+  });
+
+  it('cancelAlerts=true, cancelAlertSports=[basketball] → matches basketball, skips volleyball', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(true);
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'volleyball' })).toBe(false);
+  });
+
+  it('cancelAlerts=true, cancelAlertSports=[basketball], undefined sportId → allowed', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(true);
+  });
+
+  it('cancelAlerts=false → blocked regardless of cancelAlertSports', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: false, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(false);
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(false);
+  });
+});
+
+describe('cancelAlerts sport filtering — slot-freed integration', () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+
+  it('sends only to basketball sub when basketball slot freed', async () => {
+    const kv = createKVMock({
+      'sub-bball': makeSub({ endpoint: 'https://push.example.com/bball', cancelAlerts: true, cancelAlertSports: ['basketball'] }),
+      'sub-vball': makeSub({ endpoint: 'https://push.example.com/vball', cancelAlerts: true, cancelAlertSports: ['volleyball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'slot-freed',
+      slots: [{ day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' }],
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(1);
+    expect(data.result.skipped).toBe(1);
+    expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/bball').length).toBe(1);
+    expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/vball').length).toBe(0);
+  });
+
+  it('mixed slots → fan-out per sport; all-sports sub receives one notification per sport group', async () => {
+    const kv = createKVMock({
+      'sub-bball': makeSub({ endpoint: 'https://push.example.com/bball', cancelAlerts: true, cancelAlertSports: ['basketball'] }),
+      'sub-all': makeSub({ endpoint: 'https://push.example.com/all', cancelAlerts: true, cancelAlertSports: [] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'slot-freed',
+      slots: [
+        { day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' },
+        { day: 'Monday', startTime: '3:00 PM', endTime: '5:00 PM', activity: 'Volleyball' },
+      ],
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    // basketball group: bball-sub (sent) + all-sub (sent) = 2
+    // volleyball group: bball-sub (skipped) + all-sub (sent) = 1 sent, 1 skipped
+    expect(data.result.sent).toBe(3);
+    expect(data.result.skipped).toBe(1);
+  });
+
+  it('filtered sub skips non-matching sport group', async () => {
+    const kv = createKVMock({
+      'sub-vball': makeSub({ endpoint: 'https://push.example.com/vball', cancelAlerts: true, cancelAlertSports: ['volleyball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'slot-freed',
+      slots: [{ day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' }],
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number; skipped: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(0);
+    expect(data.result.skipped).toBe(1);
+    expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/vball').length).toBe(0);
   });
 });

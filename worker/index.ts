@@ -33,8 +33,9 @@ interface NotifPrefs {
   thirtyMin: boolean;
   dailyBriefing: boolean;
   sports?: string[];
-  dailyBriefingHour?: number;  // 7–10 AM ET; defaults to 8
-  cancelAlerts?: boolean;  // alert when a booked slot is removed; defaults to false
+  dailyBriefingHour?: number;    // 7–10 AM ET; defaults to 8
+  cancelAlerts?: boolean;        // alert when a booked slot is removed; defaults to false
+  cancelAlertSports?: string[];  // [] or undefined = all sports; non-empty = only these sports
 }
 
 interface FreedSlot {
@@ -86,6 +87,7 @@ const THIRTY_MIN_WINDOW_MIN = 20;
 const THIRTY_MIN_WINDOW_MAX = 45;
 const GYM_OPEN_HOUR = 8;   // 8 AM ET
 const GYM_CLOSE_HOUR = 22; // 10 PM ET
+export const DEFAULT_DAILY_BRIEFING_HOUR = 8;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -181,10 +183,15 @@ export function isSubscriberAllowed(
   opts: FanOutOptions,
 ): boolean {
   const { sportId, etHour } = opts;
+  if (type === 'cancelAlerts') {
+    if (!sub.prefs.cancelAlerts) return false;
+    const filtered = sub.prefs.cancelAlertSports;
+    if (!filtered || filtered.length === 0) return true;  // all sports
+    return sportId ? filtered.includes(sportId) : true;   // per-sport filter
+  }
   if (sportId) return (sub.prefs.sports ?? []).includes(sportId);
-  if (type === 'cancelAlerts') return Boolean(sub.prefs.cancelAlerts);
   return Boolean(sub.prefs[type]) &&
-    (etHour === undefined || (sub.prefs.dailyBriefingHour ?? 8) === etHour);
+    (etHour === undefined || (sub.prefs.dailyBriefingHour ?? DEFAULT_DAILY_BRIEFING_HOUR) === etHour);
 }
 
 async function fanOut(
@@ -305,8 +312,9 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
       thirtyMin: body.prefs?.thirtyMin ?? true,
       dailyBriefing: body.prefs?.dailyBriefing ?? true,
       sports: body.prefs?.sports ?? [],
-      dailyBriefingHour: incomingHour ?? 8,
+      dailyBriefingHour: incomingHour ?? DEFAULT_DAILY_BRIEFING_HOUR,
       cancelAlerts: body.prefs?.cancelAlerts ?? false,
+      cancelAlertSports: body.prefs?.cancelAlertSports ?? [],
     },
     subscribedAt: new Date().toISOString(),
   };
@@ -331,6 +339,7 @@ async function handleUpdatePrefs(request: Request, env: Env): Promise<Response> 
   if (body.prefs?.dailyBriefing !== undefined) sub.prefs.dailyBriefing = body.prefs.dailyBriefing;
   if (body.prefs?.sports !== undefined) sub.prefs.sports = body.prefs.sports;
   if (body.prefs?.cancelAlerts !== undefined) sub.prefs.cancelAlerts = body.prefs.cancelAlerts;
+  if (body.prefs?.cancelAlertSports !== undefined) sub.prefs.cancelAlertSports = body.prefs.cancelAlertSports;
   if (body.prefs?.dailyBriefingHour !== undefined) {
     const h = body.prefs.dailyBriefingHour;
     if (!Number.isInteger(h) || h < 7 || h > 10) return json({ error: 'dailyBriefingHour must be 7, 8, 9, or 10' }, 400);
@@ -414,21 +423,40 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
       return json({ error: 'Missing or empty slots' }, 400);
     }
 
-    const notifBody = buildSlotFreedBody(slots);
-    const notifData: NotificationData = {
-      title: 'Session removed from schedule',
-      body: truncateBody(notifBody),
-      tag: 'flcc-slot-freed',
-      url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#today`,
-    };
-
     // Use generatedAt (from freed-slots.json) as the idempotency scope so the
     // same file seen across midnight doesn't re-send. TTL 48h outlasts the
     // scraper's daily cycle.
     const scope = (typeof body.generatedAt === 'string' && body.generatedAt) ? body.generatedAt : isoDate;
-    const idKey = `idempotent:slot-freed:${scope}:${slots.map(s => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
-    const result = await fanOut(env, notifData, 'cancelAlerts', idKey, { idempotencyTtl: 172800, dryRun });
-    return json({ ok: true, result });
+
+    // Group slots by sport so subscribers can filter by sport via cancelAlertSports
+    const sportGroups = new Map<string | undefined, FreedSlot[]>();
+    for (const slot of slots) {
+      const pattern = SPORT_PATTERNS.find((p) => p.test(slot.activity));
+      const key = pattern?.id;
+      if (!sportGroups.has(key)) sportGroups.set(key, []);
+      sportGroups.get(key)!.push(slot);
+    }
+
+    let totalSent = 0, totalSkipped = 0, totalCleaned = 0, totalFailed = 0;
+    const details: Array<{ sportId?: string; sent: number; skipped: number; cleaned: number; failed: number }> = [];
+
+    for (const [sportId, group] of sportGroups) {
+      const notifBody = buildSlotFreedBody(group);
+      const notifData: NotificationData = {
+        title: 'Session removed from schedule',
+        body: truncateBody(notifBody),
+        tag: 'flcc-slot-freed',
+        url: `${env.APP_ORIGIN}/fair-lawn-community-center-available/#today`,
+      };
+      const idKey = `idempotent:slot-freed:${scope}:${sportId ?? 'unknown'}:${group.map((s) => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
+      const result = await fanOut(env, notifData, 'cancelAlerts', idKey, { sportId, idempotencyTtl: 172800, dryRun });
+      totalSent += result.sent; totalSkipped += result.skipped;
+      totalCleaned += result.cleaned; totalFailed += result.failed;
+      details.push({ sportId, ...result });
+    }
+
+    const result = { sent: totalSent, skipped: totalSkipped, cleaned: totalCleaned, failed: totalFailed };
+    return json({ ok: true, result, details });
   }
 
   if (body.type !== '30min') {
@@ -522,21 +550,37 @@ async function handleStats(request: Request, env: Env): Promise<Response> {
   let cursor: string | undefined;
   let subscribers = 0;
   let idempotencyKeys = 0;
+  const byPref = {
+    thirtyMin: 0,
+    dailyBriefing: 0,
+    cancelAlerts: 0,
+    sports: {} as Record<string, number>,
+  };
 
   do {
     const list = await env.SUBSCRIPTIONS.list({ cursor });
     cursor = list.list_complete ? undefined : list.cursor;
 
-    for (const k of list.keys) {
-      if (k.name.startsWith('idempotent:')) {
-        idempotencyKeys++;
-      } else {
-        subscribers++;
-      }
-    }
+    const subKeys = list.keys.filter((k) => !k.name.startsWith('idempotent:'));
+    idempotencyKeys += list.keys.length - subKeys.length;
+    subscribers += subKeys.length;
+
+    await Promise.all(subKeys.map(async (k) => {
+      const raw = await env.SUBSCRIPTIONS.get(k.name);
+      if (!raw) return;
+      try {
+        const sub = JSON.parse(raw) as StoredSubscription;
+        if (sub.prefs.thirtyMin) byPref.thirtyMin++;
+        if (sub.prefs.dailyBriefing) byPref.dailyBriefing++;
+        if (sub.prefs.cancelAlerts) byPref.cancelAlerts++;
+        for (const sport of (sub.prefs.sports ?? [])) {
+          byPref.sports[sport] = (byPref.sports[sport] ?? 0) + 1;
+        }
+      } catch { /* skip parse errors — count subscriber but not prefs */ }
+    }));
   } while (cursor);
 
-  return json({ ok: true, subscribers, idempotencyKeys });
+  return json({ ok: true, subscribers, idempotencyKeys, byPref });
 }
 
 async function handleDailyBriefing(env: Env): Promise<void> {

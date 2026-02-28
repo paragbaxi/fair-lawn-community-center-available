@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: push-notify
@@ -32,3 +33,15 @@ jobs:
           CLOUDFLARE_WORKER_URL: ${{ secrets.CLOUDFLARE_WORKER_URL }}
           NOTIFY_API_KEY: ${{ secrets.NOTIFY_API_KEY }}
         run: node scripts/check-and-notify.mjs
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          gh issue create \
+            --title "Push notify cron failed — ${DATE}" \
+            --body "The push-notify cron job failed. See the run for details: ${RUN_URL}" \
+            --label "bug"
