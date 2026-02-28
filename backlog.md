@@ -5,16 +5,11 @@
 ### P3: cancelAlertSports end-to-end device verification
 The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. **Logic is now unit-tested** (`worker/index.test.ts` — `describe('isSubscriberAllowed — cancelAlerts', ...)`, 5 cases covering all-sports mode, per-sport allow/deny, undefined sportId, and cancelAlerts=false guard). Remaining manual steps: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Real-device receipt is outside CI scope.
 
-### P3: Stale local branches — decide and clean up
-`fix/notif-sheet-aria-keyrepeat-truncation` deleted (was 0 commits ahead of main). Two branches remain with unmerged work:
-- `feat/dry-run-notifications` (4 commits ahead): dry-run observability log + `isSubscriberAllowed` helper + midnight-safety audit. Some of this work may already be subsumed by what landed in main.
-- `feat/sport-status-banner` (1 commit ahead): sport status banner — this feature is already live on main; the branch commit may be an artefact. Verify with `git log feat/sport-status-banner ^main` and delete if no net-new content.
-Action: diff each branch against main, cherry-pick any useful commits, then delete. Do NOT force-delete without reviewing.
+### ~~P3: Stale local branches — decide and clean up~~
 
 ### ~~P4: QA test for cancelAlertSports sport chips in NotifSheet~~
 
-### P3: Stale agent worktrees — prune
-`git branch -v` shows 9 `worktree-agent-*` branches still referenced locally (all 55–73 commits behind main). These are leftover from past agent work sessions. Run `git worktree prune && git branch -d worktree-agent-*` (verify each is fully behind main first). Harmless but clutters branch listings and could confuse future git operations.
+### ~~P3: Stale agent worktrees — prune~~
 
 ### P4: `/stats byPref` — no integration smoke test
 The `byPref` breakdown added to `GET /stats` has unit tests but no integration verification. After next Worker deploy, curl `/stats` and confirm `byPref.thirtyMin`, `byPref.dailyBriefing`, `byPref.cancelAlerts`, and `byPref.sports` are present and plausible. Update this item when confirmed.
