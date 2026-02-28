@@ -36,6 +36,18 @@ describe('normalizeTime', () => {
   it('handles lowercase am/pm', () => {
     expect(normalizeTime('10:15 am')).toBe('10:15 AM');
   });
+
+  it('normalizes short-format "9a" (no colon, single-letter period)', () => {
+    expect(normalizeTime('9a')).toBe('9:00 AM');
+  });
+
+  it('normalizes short-format "4:30p" (no AM/PM suffix, single-letter period)', () => {
+    expect(normalizeTime('4:30p')).toBe('4:30 PM');
+  });
+
+  it('normalizes short-format "9am" (no colon, lowercase)', () => {
+    expect(normalizeTime('9am')).toBe('9:00 AM');
+  });
 });
 
 // --- parseTimeMinutes ---
@@ -254,6 +266,24 @@ describe('parseSchedule', () => {
 
     it('extends close time for Table Tennis (9:00 PM)', () => {
       expect(schedule.Sunday.close).toBe('9:00 PM');
+    });
+  });
+
+  // Short-format time integration: "9a – 4:30pm" in activity line
+  describe('short-format times', () => {
+    const shortFixture = [
+      'Open Gym Hours',
+      'Monday, February 9 - 7:00 a.m. to 9:00 p.m.',
+      'Basketball: 9a – 4:30pm',
+    ].join('\n');
+
+    it('parseSchedule parses "9a – 4:30pm" activity without correction', () => {
+      const { schedule } = parseSchedule(shortFixture, 2026);
+      const basketball = schedule.Monday.activities.find(a => a.name === 'Basketball');
+      expect(basketball).toBeDefined();
+      expect(basketball!.start).toBe('9:00 AM');
+      expect(basketball!.end).toBe('4:30 PM');
+      expect(basketball!.corrected).toBeUndefined();
     });
   });
 

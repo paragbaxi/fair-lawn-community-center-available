@@ -9,10 +9,10 @@ function makeDay(activities: Array<{
   start: string;
   end: string;
   isOpenGym?: boolean;
-}>): DaySchedule {
+}>, close = '9:00 PM'): DaySchedule {
   return {
     open: '7:00 AM',
-    close: '9:00 PM',
+    close,
     activities: activities.map(a => ({
       name: a.name,
       start: a.start,
@@ -71,10 +71,11 @@ describe('sanitizeSchedule', () => {
     expect(out.Monday.activities).toHaveLength(0);
   });
 
-  it('auto-swaps reversed times when both times are within gym hours (6 AM–11:59 PM)', () => {
-    // 9:00 PM start, 4:30 PM end — both in gym hours, but reversed
+  // Scenario B — both PM, wrong period on start
+  it('auto-corrects both-PM reversed times by flipping start to AM (Scenario B)', () => {
+    // 9:00 PM start, 4:30 PM end — both PM, reversed → flip start to 9:00 AM
     const schedule = makeSchedule({
-      Tuesday: makeDay([{ name: 'Pickleball', start: '9:00 PM', end: '4:30 PM' }]),
+      Tuesday: makeDay([{ name: 'Badminton', start: '9:00 PM', end: '4:30 PM' }]),
     });
 
     const { schedule: out, skipped, corrected } = sanitizeSchedule(schedule);
@@ -84,22 +85,22 @@ describe('sanitizeSchedule', () => {
     expect(out.Tuesday.activities).toHaveLength(1);
   });
 
-  it('swapped activity has start earlier than end after correction', () => {
-    // 9:00 PM start, 4:30 PM end → should become 4:30 PM start, 9:00 PM end
+  it('both-PM flip produces correct 9:00 AM – 4:30 PM after correction', () => {
+    // 9:00 PM start, 4:30 PM end → should become 9:00 AM start, 4:30 PM end (Scenario B)
     const schedule = makeSchedule({
-      Tuesday: makeDay([{ name: 'Pickleball', start: '9:00 PM', end: '4:30 PM' }]),
+      Tuesday: makeDay([{ name: 'Badminton', start: '9:00 PM', end: '4:30 PM' }]),
     });
 
     const { schedule: out } = sanitizeSchedule(schedule);
     const act = out.Tuesday.activities[0];
 
-    expect(act.start).toBe('4:30 PM');
-    expect(act.end).toBe('9:00 PM');
+    expect(act.start).toBe('9:00 AM');
+    expect(act.end).toBe('4:30 PM');
     expect(act.corrected).toBe(true);
   });
 
   it('skips reversed times where end is before 6:00 AM (ambiguous overnight)', () => {
-    // end = "2:00 AM" (120 minutes) is below 360 — ambiguous overnight
+    // end = "2:00 AM" (120 minutes) is below 360 — C1 invalid, ambiguous overnight
     const schedule = makeSchedule({
       Wednesday: makeDay([{ name: 'Late Gym', start: '9:00 PM', end: '2:00 AM' }]),
     });
@@ -111,32 +112,122 @@ describe('sanitizeSchedule', () => {
     expect(out.Wednesday.activities).toHaveLength(0);
   });
 
-  it('skips reversed times where start is before 6:00 AM (ambiguous overnight)', () => {
-    // start = "5:00 AM" (300 minutes) is below 360 — ambiguous overnight
+  // Scenario C — both AM, wrong period on end
+  it('auto-corrects both-AM reversed times by flipping end to PM (Scenario C)', () => {
+    // 9:00 AM start, 5:00 AM end — both AM, reversed → flip end to 5:00 PM
     const schedule = makeSchedule({
-      Thursday: makeDay([{ name: 'Early Bird', start: '5:00 AM', end: '9:00 AM' }]),
-    });
-
-    // 5:00 AM start, 9:00 AM end — start < end so NOT reversed, should pass through
-    // Let's instead use a genuine reversed case: 9:00 AM start, 5:00 AM end
-    const schedule2 = makeSchedule({
       Thursday: makeDay([{ name: 'Early Bird', start: '9:00 AM', end: '5:00 AM' }]),
     });
 
-    const { schedule: out, skipped, corrected } = sanitizeSchedule(schedule2);
+    const { schedule: out, skipped, corrected } = sanitizeSchedule(schedule);
 
-    // 5:00 AM = 300 minutes, which is < 360 — ambiguous, must be skipped
-    expect(skipped).toBe(1);
-    expect(corrected).toBe(0);
-    expect(out.Thursday.activities).toHaveLength(0);
+    expect(skipped).toBe(0);
+    expect(corrected).toBe(1);
+    const act = out.Thursday.activities[0];
+    expect(act.start).toBe('9:00 AM');
+    expect(act.end).toBe('5:00 PM');
+    expect(act.corrected).toBe(true);
   });
 
-  it('handles multiple activities on the same day: valid pass, reversed-gym-hours get corrected, invalid get skipped', () => {
+  // Scenario D — different periods, times transposed
+  it('auto-swaps reversed times with different periods (Scenario D)', () => {
+    // 4:30 PM start, 9:00 AM end — different periods → swap → 9:00 AM – 4:30 PM
+    const schedule = makeSchedule({
+      Monday: makeDay([{ name: 'Open Swim', start: '4:30 PM', end: '9:00 AM' }]),
+    });
+
+    const { schedule: out, skipped, corrected } = sanitizeSchedule(schedule);
+
+    expect(skipped).toBe(0);
+    expect(corrected).toBe(1);
+    const act = out.Monday.activities[0];
+    expect(act.start).toBe('9:00 AM');
+    expect(act.end).toBe('4:30 PM');
+    expect(act.corrected).toBe(true);
+  });
+
+  // Signal 1 — day close bound eliminates swap candidate
+  it('Signal 1: Sunday close (5 PM) eliminates swap, leaving only flip valid', () => {
+    // 9:00 PM – 4:30 PM on a day with close 5:00 PM:
+    //   C1 (swap → 4:30 PM – 9:00 PM): 9 PM > close 5 PM → invalid
+    //   C2 (flip start → 9:00 AM – 4:30 PM): 4:30 PM ≤ close 5 PM → valid
+    const schedule = makeSchedule({
+      Sunday: makeDay([{ name: 'Yoga', start: '9:00 PM', end: '4:30 PM' }], '5:00 PM'),
+    });
+
+    const { schedule: out, skipped, corrected } = sanitizeSchedule(schedule);
+
+    expect(skipped).toBe(0);
+    expect(corrected).toBe(1);
+    const act = out.Sunday.activities[0];
+    expect(act.start).toBe('9:00 AM');
+    expect(act.end).toBe('4:30 PM');
+    expect(act.corrected).toBe(true);
+  });
+
+  // Signal 3 — morning anchor tiebreaker (both C2 and C1 valid)
+  it('Signal 3: morning anchor confirms same-period flip when both C2 and C1 are valid', () => {
+    // Basketball (valid, 10 AM morning anchor) + Table Tennis reversed both-PM
+    // C2: 9:00 AM – 4:30 PM (valid); C1: 4:30 PM – 9:00 PM (valid)
+    // hasMorningAnchor = true (Basketball at 10 AM) → prefer C2
+    const schedule = makeSchedule({
+      Tuesday: makeDay([
+        { name: 'Basketball', start: '10:00 AM', end: '12:00 PM' },
+        { name: 'Table Tennis', start: '9:00 PM', end: '4:30 PM' },
+      ]),
+    });
+
+    const { schedule: out } = sanitizeSchedule(schedule);
+    const tableTennis = out.Tuesday.activities.find(a => a.name === 'Table Tennis');
+
+    expect(tableTennis).toBeDefined();
+    expect(tableTennis!.start).toBe('9:00 AM');
+    expect(tableTennis!.end).toBe('4:30 PM');
+    expect(tableTennis!.corrected).toBe(true);
+  });
+
+  // Signal 2 default — no morning anchor, same-period flip still preferred
+  it('Signal 2 default: no morning anchor → same-period flip still preferred over swap', () => {
+    // No other activities; 9:00 PM – 4:30 PM both PM
+    // C2: 9:00 AM – 4:30 PM valid; C1: 4:30 PM – 9:00 PM valid
+    // hasMorningAnchor = false → Signal 2 default → C2 preferred
+    const schedule = makeSchedule({
+      Wednesday: makeDay([{ name: 'Yoga', start: '9:00 PM', end: '4:30 PM' }]),
+    });
+
+    const { schedule: out } = sanitizeSchedule(schedule);
+    const act = out.Wednesday.activities[0];
+
+    expect(act.start).toBe('9:00 AM');
+    expect(act.end).toBe('4:30 PM');
+    expect(act.corrected).toBe(true);
+  });
+
+  // Fallback to swap when same-period flip is invalid
+  it('falls back to swap (C1) when same-period flip produces a time below GYM_MIN', () => {
+    // 1:00 PM – 12:30 PM (both PM):
+    //   C2: flip start → 1:00 AM = 60 min < 360 (GYM_MIN) → invalid
+    //   C1: swap → 12:30 PM – 1:00 PM → valid
+    const schedule = makeSchedule({
+      Thursday: makeDay([{ name: 'Zumba', start: '1:00 PM', end: '12:30 PM' }]),
+    });
+
+    const { schedule: out, skipped, corrected } = sanitizeSchedule(schedule);
+
+    expect(skipped).toBe(0);
+    expect(corrected).toBe(1);
+    const act = out.Thursday.activities[0];
+    expect(act.start).toBe('12:30 PM');
+    expect(act.end).toBe('1:00 PM');
+    expect(act.corrected).toBe(true);
+  });
+
+  it('handles multiple activities on the same day: valid pass, reversed get corrected, invalid get skipped', () => {
     const schedule = makeSchedule({
       Friday: makeDay([
         // valid — passes through
         { name: 'Basketball', start: '10:00 AM', end: '12:00 PM' },
-        // reversed but both in gym hours — should be corrected
+        // both PM reversed — C2: flip start 8:00 PM → 8:00 AM (valid, in gym hours, ≤ close 9 PM)
         { name: 'Volleyball', start: '8:00 PM', end: '6:00 PM' },
         // invalid end time — should be skipped
         { name: 'Tennis', start: '1:00 PM', end: 'INVALID' },
@@ -161,8 +252,8 @@ describe('sanitizeSchedule', () => {
 
     expect(volleyball).toBeDefined();
     expect(volleyball!.corrected).toBe(true);
-    // Swapped: was 8:00 PM → 6:00 PM, now 6:00 PM → 8:00 PM
-    expect(volleyball!.start).toBe('6:00 PM');
-    expect(volleyball!.end).toBe('8:00 PM');
+    // C2: flip start 8:00 PM → 8:00 AM, end stays 6:00 PM
+    expect(volleyball!.start).toBe('8:00 AM');
+    expect(volleyball!.end).toBe('6:00 PM');
   });
 });
