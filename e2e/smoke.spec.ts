@@ -10,9 +10,9 @@ test('status card renders with a status class', async ({ page }) => {
   await page.goto('/');
   const card = page.locator('.status-card');
   await expect(card).toBeVisible();
-  // Card should have one of: available, in-use, closed
+  // Card should have one of: available, opening-soon, in-use, closed
   const classes = await card.getAttribute('class');
-  expect(classes).toMatch(/available|in-use|closed/);
+  expect(classes).toMatch(/available|opening-soon|in-use|closed/);
 });
 
 test('skip link becomes visible on focus', async ({ page }) => {

@@ -25,8 +25,15 @@ function shot(name: string) {
  * - Sets localStorage with endpoint + prefs
  * - Routes worker API calls to succeed (so savePrefs/toggleSport don't throw)
  */
-async function mockSubscribed(page: Page, prefs = {
-  thirtyMin: false, dailyBriefing: true, sports: [] as string[], dailyBriefingHour: 8,
+async function mockSubscribed(page: Page, prefs: {
+  thirtyMin?: boolean;
+  dailyBriefing?: boolean;
+  sports?: string[];
+  dailyBriefingHour?: number;
+  cancelAlerts?: boolean;
+  cancelAlertSports?: string[];
+} = {
+  thirtyMin: false, dailyBriefing: true, sports: [], dailyBriefingHour: 8,
 }) {
   await page.addInitScript((prefsJson: string) => {
     Object.defineProperty(Notification, 'permission', {
@@ -381,4 +388,58 @@ test('network error on sport toggle: inline error shown, toggle reverts, sheet s
   await expect(dialog).toBeVisible();
 
   await page.screenshot({ path: shot('11-error-toggle-reverts.png') });
+});
+
+// ─── cancelAlertSports chips ─────────────────────────────────────────────────
+
+test.describe('cancelAlertSports chips', () => {
+  test('chip group is visible and first chip toggles to pressed', async ({ page }) => {
+    await mockSubscribed(page, {
+      thirtyMin: false,
+      dailyBriefing: true,
+      sports: [],
+      dailyBriefingHour: 8,
+      cancelAlerts: true,
+      cancelAlertSports: [],
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('[aria-label="Notification settings"]', { timeout: 10000 });
+    await page.locator('[aria-label="Notification settings"]').click();
+
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 3000 });
+    await page.waitForSelector('[role="dialog"] [data-notif-initialized]', { timeout: 6000 });
+    await page.waitForTimeout(ANIM_MS);
+
+    // Guard: must be in subscribed state for the SPORTS section to appear
+    const sportsSect = dialog.locator('section').filter({ has: dialog.locator('h3', { hasText: /^sports$/i }) });
+    if (!await sportsSect.isVisible({ timeout: 1000 }).catch(() => false)) {
+      test.skip(true, 'Not in subscribed state — cannot verify cancelAlertSports chips');
+      return;
+    }
+
+    // The cancellation alert sports chip group must be visible
+    // aria-label from NotifSheet.svelte line 172: aria-label="Cancellation alert sports"
+    const chipGroup = dialog.locator('[aria-label="Cancellation alert sports"]');
+    await expect(chipGroup).toBeVisible();
+
+    // Find the first sport chip in the group
+    // Individual chips use aria-label="{sport.label} cancellation alert" and aria-pressed
+    const firstChip = chipGroup.locator('button').first();
+
+    // Initially unselected: cancelAlertSports is [] so no chip is pressed
+    await expect(firstChip).toHaveAttribute('aria-pressed', 'false');
+
+    // Override route to succeed (takes precedence over the mockSubscribed route via LIFO)
+    await page.route('**/flcc-push.trueto.workers.dev/**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+    );
+
+    // Click the chip — it should become pressed
+    await firstChip.click();
+    await expect(firstChip).toHaveAttribute('aria-pressed', 'true');
+
+    await page.screenshot({ path: shot('cancel-alert-chips.png') });
+  });
 });

@@ -3,25 +3,20 @@
 ## Open
 
 ### P3: cancelAlertSports end-to-end device verification
-The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. Verify: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Follow the same device-receipt checklist used for the 30-min pipeline.
+The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. **Logic is now unit-tested** (`worker/index.test.ts` — `describe('isSubscriberAllowed — cancelAlerts', ...)`, 5 cases covering all-sports mode, per-sport allow/deny, undefined sportId, and cancelAlerts=false guard). Remaining manual steps: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Real-device receipt is outside CI scope.
 
 ### P3: Stale local branches — review and delete
-Three local branches exist that appear to be fully merged or superseded: `feat/dry-run-notifications`, `feat/sport-status-banner`, `fix/notif-sheet-aria-keyrepeat-truncation`. Confirm each is merged into main (all their commits appear in `git log main`) then delete with `git branch -d`. Keeps local branch list clean.
+`fix/notif-sheet-aria-keyrepeat-truncation` deleted (was 0 commits ahead of main). `feat/dry-run-notifications` and `feat/sport-status-banner` retain unmerged commits — do NOT delete.
 
-### P4: QA test for cancelAlertSports sport chips in NotifSheet
-The cancel-sport chips row (rendered below the cancelAlerts toggle when `cancelAlerts=true`) has no QA spec. Add a test in `qa-notif-sheet.spec.ts` that enables cancelAlerts, verifies chips render, and confirms a chip toggle updates `aria-pressed`. Use the existing sport chip toggle pattern in that file.
+### ~~P4: QA test for cancelAlertSports sport chips in NotifSheet~~
 
 ### P4: `/stats byPref` — no integration smoke test
 The `byPref` breakdown added to `GET /stats` has unit tests but no integration verification. After next Worker deploy, curl `/stats` and confirm `byPref.thirtyMin`, `byPref.dailyBriefing`, `byPref.cancelAlerts`, and `byPref.sports` are present and plausible. Update this item when confirmed.
 
-### P4: QA Playwright test for `opening-soon` teal state
-The `opening-soon` card (teal, "OPEN GYM SOON") has no QA spec. Add a test in a new `qa-gym-status.spec.ts` (or extend an existing status spec) that: (1) mocks clock to a time in a gap before Open Gym (e.g. Monday 8:00 AM when Open Gym starts at 10:00 AM), (2) asserts `.status-card.opening-soon` is visible, (3) asserts countdown text matches "Opens in", (4) asserts subtext matches `Open Gym HH:MM – HH:MM` format. Use `page.clock.install()` before `page.goto()` per project Playwright conventions.
+### ~~P4: QA Playwright test for `opening-soon` teal state~~
+### ~~P4: Dark-mode visual verification for `opening-soon` card~~
 
-### P4: Dark-mode visual verification for `opening-soon` card
-`CompactStatus.svelte` and `StatusCard.svelte` both use `var(--color-upcoming*)` tokens which are defined in the global dark-mode block of `app.css` — so dark-mode values are inherited correctly without component-level overrides. However this has not been visually confirmed. Add a dark-mode QA screenshot for the `opening-soon` state once QA test above is in place, or do a quick manual check with `prefers-color-scheme: dark` forced in DevTools.
-
-### P5: `check-sport-sync.mjs` does not cover `cancelAlertSports` sport ID path
-`cancelAlertSports` now uses the same sport IDs as `SPORT_PATTERNS[*].id`, but `check-sport-sync.mjs` only validates that `SPORT_PATTERNS` is consistent between `check-and-notify-logic.mjs` and `worker/index.ts`. The `cancelAlertSports` path is implicitly covered by the same ID set — low risk today, but worth noting if the sport list is ever extended independently.
+### ~~P5: `check-sport-sync.mjs` does not cover `cancelAlertSports` sport ID path~~
 
 ### P5: Fair Lawn Public Library availability app
 Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:

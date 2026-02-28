@@ -1833,3 +1833,32 @@ describe('cancelAlerts sport filtering — slot-freed integration', () => {
     expect(mockFetch.mock.calls.filter(([u]: [string]) => u === 'https://push.example.com/vball').length).toBe(0);
   });
 });
+
+// ─── isSubscriberAllowed — cancelAlerts unit tests ────────────────────────────
+
+describe('isSubscriberAllowed — cancelAlerts', () => {
+  it('cancelAlerts=true, cancelAlertSports=[], sportId=basketball → true (all-sports mode when list empty)', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: [] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(true);
+  });
+
+  it('cancelAlerts=true, cancelAlertSports=[basketball], sportId=basketball → true', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(true);
+  });
+
+  it('cancelAlerts=true, cancelAlertSports=[basketball], sportId=volleyball → false', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'volleyball' })).toBe(false);
+  });
+
+  it('cancelAlerts=true, cancelAlertSports=[basketball], sportId=undefined → true (unrecognized/no sport)', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(true);
+  });
+
+  it('cancelAlerts=false, cancelAlertSports=[basketball], sportId=basketball → false', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: false, cancelAlertSports: ['basketball'] }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', { sportId: 'basketball' })).toBe(false);
+  });
+});

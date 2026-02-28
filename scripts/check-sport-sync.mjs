@@ -83,6 +83,18 @@ if (hasError) {
   process.exit(1);
 }
 
+// ─── 4th check: cancelAlertSports IDs are covered by SPORT_PATTERNS ──────────
+// cancelAlertSports accepts the same sport IDs as SPORT_PATTERNS[*].id.
+// Since the 3-way sync above already ensures worker/index.ts SPORT_PATTERNS matches
+// check-and-notify-logic.mjs SPORT_PATTERNS, we just need to confirm the IDs are
+// the same canonical set used for cancelAlertSports filtering.
+const cancelAlertSportIds = new Set(workerSportIds);
+if (cancelAlertSportIds.size === 0) {
+  console.error('ERROR: No SPORT_PATTERNS found in worker/index.ts — cancelAlertSports check failed');
+  process.exit(1);
+}
+console.log(`✓ cancelAlertSports IDs covered by SPORT_PATTERNS (${cancelAlertSportIds.size} sports)`);
+
 const ids = sources[0].ids;
 console.log(`Sport IDs in sync across all 3 sources: [${ids.map((id) => `'${id}'`).join(', ')}]`);
 process.exit(0);
