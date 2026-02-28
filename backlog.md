@@ -490,8 +490,8 @@ Added staleness guard in `scripts/check-and-notify.mjs`: if `generatedAt` is old
 ### P3: cancelAlertSports end-to-end device verification
 The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. Verify: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Follow the same device-receipt checklist used for the 30-min pipeline.
 
-### P3: Gym status display — misleading color and missing open time
-GitHub issue #35. Two UX problems: (1) Status card turns green and shows "Starts in Xh Xm" when Open Gym is *upcoming* but the gym is not yet open — green implies open now. (2) Countdown shows "Opens in 2h 15m" without the actual clock time; users must do mental math. Proposed fix: distinguish open-now (solid green) from opening-soon (softer/outlined), and show both countdown and time ("Opens in 2h · at 10:00 AM"). **UX agent review recommended before implementing.** Related file: `src/lib/StatusCard.svelte`.
+### ~~P3: Gym status display — misleading color and missing open time~~
+Added `'opening-soon'` to `GymStatus` type. Gap before Open Gym now shows teal card ("OPEN GYM SOON") instead of green ("GYM AVAILABLE"). Countdown simplified to "Opens in X"; subtext shows full session window "Open Gym START – END". UX agent reviewed both layout options (A: split by size, B: full window in subtext) — Option B shipped. 284 tests pass. Deployed 2026-02-28.
 
 ### P4: QA test for cancelAlertSports sport chips in NotifSheet
 The cancel-sport chips row (rendered below the cancelAlerts toggle when `cancelAlerts=true`) has no QA spec. Add a test in `qa-notif-sheet.spec.ts` that enables cancelAlerts, verifies chips render, and confirms a chip toggle updates `aria-pressed`. Use the existing sport chip toggle pattern in that file.
@@ -501,6 +501,15 @@ The `byPref` breakdown added to `GET /stats` has unit tests but no integration v
 
 ### P5: `check-sport-sync.mjs` does not cover `cancelAlertSports` sport ID path
 `cancelAlertSports` now uses the same sport IDs as `SPORT_PATTERNS[*].id`, but `check-sport-sync.mjs` only validates that `SPORT_PATTERNS` is consistent between `check-and-notify-logic.mjs` and `worker/index.ts`. The `cancelAlertSports` path is implicitly covered by the same ID set — low risk today, but worth noting if the sport list is ever extended independently.
+
+### P4: QA Playwright test for `opening-soon` teal state
+The `opening-soon` card (teal, "OPEN GYM SOON") has no QA spec. Add a test in a new `qa-gym-status.spec.ts` (or extend an existing status spec) that: (1) mocks clock to a time in a gap before Open Gym (e.g. Monday 8:00 AM when Open Gym starts at 10:00 AM), (2) asserts `.status-card.opening-soon` is visible, (3) asserts countdown text matches "Opens in", (4) asserts subtext matches `Open Gym HH:MM – HH:MM` format. Use `page.clock.install()` before `page.goto()` per project Playwright conventions.
+
+### P4: Dark-mode visual verification for `opening-soon` card
+`CompactStatus.svelte` and `StatusCard.svelte` both use `var(--color-upcoming*)` tokens which are defined in the global dark-mode block of `app.css` — so dark-mode values are inherited correctly without component-level overrides. However this has not been visually confirmed. Add a dark-mode QA screenshot for the `opening-soon` state once QA test above is in place, or do a quick manual check with `prefers-color-scheme: dark` forced in DevTools.
+
+### P3: Stale local branches — review and delete
+Three local branches exist that appear to be fully merged or superseded: `feat/dry-run-notifications`, `feat/sport-status-banner`, `fix/notif-sheet-aria-keyrepeat-truncation`. Confirm each is merged into main (all their commits appear in `git log main`) then delete with `git branch -d`. Keeps local branch list clean.
 
 ---
 
