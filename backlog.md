@@ -5,10 +5,16 @@
 ### P3: cancelAlertSports end-to-end device verification
 The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. **Logic is now unit-tested** (`worker/index.test.ts` — `describe('isSubscriberAllowed — cancelAlerts', ...)`, 5 cases covering all-sports mode, per-sport allow/deny, undefined sportId, and cancelAlerts=false guard). Remaining manual steps: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Real-device receipt is outside CI scope.
 
-### P3: Stale local branches — review and delete
-`fix/notif-sheet-aria-keyrepeat-truncation` deleted (was 0 commits ahead of main). `feat/dry-run-notifications` and `feat/sport-status-banner` retain unmerged commits — do NOT delete.
+### P3: Stale local branches — decide and clean up
+`fix/notif-sheet-aria-keyrepeat-truncation` deleted (was 0 commits ahead of main). Two branches remain with unmerged work:
+- `feat/dry-run-notifications` (4 commits ahead): dry-run observability log + `isSubscriberAllowed` helper + midnight-safety audit. Some of this work may already be subsumed by what landed in main.
+- `feat/sport-status-banner` (1 commit ahead): sport status banner — this feature is already live on main; the branch commit may be an artefact. Verify with `git log feat/sport-status-banner ^main` and delete if no net-new content.
+Action: diff each branch against main, cherry-pick any useful commits, then delete. Do NOT force-delete without reviewing.
 
 ### ~~P4: QA test for cancelAlertSports sport chips in NotifSheet~~
+
+### P3: Stale agent worktrees — prune
+`git branch -v` shows 9 `worktree-agent-*` branches still referenced locally (all 55–73 commits behind main). These are leftover from past agent work sessions. Run `git worktree prune && git branch -d worktree-agent-*` (verify each is fully behind main first). Harmless but clutters branch listings and could confuse future git operations.
 
 ### P4: `/stats byPref` — no integration smoke test
 The `byPref` breakdown added to `GET /stats` has unit tests but no integration verification. After next Worker deploy, curl `/stats` and confirm `byPref.thirtyMin`, `byPref.dailyBriefing`, `byPref.cancelAlerts`, and `byPref.sports` are present and plausible. Update this item when confirmed.
@@ -17,6 +23,9 @@ The `byPref` breakdown added to `GET /stats` has unit tests but no integration v
 ### ~~P4: Dark-mode visual verification for `opening-soon` card~~
 
 ### ~~P5: `check-sport-sync.mjs` does not cover `cancelAlertSports` sport ID path~~
+
+### P4: `midnight.spec.ts` — audit Svelte 5 `$effect` + fake-timers interaction
+`page.clock.install()` fakes `queueMicrotask`, blocking Svelte 5 `$effect` callbacks. The midnight tests currently pass because their assertions target `$derived` gym-state (responds directly to faked `new Date()`), not `$effect`-initialized component state. But if future midnight tests add assertions on any `$effect`-driven DOM (e.g. accordion expansion, notification badge state), they will silently fail. Quick audit: read `e2e/midnight.spec.ts` and confirm no assertion depends on `$effect`; add a comment documenting the constraint. See MEMORY.md for the full pattern.
 
 ### P5: Fair Lawn Public Library availability app
 Build a similar scraper + availability app for the Fair Lawn Public Library. Key open questions before starting:
