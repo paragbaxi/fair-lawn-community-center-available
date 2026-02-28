@@ -452,14 +452,36 @@ Resolved by `--dry-run` flag added in `feat/dry-run-notifications` (2026-02-28).
 
 ## Open
 
-### P3: `check-and-notify.mjs` dry-run observability — off-hours runs silently return sent=0
-When `--dry-run` is used outside gym hours, `nowMinutes` won't fall in the 20–45 min window so the Open Gym and sport-30min blocks both produce `sent: 0` — correct behavior, but the output gives no signal about whether the schedule was read or any activities were found. A dry-run off-hours is a valid "is the pipeline wired up?" check, but the logs look identical to a genuine no-activity window. Consider logging the activity count from `todaySchedule` even when no slot matches, so operators can confirm the schedule was fetched correctly.
+### ~~P3: `check-and-notify.mjs` dry-run observability — off-hours runs silently return sent=0~~
+Added dry-run diagnostic log immediately after schedule parse: logs day, ISO date, activity count, and `nowMinutes` vs window bounds. Off-hours dry-runs now confirm the schedule was read even when `sent=0`. Done 2026-02-28.
 
-### P4: Worker `fanOut` — per-type dispatch could be its own function
-`fanOut` now handles three meaningfully different routing modes (sportId filter, dailyBriefingHour filter, cancelAlerts flag) via a single `allowed` branch. The options object introduced in 2026-02-28 is a good step, but long-term the function is doing three jobs. Consider extracting `isSubscriberAllowed(sub, type, opts)` as a pure helper to make each routing case independently testable without standing up a full KV mock.
+### ~~P4: Worker `fanOut` — per-type dispatch could be its own function~~
+Extracted `export function isSubscriberAllowed(sub, type, opts)` from the inline ternary in `fanOut`. 9 pure-predicate tests added (sport routing, cancelAlerts, thirtyMin, dailyBriefingHour match/mismatch/undefined); no KV mock required. 67 worker tests total. Done 2026-02-28.
 
 ### ~~P4: Test suite midnight-safety audit — other describe-scope `new Date()` calls~~
 Audited `index.test.ts`, `check-and-notify-logic.test.ts`, and `src/lib/time.test.ts`. One describe-scope `new Date(...)` found: `time.test.ts:8` (`const ref = new Date(2026, 1, 16, 0, 0, 0)`) — a static frozen fixture, not a live clock, zero runtime risk. Updated comment to clarify. All other `new Date()` calls are inside `it()`/`beforeEach()`/`beforeAll()`. Done 2026-02-28.
+
+---
+
+## Open
+
+### P2: Cron failure alerting — silent notification misses are invisible to the operator
+When `check-and-notify.mjs` throws or the Worker returns 5xx, GitHub marks the cron run red but nothing proactively alerts the operator. Subscribers silently miss notifications with no indication anything went wrong. Add an `on: failure` step to the cron workflow that creates a GitHub issue (or POSTs to a webhook) so missed notification runs surface immediately. Only item here with a real subscriber-impact SLA.
+
+### P3: `cancelAlerts` has no sport dimension — cross-sport freed-slot noise
+`cancelAlerts` is a single boolean; a Basketball-only subscriber receives freed-slot pushes for Volleyball, Swimming, and every other cancelled activity. Add an optional `cancelAlertSports: string[]` pref (empty = all sports, non-empty = intersection). `isSubscriberAllowed` already handles `sportId` for 30-min routing — the pattern is established. Requires a subscribe-UI toggle update and a `cancelAlertSports` field in `StoredSubscription`.
+
+### P3: Subscriber count observability — no way to monitor reach or churn
+The only way to see how many subscribers exist or what prefs they've chosen is to run a dry-run and read the logs. Add a `GET /admin/subscribers/count` endpoint (protected by `X-Api-Key`) returning `{ total, byType: { thirtyMin, dailyBriefing, cancelAlerts, sports: Record<string,number> } }`. Lets you verify pipeline growth and diagnose pref distribution without a full fan-out.
+
+### P4: Empty daily briefing — behavior when today has zero activities is implicit
+When `activities.length === 0` (gym closed, holiday), the daily briefing fires 0 notifications — subscribers who opted in receive nothing. Add an explicit early-exit log so the behavior is visible in cron output. Decide whether to send a "No activities today" push or stay silent, and add a test case for the empty-schedule path.
+
+### P4: `dailyBriefingHour ?? 8` default is hardcoded in two places
+The fallback `8` in `isSubscriberAllowed` and the subscribe-UI default should always agree. Extract `DEFAULT_DAILY_BRIEFING_HOUR = 8` as a named export from `worker/index.ts` and import it wherever the default is assumed, to prevent silent drift.
+
+### P4: `freed-slots.json` staleness is unchecked
+`freed-slots.json` carries a `generatedAt` timestamp used for idempotency keying, but `check-and-notify.mjs` never checks whether the file is stale (e.g., scraper hasn't run in >48h). A scraper outage followed by recovery could replay old freed-slot notifications after idempotency TTLs expire. Add a staleness guard: log a warning and skip cancelAlerts if `generatedAt` is older than 48h.
 
 ---
 
