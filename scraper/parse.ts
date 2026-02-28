@@ -2,8 +2,8 @@ import type { Activity, DaySchedule, Notice } from '../src/lib/types.js';
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-// Time range regex for patterns like "9:00 a.m. to 12:00 p.m." or "7:00 AM - 9:00 PM"
-export const TIME_RANGE_RE = /(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.))\s*(?:to|-|–)\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.))/i;
+// Time range regex for patterns like "9:00 a.m. to 12:00 p.m.", "7:00 AM - 9:00 PM", or "9a – 4:30pm"
+export const TIME_RANGE_RE = /(\d{1,2}(?::\d{2})?\s*(?:AM?|PM?|am?|pm?|a\.m?\.?|p\.m?\.?))\s*(?:to|-|–)\s*(\d{1,2}(?::\d{2})?\s*(?:AM?|PM?|am?|pm?|a\.m?\.?|p\.m?\.?))/i;
 
 export interface DayParseInfo {
   day: string;
@@ -17,9 +17,10 @@ export interface DayParseInfo {
 // Normalize time strings like "9:00 a.m.", "12:00 PM" to "H:MM AM/PM"
 export function normalizeTime(raw: string): string {
   const t = raw.trim().replace(/\./g, '').replace(/\s+/g, ' ').toUpperCase();
-  const match = t.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)/);
+  const match = t.match(/(\d{1,2}):?(\d{2})?\s*(AM?|PM?)/);
   if (match) {
-    return `${match[1]}:${match[2] || '00'} ${match[3]}`;
+    const period = match[3].length === 1 ? match[3] + 'M' : match[3]; // "A"→"AM", "P"→"PM"
+    return `${match[1]}:${match[2] || '00'} ${period}`;
   }
   return t;
 }
@@ -130,8 +131,8 @@ export function parseSchedule(
   if (openGymIdx !== -1) {
     // Day header: "Monday, February 9 - 7:00 a.m. to 5:00 p.m." or "Friday, February 13 - Gym Closed"
     const dayHeaderRe = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(\w+)\s+(\d+)\s*[-–]\s*(.*)/i;
-    // Activity: "Pickleball (Half Gym): 9:00 a.m. to 12:00 p.m."
-    const activityRe = /^(.+?):\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))\s*(?:to|-|–)\s*(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))/i;
+    // Activity: "Pickleball (Half Gym): 9:00 a.m. to 12:00 p.m." or "Basketball: 9a – 4:30pm"
+    const activityRe = /^(.+?):\s*(\d{1,2}(?::\d{2})?\s*(?:a\.?m?\.?|p\.?m?\.?))\s*(?:to|-|–)\s*(\d{1,2}(?::\d{2})?\s*(?:a\.?m?\.?|p\.?m?\.?))/i;
     // Cancelled: "Indoor Tennis: Cancelled"
     const cancelledRe = /:\s*cancell?ed/i;
 
