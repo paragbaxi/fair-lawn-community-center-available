@@ -55,7 +55,7 @@
       {#if gymState.status === 'available' && gymState.currentActivity}
         {formatCountdown(countdownMs)} left
       {:else if gymState.status === 'opening-soon'}
-        Starts in {formatCountdown(countdownMs)} · at {gymState.nextOpenGym!.start}
+        Opens in {formatCountdown(countdownMs)}
       {:else if gymState.status === 'in-use' && gymState.nextOpenGym && !gymState.nextOpenGymDay}
         Next up in {formatCountdown(countdownMs)}
       {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay && gymState.currentActivity}
@@ -73,7 +73,7 @@
   {#if gymState.status === 'available' && gymState.currentActivity}
     <p class="status-subtext">{gymState.countdownLabel}</p>
   {:else if gymState.status === 'opening-soon'}
-    <p class="status-subtext">Open Gym until {gymState.nextOpenGym!.end}</p>
+    <p class="status-subtext">Open Gym {gymState.nextOpenGym!.start} – {gymState.nextOpenGym!.end}</p>
   {:else if gymState.status === 'in-use' && gymState.nextOpenGym && gymState.nextOpenGymDay}
     <p class="status-subtext">Next Open Gym: {gymState.nextOpenGymDay} at {gymState.nextOpenGym.start}</p>
   {:else if gymState.status === 'in-use' && gymState.nextOpenGym}
