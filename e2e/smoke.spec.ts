@@ -810,6 +810,11 @@ test.describe('Corrected times badge', () => {
     await page.clock.install({ time: new Date('2026-03-02T15:30:00.000Z') });
     await page.goto('/#today?day=Saturday');
     await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
+    // page.clock.install() fakes queueMicrotask (via @sinonjs/fake-timers).
+    // Svelte 5 schedules $effect callbacks via queueMicrotask, so the expandedDays
+    // initialisation effect is queued but blocked. fastForward(1) flushes the fake
+    // microtask queue, letting the effect run and expand Monday's accordion row.
+    await page.clock.fastForward(1);
 
     // Monday is expanded by default (today=Monday, skipDay=Saturday → Monday visible & open).
     const accordionBadge = page.locator('.schedule-accordion .accordion-content .corrected-badge').first();
