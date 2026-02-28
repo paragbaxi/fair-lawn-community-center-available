@@ -32,9 +32,10 @@ export type TabId = 'status' | 'today' | 'sports';
 export interface NotifPrefs {
   thirtyMin: boolean;
   dailyBriefing: boolean;
-  sports?: string[];   // optional; defaults to [] on read; e.g. ['basketball']
-  dailyBriefingHour?: number;  // 7–10 AM ET; defaults to 8
-  cancelAlerts?: boolean;  // alert when a booked slot is removed; defaults to false
+  sports?: string[];              // optional; defaults to [] on read; e.g. ['basketball']
+  dailyBriefingHour?: number;    // 7–10 AM ET; defaults to 8
+  cancelAlerts?: boolean;        // alert when a booked slot is removed; defaults to false
+  cancelAlertSports?: string[];  // [] or undefined = all sports; non-empty = only these sports
 }
 
 // Keep types.ts pure (no logic imports) to avoid circular dependencies.

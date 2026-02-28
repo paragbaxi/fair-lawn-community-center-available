@@ -4,7 +4,9 @@
   import { cubicOut } from 'svelte/easing';
   import { getAvailableSports } from './filters.js';
   import { activityEmoji } from './emoji.js';
-  import { notifStore, handleEnable, handleDisable, savePrefs, toggleSport } from './notifStore.svelte.js';
+  import { notifStore, handleEnable, handleDisable, savePrefs, toggleSport, toggleCancelSport } from './notifStore.svelte.js';
+  // Mirror of worker DEFAULT_DAILY_BRIEFING_HOUR — Svelte can't import from worker
+  const DEFAULT_HOUR = 8;
   import type { GymState, ScheduleData } from './types.js';
 
   let { open, gymState, data, onClose, highlight = null }: {
@@ -166,6 +168,26 @@
               <span class="toggle-thumb"></span>
             </button>
           </label>
+          {#if notifStore.prefs.cancelAlerts && notifiableSports.length > 0}
+            <div class="sheet-time-row" role="group" aria-label="Cancellation alert sports">
+              <span class="sheet-time-label">
+                {(notifStore.prefs.cancelAlertSports ?? []).length === 0 ? 'All sports' : 'Sports'}
+              </span>
+              <div class="sheet-time-chips">
+                {#each notifiableSports as sport}
+                  {@const sel = (notifStore.prefs.cancelAlertSports ?? []).includes(sport.id)}
+                  <button
+                    class="time-chip"
+                    class:time-chip-selected={sel}
+                    onclick={() => toggleCancelSport(sport.id)}
+                    disabled={notifStore.loading}
+                    aria-label="{sport.label} cancellation alert"
+                    aria-pressed={sel}
+                  >{sport.label}</button>
+                {/each}
+              </div>
+            </div>
+          {/if}
           {#if notifiableSports.length > 0}
             <div class="sheet-sport-divider" aria-hidden="true"></div>
           {/if}
@@ -191,7 +213,7 @@
         <!-- Daily section -->
         <section class="sheet-section">
           <h3 class="sheet-section-title">Daily</h3>
-          <p class="sheet-section-sub">Today's schedule summary{notifStore.prefs.dailyBriefing ? ` · ${notifStore.prefs.dailyBriefingHour ?? 8} AM ET` : ''}</p>
+          <p class="sheet-section-sub">Today's schedule summary{notifStore.prefs.dailyBriefing ? ` · ${notifStore.prefs.dailyBriefingHour ?? DEFAULT_HOUR} AM ET` : ''}</p>
           <label class="sheet-toggle-row">
             ☀️ Morning briefing
             <button
@@ -215,7 +237,7 @@
                 onkeydown={(e) => {
                   if (e.repeat) return;
                   const hours = [7, 8, 9, 10];
-                  const cur = notifStore.prefs.dailyBriefingHour ?? 8;
+                  const cur = notifStore.prefs.dailyBriefingHour ?? DEFAULT_HOUR;
                   const idx = hours.indexOf(cur);
                   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                     e.preventDefault();
@@ -229,7 +251,7 @@
                 }}
               >
                 {#each [7, 8, 9, 10] as hour}
-                  {@const selected = (notifStore.prefs.dailyBriefingHour ?? 8) === hour}
+                  {@const selected = (notifStore.prefs.dailyBriefingHour ?? DEFAULT_HOUR) === hour}
                   <button
                     class="time-chip"
                     class:time-chip-selected={selected}

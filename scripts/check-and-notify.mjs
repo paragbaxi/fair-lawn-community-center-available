@@ -70,6 +70,7 @@ const nowMinutes = etHour * 60 + etMinute;
 
 const GYM_OPEN_HOUR = 8;   // 8 AM ET
 const GYM_CLOSE_HOUR = 22; // 10 PM ET
+const FREED_SLOTS_MAX_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 // In dry-run, bypass the time gate so the pipeline can be tested at any hour.
 // Note: off-hours dry-runs will still return sent=0 because nowMinutes won't
@@ -174,6 +175,14 @@ if (existsSync(freedSlotsPath)) {
   } catch (err) {
     console.error('[check-and-notify] Failed to parse freed-slots.json (skipping):', err);
     freedSlotsData = null;
+  }
+
+  if (freedSlotsData && freedSlotsData.generatedAt) {
+    const age = Date.now() - new Date(freedSlotsData.generatedAt).getTime();
+    if (age > FREED_SLOTS_MAX_AGE_MS) {
+      console.warn(`[check-and-notify] freed-slots.json is stale (${Math.round(age / 3600000)}h old), skipping cancelAlerts.`);
+      freedSlotsData = null;
+    }
   }
 
   if (freedSlotsData && Array.isArray(freedSlotsData.slots) && freedSlotsData.slots.length > 0) {
