@@ -30,6 +30,11 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
+// ─── Dry-run flag ─────────────────────────────────────────────────────────────
+
+const DRY_RUN = process.argv.includes('--dry-run');
+if (DRY_RUN) console.log('[check-and-notify] Dry-run mode — no notifications will be sent.');
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
@@ -66,7 +71,10 @@ const nowMinutes = etHour * 60 + etMinute;
 const GYM_OPEN_HOUR = 8;   // 8 AM ET
 const GYM_CLOSE_HOUR = 22; // 10 PM ET
 
-if (etHour < GYM_OPEN_HOUR || etHour >= GYM_CLOSE_HOUR) {
+// In dry-run, bypass the time gate so the pipeline can be tested at any hour.
+// Note: off-hours dry-runs will still return sent=0 because nowMinutes won't
+// match any activity in the 20–45 min window — the run completes normally.
+if (!DRY_RUN && (etHour < GYM_OPEN_HOUR || etHour >= GYM_CLOSE_HOUR)) {
   console.log(`[check-and-notify] Outside 8 AM–10 PM ET window (${etHour}:${String(etMinute).padStart(2, '0')} ET), skipping all notifications.`);
   process.exit(0);
 }
@@ -90,6 +98,13 @@ try {
 const todaySchedule = scheduleData.schedule?.[dayName];
 const activities = todaySchedule?.activities ?? [];
 
+// Dry-run diagnostic: confirm the schedule was read and show activity count.
+// Off-hours runs will still show sent=0 because nowMinutes won't be in the window.
+if (DRY_RUN) {
+  const isoDate = `${etPart('year')}-${etPart('month')}-${etPart('day')}`;
+  console.log(`[check-and-notify] dry-run: ${dayName} ${isoDate} — ${activities.length} activities found, nowMinutes=${nowMinutes} (window: +${THIRTY_MIN_WINDOW_MIN}–${THIRTY_MIN_WINDOW_MAX} min)`);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function postNotify(body) {
@@ -99,7 +114,7 @@ async function postNotify(body) {
       'Content-Type': 'application/json',
       'X-Api-Key': API_KEY,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, dryRun: DRY_RUN }),
   });
   if (!res.ok) {
     throw new Error(`Worker /notify returned ${res.status}: ${await res.text()}`);

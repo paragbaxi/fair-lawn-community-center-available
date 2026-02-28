@@ -5,7 +5,7 @@ import type { ScheduleData, DaySchedule, Activity } from './types.js';
 // --- parseTime ---
 
 describe('parseTime', () => {
-  const ref = new Date(2026, 1, 16, 0, 0, 0); // Feb 16, 2026 midnight
+  const ref = new Date(2026, 1, 16, 0, 0, 0); // frozen fixture — not a live clock, safe at describe scope
 
   it('parses AM times', () => {
     const result = parseTime('9:00 AM', ref);

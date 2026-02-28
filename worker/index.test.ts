@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import worker, { buildSlotFreedBody } from './index.js';
+import worker, { buildSlotFreedBody, isSubscriberAllowed } from './index.js';
 
 // ─── Mock @block65/webcrypto-web-push ─────────────────────────────────────────
 
@@ -1450,6 +1450,146 @@ describe('slot-freed', () => {
   });
 });
 
+// ─── dryRun ───────────────────────────────────────────────────────────────────
+
+describe('dryRun', () => {
+  // sportBody is fully static (no dates) — safe at describe scope
+  const sportBody = {
+    type: 'sport-30min',
+    sportId: 'basketball',
+    sportLabel: 'Basketball',
+    activities: [{ start: '2:00 PM', end: '4:00 PM', dayName: 'Monday' }],
+  };
+
+  let isoDate: string;
+  let idKey: string;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    isoDate = new Date().toISOString().slice(0, 10);
+    idKey = `idempotent:${isoDate}:Monday:sport-basketball`;
+  });
+
+  it('sport-30min dry-run: counts matching subscriber without sending push', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['basketball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ ...sportBody, dryRun: true });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(1);
+    expect(mockFetch.mock.calls.length).toBe(0);
+  });
+
+  it('sport-30min dry-run: does not write idempotency key', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['basketball'] }),
+    });
+    const env = makeEnv(kv);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+
+    const req = notifyRequest({ ...sportBody, dryRun: true });
+    await worker.fetch(req, env as never);
+
+    expect(await kv.get(idKey)).toBeNull();
+  });
+
+  it('sport-30min dry-run then real: dry does not consume idempotency; real run fires normally', async () => {
+    // Single shared KV so state carries across both calls
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['basketball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    // Dry-run: no key written, no push
+    const dryReq = notifyRequest({ ...sportBody, dryRun: true });
+    await worker.fetch(dryReq, env as never);
+    expect(await kv.get(idKey)).toBeNull();
+    expect(mockFetch.mock.calls.length).toBe(0);
+
+    // Real run: key written, push sent
+    const realReq = notifyRequest({ ...sportBody });
+    const realRes = await worker.fetch(realReq, env as never);
+    const realData = await realRes.json() as { result: { sent: number } };
+    expect(realData.result.sent).toBe(1);
+    expect(await kv.get(idKey)).toBe('1');
+    expect(mockFetch.mock.calls.length).toBe(1);
+  });
+
+  it('sport-30min dry-run with no matching subscriber: sent=0, no push, no idempotency key', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['volleyball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ ...sportBody, dryRun: true });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { result: { sent: number } };
+
+    expect(data.result.sent).toBe(0);
+    expect(mockFetch.mock.calls.length).toBe(0);
+    expect(await kv.get(idKey)).toBeNull();
+  });
+
+  it('slot-freed dry-run: no push sent and no slot-freed idempotency key written', async () => {
+    const kv = createKVMock({
+      'sub-cancel': makeSub({ endpoint: 'https://push.example.com/cancel', cancelAlerts: true }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'slot-freed',
+      slots: [{ day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' }],
+      dryRun: true,
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number } };
+
+    expect(res.status).toBe(200);
+    expect(mockFetch.mock.calls.length).toBe(0);
+    const { keys } = await kv.list({});
+    expect(keys.some(k => k.name.startsWith('idempotent:slot-freed:'))).toBe(false);
+  });
+
+  it('30min open-gym dry-run: counts matching subscriber without sending push', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', thirtyMin: true }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: '30min',
+      activities: [{ start: '9:00 AM', end: '11:00 AM', dayName: 'Monday' }],
+      dryRun: true,
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; results: Array<{ sent: number }> };
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.results[0].sent).toBe(1);
+    expect(mockFetch.mock.calls.length).toBe(0);
+
+    // Idempotency key must not be written
+    const openGymIdKey = `idempotent:${isoDate}:Monday:9:00 AM:30min`;
+    expect(await kv.get(openGymIdKey)).toBeNull();
+  });
+});
+
 // ─── buildSlotFreedBody unit tests ───────────────────────────────────────────
 
 describe('buildSlotFreedBody', () => {
@@ -1475,5 +1615,54 @@ describe('buildSlotFreedBody', () => {
       { day: 'Tuesday', startTime: '3:00 PM', endTime: '5:00 PM', activity: 'Volleyball' },
     ]);
     expect(result).toBe("2 sessions removed from this week's schedule");
+  });
+});
+
+// ─── isSubscriberAllowed unit tests ──────────────────────────────────────────
+
+describe('isSubscriberAllowed', () => {
+  it('sport route: allows sub whose sports array includes the sportId', () => {
+    const sub = JSON.parse(makeSub({ sports: ['basketball', 'volleyball'] }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', { sportId: 'basketball' })).toBe(true);
+  });
+
+  it('sport route: blocks sub whose sports array does not include the sportId', () => {
+    const sub = JSON.parse(makeSub({ sports: ['volleyball'] }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', { sportId: 'basketball' })).toBe(false);
+  });
+
+  it('cancelAlerts route: allows sub with cancelAlerts=true', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(true);
+  });
+
+  it('cancelAlerts route: blocks sub with cancelAlerts=false', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: false }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(false);
+  });
+
+  it('thirtyMin route: allows sub with thirtyMin=true', () => {
+    const sub = JSON.parse(makeSub({ thirtyMin: true }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', {})).toBe(true);
+  });
+
+  it('thirtyMin route: blocks sub with thirtyMin=false', () => {
+    const sub = JSON.parse(makeSub({ thirtyMin: false }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', {})).toBe(false);
+  });
+
+  it('dailyBriefing: allows sub when etHour matches dailyBriefingHour', () => {
+    const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
+    expect(isSubscriberAllowed(sub, 'dailyBriefing', { etHour: 9 })).toBe(true);
+  });
+
+  it('dailyBriefing: blocks sub when etHour does not match dailyBriefingHour', () => {
+    const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
+    expect(isSubscriberAllowed(sub, 'dailyBriefing', { etHour: 8 })).toBe(false);
+  });
+
+  it('dailyBriefing: allows sub when etHour is undefined (any hour)', () => {
+    const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
+    expect(isSubscriberAllowed(sub, 'dailyBriefing', {})).toBe(true);
   });
 });

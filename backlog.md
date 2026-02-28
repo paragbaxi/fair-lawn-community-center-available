@@ -445,8 +445,21 @@ Investigated 2026-02-26. The claimed 30-minute fire gap does not exist. `*/30 12
 
 ## Open
 
-### P3: Pipeline verification sends fake notifications to real subscribers
-The 2026-02-26 curl test (`POST /notify type=30min`) sent to 3 real subscribers with `sent: 3` — those users received a fake "Open Gym in ~30 min" notification. Future verification should use a dedicated test subscriber (subscribe via an incognito tab, note that subscription's endpoint, then either: (a) target it directly via a Worker admin endpoint, or (b) ensure all other subscribers have the relevant pref turned off before testing). Alternatively, add a `dryRun: true` flag to `/notify` that logs fanOut results without actually pushing.
+### ~~P3: Pipeline verification sends fake notifications to real subscribers~~
+Resolved by `--dry-run` flag added in `feat/dry-run-notifications` (2026-02-28). `POST /notify` with `dryRun: true` counts matching subscribers without pushing; `check-and-notify.mjs --dry-run` bypasses the time gate and passes the flag through to the Worker. Safe to run at any hour.
+
+---
+
+## Open
+
+### P3: `check-and-notify.mjs` dry-run observability — off-hours runs silently return sent=0
+When `--dry-run` is used outside gym hours, `nowMinutes` won't fall in the 20–45 min window so the Open Gym and sport-30min blocks both produce `sent: 0` — correct behavior, but the output gives no signal about whether the schedule was read or any activities were found. A dry-run off-hours is a valid "is the pipeline wired up?" check, but the logs look identical to a genuine no-activity window. Consider logging the activity count from `todaySchedule` even when no slot matches, so operators can confirm the schedule was fetched correctly.
+
+### P4: Worker `fanOut` — per-type dispatch could be its own function
+`fanOut` now handles three meaningfully different routing modes (sportId filter, dailyBriefingHour filter, cancelAlerts flag) via a single `allowed` branch. The options object introduced in 2026-02-28 is a good step, but long-term the function is doing three jobs. Consider extracting `isSubscriberAllowed(sub, type, opts)` as a pure helper to make each routing case independently testable without standing up a full KV mock.
+
+### ~~P4: Test suite midnight-safety audit — other describe-scope `new Date()` calls~~
+Audited `index.test.ts`, `check-and-notify-logic.test.ts`, and `src/lib/time.test.ts`. One describe-scope `new Date(...)` found: `time.test.ts:8` (`const ref = new Date(2026, 1, 16, 0, 0, 0)`) — a static frozen fixture, not a live clock, zero runtime risk. Updated comment to clarify. All other `new Date()` calls are inside `it()`/`beforeEach()`/`beforeAll()`. Done 2026-02-28.
 
 ---
 
