@@ -30,6 +30,11 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
+// ─── Dry-run flag ─────────────────────────────────────────────────────────────
+
+const DRY_RUN = process.argv.includes('--dry-run');
+if (DRY_RUN) console.log('[check-and-notify] Dry-run mode — no notifications will be sent.');
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL;
@@ -66,7 +71,7 @@ const nowMinutes = etHour * 60 + etMinute;
 const GYM_OPEN_HOUR = 8;   // 8 AM ET
 const GYM_CLOSE_HOUR = 22; // 10 PM ET
 
-if (etHour < GYM_OPEN_HOUR || etHour >= GYM_CLOSE_HOUR) {
+if (!DRY_RUN && (etHour < GYM_OPEN_HOUR || etHour >= GYM_CLOSE_HOUR)) {
   console.log(`[check-and-notify] Outside 8 AM–10 PM ET window (${etHour}:${String(etMinute).padStart(2, '0')} ET), skipping all notifications.`);
   process.exit(0);
 }
@@ -99,7 +104,7 @@ async function postNotify(body) {
       'Content-Type': 'application/json',
       'X-Api-Key': API_KEY,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, dryRun: DRY_RUN }),
   });
   if (!res.ok) {
     throw new Error(`Worker /notify returned ${res.status}: ${await res.text()}`);

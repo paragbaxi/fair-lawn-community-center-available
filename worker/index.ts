@@ -176,13 +176,18 @@ async function fanOut(
   sportId?: string,
   etHour?: number,
   idempotencyTtl = 7200,
+  dryRun = false,
 ): Promise<{ sent: number; skipped: number; cleaned: number; failed: number }> {
-  // Idempotency check
-  const existing = await env.SUBSCRIPTIONS.get(idempotencyKeyStr);
-  if (existing) return { sent: 0, skipped: 0, cleaned: 0, failed: 0 };
+  // Dry-run skips idempotency read + write so real runs are never blocked by a
+  // dry-run and dry-run always reports current subscriber count regardless of
+  // whether a real run has already fired today.
+  if (!dryRun) {
+    const existing = await env.SUBSCRIPTIONS.get(idempotencyKeyStr);
+    if (existing) return { sent: 0, skipped: 0, cleaned: 0, failed: 0 };
 
-  // Write idempotency key before sending
-  await env.SUBSCRIPTIONS.put(idempotencyKeyStr, '1', { expirationTtl: idempotencyTtl });
+    // Write idempotency key before sending
+    await env.SUBSCRIPTIONS.put(idempotencyKeyStr, '1', { expirationTtl: idempotencyTtl });
+  }
 
   const vapidKeys = getVapidKeys(env);
   let cursor: string | undefined;
@@ -220,6 +225,9 @@ async function fanOut(
           skipped++;
           return;
         }
+
+        // In dry-run: count matching subscribers without making any push calls
+        if (dryRun) { sent++; return; }
 
         const pushSub: PushSubscription = {
           endpoint: sub.endpoint,
@@ -360,7 +368,9 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     sportLabel?: string;
     slots?: FreedSlot[];
     generatedAt?: string;
+    dryRun?: boolean;
   };
+  const dryRun = body.dryRun === true;
 
   const headerKey = request.headers.get('X-Api-Key') ?? '';
   if (headerKey !== env.NOTIFY_API_KEY && body.apiKey !== env.NOTIFY_API_KEY) {
@@ -383,7 +393,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     };
     const idKey = `idempotent:${isoDate}:${act.dayName}:sport-${body.sportId}`;
     // 'thirtyMin' is unused when sportId is provided — fanOut branches on sportId presence
-    const result = await fanOut(env, notifData, 'thirtyMin', idKey, body.sportId);
+    const result = await fanOut(env, notifData, 'thirtyMin', idKey, body.sportId, undefined, 7200, dryRun);
     return json({ ok: true, result });
   }
 
@@ -406,7 +416,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     // scraper's daily cycle.
     const scope = (typeof body.generatedAt === 'string' && body.generatedAt) ? body.generatedAt : isoDate;
     const idKey = `idempotent:slot-freed:${scope}:${slots.map(s => `${s.day}|${s.startTime}|${s.activity}`).join(',')}`;
-    const result = await fanOut(env, notifData, 'cancelAlerts', idKey, undefined, undefined, 172800);
+    const result = await fanOut(env, notifData, 'cancelAlerts', idKey, undefined, undefined, 172800, dryRun);
     return json({ ok: true, result });
   }
 
@@ -429,7 +439,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     };
 
     const idKey = idempotencyKey(isoDate, act.dayName, act.start, '30min');
-    const result = await fanOut(env, notifData, 'thirtyMin', idKey);
+    const result = await fanOut(env, notifData, 'thirtyMin', idKey, undefined, undefined, 7200, dryRun);
     results.push(result);
   }
 

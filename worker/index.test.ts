@@ -1450,6 +1450,117 @@ describe('slot-freed', () => {
   });
 });
 
+// ─── dryRun ───────────────────────────────────────────────────────────────────
+
+describe('dryRun', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  // Shared fixtures for sport-30min dry-run tests
+  const sportBody = {
+    type: 'sport-30min',
+    sportId: 'basketball',
+    sportLabel: 'Basketball',
+    activities: [{ start: '2:00 PM', end: '4:00 PM', dayName: 'Monday' }],
+  };
+  const isoDate = new Date().toISOString().slice(0, 10);
+  const idKey = `idempotent:${isoDate}:Monday:sport-basketball`;
+
+  it('sport-30min dry-run: counts matching subscriber without sending push', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['basketball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ ...sportBody, dryRun: true });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number } };
+
+    expect(res.status).toBe(200);
+    expect(data.result.sent).toBe(1);
+    expect(mockFetch.mock.calls.length).toBe(0);
+  });
+
+  it('sport-30min dry-run: does not write idempotency key', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['basketball'] }),
+    });
+    const env = makeEnv(kv);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+
+    const req = notifyRequest({ ...sportBody, dryRun: true });
+    await worker.fetch(req, env as never);
+
+    expect(await kv.get(idKey)).toBeNull();
+  });
+
+  it('sport-30min dry-run then real: dry does not consume idempotency; real run fires normally', async () => {
+    // Single shared KV so state carries across both calls
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['basketball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    // Dry-run: no key written, no push
+    const dryReq = notifyRequest({ ...sportBody, dryRun: true });
+    await worker.fetch(dryReq, env as never);
+    expect(await kv.get(idKey)).toBeNull();
+    expect(mockFetch.mock.calls.length).toBe(0);
+
+    // Real run: key written, push sent
+    const realReq = notifyRequest({ ...sportBody });
+    const realRes = await worker.fetch(realReq, env as never);
+    const realData = await realRes.json() as { result: { sent: number } };
+    expect(realData.result.sent).toBe(1);
+    expect(await kv.get(idKey)).toBe('1');
+    expect(mockFetch.mock.calls.length).toBe(1);
+  });
+
+  it('sport-30min dry-run with no matching subscriber: sent=0, no push, no idempotency key', async () => {
+    const kv = createKVMock({
+      'sub-1': makeSub({ endpoint: 'https://push.example.com/sub1', sports: ['volleyball'] }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({ ...sportBody, dryRun: true });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { result: { sent: number } };
+
+    expect(data.result.sent).toBe(0);
+    expect(mockFetch.mock.calls.length).toBe(0);
+    expect(await kv.get(idKey)).toBeNull();
+  });
+
+  it('slot-freed dry-run: no push sent and no slot-freed idempotency key written', async () => {
+    const kv = createKVMock({
+      'sub-cancel': makeSub({ endpoint: 'https://push.example.com/cancel', cancelAlerts: true }),
+    });
+    const env = makeEnv(kv);
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    global.fetch = mockFetch;
+
+    const req = notifyRequest({
+      type: 'slot-freed',
+      slots: [{ day: 'Monday', startTime: '2:00 PM', endTime: '4:00 PM', activity: 'Basketball' }],
+      dryRun: true,
+    });
+    const res = await worker.fetch(req, env as never);
+    const data = await res.json() as { ok: boolean; result: { sent: number } };
+
+    expect(res.status).toBe(200);
+    expect(mockFetch.mock.calls.length).toBe(0);
+    const { keys } = await kv.list({});
+    expect(keys.some(k => k.name.startsWith('idempotent:slot-freed:'))).toBe(false);
+  });
+});
+
 // ─── buildSlotFreedBody unit tests ───────────────────────────────────────────
 
 describe('buildSlotFreedBody', () => {
