@@ -465,23 +465,42 @@ Audited `index.test.ts`, `check-and-notify-logic.test.ts`, and `src/lib/time.tes
 
 ## Open
 
-### P2: Cron failure alerting — silent notification misses are invisible to the operator
-When `check-and-notify.mjs` throws or the Worker returns 5xx, GitHub marks the cron run red but nothing proactively alerts the operator. Subscribers silently miss notifications with no indication anything went wrong. Add an `on: failure` step to the cron workflow that creates a GitHub issue (or POSTs to a webhook) so missed notification runs surface immediately. Only item here with a real subscriber-impact SLA.
+### ~~P2: Cron failure alerting — silent notification misses are invisible to the operator~~
+Added `issues: write` permission and an `on: failure` step to `.github/workflows/push-notify.yml` that calls `gh issue create` with title "Push notify cron failed — [date]" and a link to the run URL. Done in PR #36, 2026-02-28.
 
-### P3: `cancelAlerts` has no sport dimension — cross-sport freed-slot noise
-`cancelAlerts` is a single boolean; a Basketball-only subscriber receives freed-slot pushes for Volleyball, Swimming, and every other cancelled activity. Add an optional `cancelAlertSports: string[]` pref (empty = all sports, non-empty = intersection). `isSubscriberAllowed` already handles `sportId` for 30-min routing — the pattern is established. Requires a subscribe-UI toggle update and a `cancelAlertSports` field in `StoredSubscription`.
+### ~~P3: `cancelAlerts` has no sport dimension — cross-sport freed-slot noise~~
+Added `cancelAlertSports?: string[]` to `NotifPrefs` (types.ts + worker). `isSubscriberAllowed` cancelAlerts branch now intersects the subscriber's `cancelAlertSports` list with the freed slot's sport. Slot-freed handler rewritten to fan-out once per sport group (not one blast for all slots). UI shows sport chips below the cancelAlerts toggle. Done in PR #36, 2026-02-28.
 
-### P3: Subscriber count observability — no way to monitor reach or churn
-The only way to see how many subscribers exist or what prefs they've chosen is to run a dry-run and read the logs. Add a `GET /admin/subscribers/count` endpoint (protected by `X-Api-Key`) returning `{ total, byType: { thirtyMin, dailyBriefing, cancelAlerts, sports: Record<string,number> } }`. Lets you verify pipeline growth and diagnose pref distribution without a full fan-out.
+### ~~P3: Subscriber count observability — no way to monitor reach or churn~~
+Extended `GET /stats` to return `byPref: { thirtyMin, dailyBriefing, cancelAlerts, sports }` counts alongside existing `subscribers` and `idempotencyKeys`. KV reads parallelized via `Promise.all`. Done in PR #36, 2026-02-28.
 
-### P4: Empty daily briefing — behavior when today has zero activities is implicit
-When `activities.length === 0` (gym closed, holiday), the daily briefing fires 0 notifications — subscribers who opted in receive nothing. Add an explicit early-exit log so the behavior is visible in cron output. Decide whether to send a "No activities today" push or stay silent, and add a test case for the empty-schedule path.
+### ~~P4: Empty daily briefing — behavior when today has zero activities is implicit~~
+Test "skips daily briefing when no activities are scheduled today" already existed at `worker/index.test.ts:417` (added in a prior PR). Worker logs "Daily briefing: no activities for {day}, skipping" and returns `{ sent: 0 }`. Behavior confirmed correct — no action needed.
 
-### P4: `dailyBriefingHour ?? 8` default is hardcoded in two places
-The fallback `8` in `isSubscriberAllowed` and the subscribe-UI default should always agree. Extract `DEFAULT_DAILY_BRIEFING_HOUR = 8` as a named export from `worker/index.ts` and import it wherever the default is assumed, to prevent silent drift.
+### ~~P4: `dailyBriefingHour ?? 8` default is hardcoded in two places~~
+Extracted `export const DEFAULT_DAILY_BRIEFING_HOUR = 8` from `worker/index.ts`. All `?? 8` occurrences in the worker and test helper now reference the constant. `NotifSheet.svelte` uses a co-located `const DEFAULT_HOUR = 8` (Svelte can't import from the worker) with a comment pointing to the source. Done in PR #36, 2026-02-28.
 
-### P4: `freed-slots.json` staleness is unchecked
-`freed-slots.json` carries a `generatedAt` timestamp used for idempotency keying, but `check-and-notify.mjs` never checks whether the file is stale (e.g., scraper hasn't run in >48h). A scraper outage followed by recovery could replay old freed-slot notifications after idempotency TTLs expire. Add a staleness guard: log a warning and skip cancelAlerts if `generatedAt` is older than 48h.
+### ~~P4: `freed-slots.json` staleness is unchecked~~
+Added staleness guard in `scripts/check-and-notify.mjs`: if `generatedAt` is older than 48h, logs a warning and skips the cancelAlerts post. `FREED_SLOTS_MAX_AGE_MS` constant moved to top-level config section. Done in PR #36, 2026-02-28.
+
+---
+
+## Open
+
+### P3: cancelAlertSports end-to-end device verification
+The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. Verify: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Follow the same device-receipt checklist used for the 30-min pipeline.
+
+### P3: Gym status display — misleading color and missing open time
+GitHub issue #35. Two UX problems: (1) Status card turns green and shows "Starts in Xh Xm" when Open Gym is *upcoming* but the gym is not yet open — green implies open now. (2) Countdown shows "Opens in 2h 15m" without the actual clock time; users must do mental math. Proposed fix: distinguish open-now (solid green) from opening-soon (softer/outlined), and show both countdown and time ("Opens in 2h · at 10:00 AM"). **UX agent review recommended before implementing.** Related file: `src/lib/StatusCard.svelte`.
+
+### P4: QA test for cancelAlertSports sport chips in NotifSheet
+The cancel-sport chips row (rendered below the cancelAlerts toggle when `cancelAlerts=true`) has no QA spec. Add a test in `qa-notif-sheet.spec.ts` that enables cancelAlerts, verifies chips render, and confirms a chip toggle updates `aria-pressed`. Use the existing sport chip toggle pattern in that file.
+
+### P4: `/stats byPref` — no integration smoke test
+The `byPref` breakdown added to `GET /stats` has unit tests but no integration verification. After next Worker deploy, curl `/stats` and confirm `byPref.thirtyMin`, `byPref.dailyBriefing`, `byPref.cancelAlerts`, and `byPref.sports` are present and plausible. Update this item when confirmed.
+
+### P5: `check-sport-sync.mjs` does not cover `cancelAlertSports` sport ID path
+`cancelAlertSports` now uses the same sport IDs as `SPORT_PATTERNS[*].id`, but `check-sport-sync.mjs` only validates that `SPORT_PATTERNS` is consistent between `check-and-notify-logic.mjs` and `worker/index.ts`. The `cancelAlertSports` path is implicitly covered by the same ID set — low risk today, but worth noting if the sport list is ever extended independently.
 
 ---
 
