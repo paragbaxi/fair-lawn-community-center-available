@@ -801,22 +801,25 @@ test.describe('Corrected times badge', () => {
     await page.route('**/data/latest.json', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(correctedMockData) })
     );
-    // WeeklySchedule always skips skipDay (= selectedDay) and expands today (= gymState.dayName).
-    // When both are the same (the normal case), no accordion row is expanded — requiring a click
-    // that has proven brittle in CI. Fix: mock the clock to Monday so gymState.dayName='Monday',
-    // then pre-select Saturday via URL so skipDay='Saturday'. Monday is visible in the accordion
-    // AND expanded by default, so the badge is reachable without a click.
-    // Monday 2026-03-02 10:30 AM ET = 15:30 UTC (gym open 7 AM–9 PM in mock data)
-    await page.clock.install({ time: new Date('2026-03-02T15:30:00.000Z') });
-    await page.goto('/#today?day=Saturday');
-    await expect(page.locator('#tab-today')).toBeVisible({ timeout: 5000 });
-    // page.clock.install() fakes queueMicrotask (via @sinonjs/fake-timers).
-    // Svelte 5 schedules $effect callbacks via queueMicrotask, so the expandedDays
-    // initialisation effect is queued but blocked. fastForward(1) flushes the fake
-    // microtask queue, letting the effect run and expand Monday's accordion row.
-    await page.clock.fastForward(1);
+    // WeeklySchedule skips skipDay (= selectedDay) and pre-expands today (= gymState.dayName)
+    // via a Svelte $effect. When today === skipDay (the default), today's row is hidden and all
+    // other rows are collapsed — requiring a click that is unreliable in CI.
+    //
+    // Fix: compute the Eastern day in Node.js and navigate with ?day=<different-day> so that
+    //   today !== skipDay → today's row IS visible and IS pre-expanded by $effect.
+    // No page.clock.install() — fake-timers fakes queueMicrotask, which is Svelte 5's effect
+    // scheduler primitive, permanently blocking $effect from running.
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const get = (type: string) => Number(parts.find(p => p.type === type)!.value);
+    const todayName = DAYS[new Date(get('year'), get('month') - 1, get('day'), 12).getDay()];
+    const skipDay = DAYS.find(d => d !== todayName)!;
 
-    // Monday is expanded by default (today=Monday, skipDay=Saturday → Monday visible & open).
+    await page.goto(`/#today?day=${skipDay}`);
+    await expect(page.locator('.schedule-accordion')).toBeVisible({ timeout: 5000 });
+    // today's row is visible and pre-expanded; every day in correctedMockData has corrected:true
     const accordionBadge = page.locator('.schedule-accordion .accordion-content .corrected-badge').first();
     await expect(accordionBadge).toBeVisible({ timeout: 5000 });
     await expect(accordionBadge).toHaveText('corrected');
