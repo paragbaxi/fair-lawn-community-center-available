@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import worker, { buildSlotFreedBody } from './index.js';
+import worker, { buildSlotFreedBody, isSubscriberAllowed } from './index.js';
 
 // ─── Mock @block65/webcrypto-web-push ─────────────────────────────────────────
 
@@ -1615,5 +1615,54 @@ describe('buildSlotFreedBody', () => {
       { day: 'Tuesday', startTime: '3:00 PM', endTime: '5:00 PM', activity: 'Volleyball' },
     ]);
     expect(result).toBe("2 sessions removed from this week's schedule");
+  });
+});
+
+// ─── isSubscriberAllowed unit tests ──────────────────────────────────────────
+
+describe('isSubscriberAllowed', () => {
+  it('sport route: allows sub whose sports array includes the sportId', () => {
+    const sub = JSON.parse(makeSub({ sports: ['basketball', 'volleyball'] }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', { sportId: 'basketball' })).toBe(true);
+  });
+
+  it('sport route: blocks sub whose sports array does not include the sportId', () => {
+    const sub = JSON.parse(makeSub({ sports: ['volleyball'] }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', { sportId: 'basketball' })).toBe(false);
+  });
+
+  it('cancelAlerts route: allows sub with cancelAlerts=true', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: true }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(true);
+  });
+
+  it('cancelAlerts route: blocks sub with cancelAlerts=false', () => {
+    const sub = JSON.parse(makeSub({ cancelAlerts: false }));
+    expect(isSubscriberAllowed(sub, 'cancelAlerts', {})).toBe(false);
+  });
+
+  it('thirtyMin route: allows sub with thirtyMin=true', () => {
+    const sub = JSON.parse(makeSub({ thirtyMin: true }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', {})).toBe(true);
+  });
+
+  it('thirtyMin route: blocks sub with thirtyMin=false', () => {
+    const sub = JSON.parse(makeSub({ thirtyMin: false }));
+    expect(isSubscriberAllowed(sub, 'thirtyMin', {})).toBe(false);
+  });
+
+  it('dailyBriefing: allows sub when etHour matches dailyBriefingHour', () => {
+    const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
+    expect(isSubscriberAllowed(sub, 'dailyBriefing', { etHour: 9 })).toBe(true);
+  });
+
+  it('dailyBriefing: blocks sub when etHour does not match dailyBriefingHour', () => {
+    const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
+    expect(isSubscriberAllowed(sub, 'dailyBriefing', { etHour: 8 })).toBe(false);
+  });
+
+  it('dailyBriefing: allows sub when etHour is undefined (any hour)', () => {
+    const sub = JSON.parse(makeSub({ dailyBriefing: true, dailyBriefingHour: 9 }));
+    expect(isSubscriberAllowed(sub, 'dailyBriefing', {})).toBe(true);
   });
 });

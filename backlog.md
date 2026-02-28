@@ -458,8 +458,8 @@ When `--dry-run` is used outside gym hours, `nowMinutes` won't fall in the 20–
 ### P4: Worker `fanOut` — per-type dispatch could be its own function
 `fanOut` now handles three meaningfully different routing modes (sportId filter, dailyBriefingHour filter, cancelAlerts flag) via a single `allowed` branch. The options object introduced in 2026-02-28 is a good step, but long-term the function is doing three jobs. Consider extracting `isSubscriberAllowed(sub, type, opts)` as a pure helper to make each routing case independently testable without standing up a full KV mock.
 
-### P4: Test suite midnight-safety audit — other describe-scope `new Date()` calls
-The `isoDate`/`idKey` stale-value fix in the `dryRun` describe block is one instance. A broader audit of `index.test.ts` and `check-and-notify-logic.test.ts` for other describe-scope `new Date()` calls would confirm no other tests share the risk. Low probability of ever causing a real CI failure but cheap to fix proactively.
+### ~~P4: Test suite midnight-safety audit — other describe-scope `new Date()` calls~~
+Audited `index.test.ts`, `check-and-notify-logic.test.ts`, and `src/lib/time.test.ts`. One describe-scope `new Date(...)` found: `time.test.ts:8` (`const ref = new Date(2026, 1, 16, 0, 0, 0)`) — a static frozen fixture, not a live clock, zero runtime risk. Updated comment to clarify. All other `new Date()` calls are inside `it()`/`beforeEach()`/`beforeAll()`. Done 2026-02-28.
 
 ---
 

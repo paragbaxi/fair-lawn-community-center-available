@@ -98,6 +98,13 @@ try {
 const todaySchedule = scheduleData.schedule?.[dayName];
 const activities = todaySchedule?.activities ?? [];
 
+// Dry-run diagnostic: confirm the schedule was read and show activity count.
+// Off-hours runs will still show sent=0 because nowMinutes won't be in the window.
+if (DRY_RUN) {
+  const isoDate = `${etPart('year')}-${etPart('month')}-${etPart('day')}`;
+  console.log(`[check-and-notify] dry-run: ${dayName} ${isoDate} — ${activities.length} activities found, nowMinutes=${nowMinutes} (window: +${THIRTY_MIN_WINDOW_MIN}–${THIRTY_MIN_WINDOW_MAX} min)`);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function postNotify(body) {

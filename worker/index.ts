@@ -175,6 +175,18 @@ interface FanOutOptions {
   dryRun?: boolean;
 }
 
+export function isSubscriberAllowed(
+  sub: StoredSubscription,
+  type: 'thirtyMin' | 'dailyBriefing' | 'cancelAlerts',
+  opts: FanOutOptions,
+): boolean {
+  const { sportId, etHour } = opts;
+  if (sportId) return (sub.prefs.sports ?? []).includes(sportId);
+  if (type === 'cancelAlerts') return Boolean(sub.prefs.cancelAlerts);
+  return Boolean(sub.prefs[type]) &&
+    (etHour === undefined || (sub.prefs.dailyBriefingHour ?? 8) === etHour);
+}
+
 async function fanOut(
   env: Env,
   notifData: NotificationData,
@@ -219,13 +231,7 @@ async function fanOut(
           return;
         }
 
-        const allowed = sportId
-          ? (sub.prefs.sports ?? []).includes(sportId)
-          : type === 'cancelAlerts'
-            ? Boolean(sub.prefs.cancelAlerts)
-            : Boolean(sub.prefs[type]) && (
-                etHour === undefined || (sub.prefs.dailyBriefingHour ?? 8) === etHour
-              );
+        const allowed = isSubscriberAllowed(sub, type, opts);
         if (!allowed) {
           skipped++;
           return;
