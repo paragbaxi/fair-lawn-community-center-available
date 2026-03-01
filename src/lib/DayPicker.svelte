@@ -64,9 +64,10 @@
   .day-btn {
     flex: 1;
     padding: 8px 0;
-    border-radius: 8px;
+    border-radius: calc(var(--radius) * 0.6);
     font-size: 0.85rem;
     font-weight: 600;
+    letter-spacing: 0.04em;
     border: 1px solid var(--color-border);
     background: var(--color-surface);
     color: var(--color-text);
@@ -83,9 +84,14 @@
   }
 
   .day-btn.selected {
-    background: var(--color-text);
-    border-color: var(--color-text);
-    color: var(--color-bg);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+  }
+
+  .day-btn.is-today:not(.selected) {
+    border-color: var(--color-available);
+    color: var(--color-available);
   }
 
   .day-btn:disabled {
@@ -108,6 +114,10 @@
     height: 5px;
     border-radius: 50%;
     background: var(--color-available);
+  }
+
+  .day-btn.selected .today-dot {
+    background: rgba(255, 255, 255, 0.8);
   }
 
   @media (prefers-reduced-motion: reduce) {
