@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseTime, formatCountdown, computeGymState, computeSportStatus, getEasternNow, DISPLAY_DAYS, getStatusConfig } from './time.js';
+import { parseTime, formatCountdown, computeGymState, computeSportStatus, getEasternNow, DISPLAY_DAYS, getStatusConfig, splitWeekAroundToday } from './time.js';
 import type { ScheduleData, DaySchedule, Activity } from './types.js';
 
 // --- parseTime ---
@@ -776,6 +776,52 @@ describe('computeGymState opening-soon (path #4a)', () => {
     expect(state.nextOpenGym?.name).toBe('Open Gym');
     expect(state.nextOpenGymDay).toBeNull();
     expect(state.countdownMs).toBe(15 * 60_000);
+  });
+});
+
+// --- splitWeekAroundToday ---
+
+describe('splitWeekAroundToday', () => {
+  it('Saturday → Sunday upcoming, Mon–Fri past', () => {
+    const { upcoming, past } = splitWeekAroundToday('Saturday');
+    expect(upcoming).toEqual(['Sunday']);
+    expect(past).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+  });
+
+  it('Wednesday → Thu–Sun upcoming, Mon–Tue past', () => {
+    const { upcoming, past } = splitWeekAroundToday('Wednesday');
+    expect(upcoming).toEqual(['Thursday', 'Friday', 'Saturday', 'Sunday']);
+    expect(past).toEqual(['Monday', 'Tuesday']);
+  });
+
+  it('Monday → all other 6 days upcoming, nothing past', () => {
+    const { upcoming, past } = splitWeekAroundToday('Monday');
+    expect(upcoming).toEqual(['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+    expect(past).toEqual([]);
+  });
+
+  it('Sunday → nothing upcoming, Mon–Sat all past', () => {
+    const { upcoming, past } = splitWeekAroundToday('Sunday');
+    expect(upcoming).toEqual([]);
+    expect(past).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
+  });
+
+  it('exclude param removes day from both upcoming and past', () => {
+    // Saturday, excluding Friday (a past day)
+    const { upcoming, past } = splitWeekAroundToday('Saturday', 'Friday');
+    expect(upcoming).toEqual(['Sunday']);
+    expect(past).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday']); // Friday excluded
+
+    // Wednesday, excluding Saturday (an upcoming day)
+    const r2 = splitWeekAroundToday('Wednesday', 'Saturday');
+    expect(r2.upcoming).toEqual(['Thursday', 'Friday', 'Sunday']); // Saturday excluded
+    expect(r2.past).toEqual(['Monday', 'Tuesday']);
+  });
+
+  it('exclude same as today has no extra effect', () => {
+    const { upcoming, past } = splitWeekAroundToday('Wednesday', 'Wednesday');
+    expect(upcoming).toEqual(['Thursday', 'Friday', 'Saturday', 'Sunday']);
+    expect(past).toEqual(['Monday', 'Tuesday']);
   });
 });
 

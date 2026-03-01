@@ -41,6 +41,27 @@ export function getEasternDayName(): string {
   return DAYS[getEasternNow().getDay()];
 }
 
+/**
+ * Splits DISPLAY_DAYS (excluding `today` and `exclude`) into two ordered lists:
+ * - upcoming: days after today in DISPLAY_DAYS order (tomorrow → end of week)
+ * - past: days before today in DISPLAY_DAYS order (start of week → yesterday)
+ * Both arrays contain full day name strings.
+ */
+export function splitWeekAroundToday(
+  today: string,
+  exclude: string | null = null
+): { upcoming: string[]; past: string[] } {
+  const todayIdx = DISPLAY_DAYS.findIndex(d => d.full === today);
+  const upcoming: string[] = [];
+  const past: string[] = [];
+  DISPLAY_DAYS.forEach((d, i) => {
+    if (d.full === today || d.full === exclude) return;
+    if (i > todayIdx) upcoming.push(d.full);
+    else past.push(d.full);
+  });
+  return { upcoming, past };
+}
+
 export function parseTime(timeStr: string, referenceDate: Date): Date {
   const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return referenceDate;

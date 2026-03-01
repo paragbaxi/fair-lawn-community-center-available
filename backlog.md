@@ -2,17 +2,23 @@
 
 ## Open
 
-### ⚠️ P2: Regenerate E2E visual regression baselines — stale after design refresh
-The Outfit font, `--radius: 16px`, and dark-mode radial-gradient card backgrounds changed the visual fingerprint significantly. All existing local snapshot baselines (`e2e/__snapshots__/`) will fail at the next `npx playwright test --update-snapshots` run. **Run this before the next round of visual QA** or any new visual regression tests will produce false positives. Steps: `npm run build && npm run preview -- --port 4174 &` then `npx playwright test --update-snapshots --project=chromium`. Visual tests are local-only (CI skips them due to Linux font rendering delta).
+### ⚠️ P2: Regenerate E2E visual regression baselines — stale after two design refreshes
+The Today tab design refresh (NOW glow line, section title rule, desaturated past items, DayPicker blue accent) joins the earlier Outfit/radius/gradient changes as a second wave of visual fingerprint shifts. All local snapshot baselines (`e2e/__snapshots__/`) must be regenerated before any new visual regression test is meaningful. **Run this before adding any new visual specs.** Steps: `npm run build && npm run preview -- --port 4174 &` then `npx playwright test --update-snapshots --project=chromium`. Visual tests are local-only (CI skips them due to Linux font rendering delta).
 
 ### P3: Self-host Outfit font via `@fontsource/outfit` (performance + privacy)
 The current implementation loads Outfit from Google Fonts CDN (`fonts.googleapis.com`). This adds a render-blocking round-trip on first load and sends the visitor's IP to Google (GDPR concern for EU users). Replace with `npm install @fontsource-variable/outfit` and a CSS `@import` in `app.css`. Eliminates the three `<link>` tags in `index.html`, works offline/PWA, and removes the external dependency from Lighthouse audits. Estimated effort: ~15 min.
 
-### P3: QA Playwright run — design refresh visually unverified
-The design refresh (#38) was deployed without a QA video run. Run the full QA suite to catch any rendering regressions: countdown label/value layout at narrow widths, dark-mode gradient card rendering, `--radius: 16px` on all card types, and Outfit font load. See MEMORY.md for QA run instructions.
+### ~~P3: QA Playwright run — design refresh visually unverified~~
+Completed: QA suite run post Today tab refresh — 24 passed, 4 skipped (expected push-permission skips). Visual confirmed: UPPERCASE label, colored border, NOW line structure correct, past items desaturated.
 
-### P4: `CompactStatus.svelte` — visual audit after design refresh
-`CompactStatus` inherits `--radius` and `--font` via CSS variables (tokens propagate automatically), but its card backgrounds use the solid `--color-*-bg` tokens — it does **not** get the dark-mode radial gradients (those are StatusCard-only via `--color-*-card-bg`). Verify the compact card looks intentionally consistent (not just forgotten) in dark mode, especially on the Sports and Schedule tabs where it appears in the sticky header.
+### ~~P4: `CompactStatus.svelte` — visual audit after design refresh~~
+Resolved: CompactStatus now has dark-mode radial gradients (`--color-*-card-bg`) matching StatusCard, plus colored border per state and pulsing dot. Intentional parity — not forgotten.
+
+### P3: NOW glow line — verify at-a-glance on a day with an active session
+The glowing green `::before` pseudo-element on `.list-item.current` was designed and QA'd on a day when the gym was closed (Saturday evening). The NOW line needs a visual pass during an active session (weekday mid-morning with Open Gym running) to confirm the glow renders as intended in both light and dark mode, and that the `top: -4px` offset doesn't clip under a preceding item's border-radius. Quick check: run `npm run dev` on a weekday while the gym is open.
+
+### P4: DayPicker — green "today" border conflicts with disabled state at week boundaries
+On days when there is no schedule data, `.day-btn:disabled` applies `opacity: 0.35`. If today falls on a day with no data (e.g. Sunday when schedule is absent), `.is-today:not(.selected)` green border competes with the disabled opacity. The result is a faint green-bordered grayed-out button — slightly confusing. Consider suppressing the green border when `disabled`.
 
 ### P4: Dark-mode card gradient snap on status change — known limitation
 When the gym state changes (e.g. in-use → available), the dark-mode status card background snaps rather than cross-fading because CSS cannot interpolate between two different gradient functions. The plan accepted this tradeoff (`transition: background` was set but browsers don't animate between gradient images). If smooth transitions become a priority, the standard workaround is two overlapping pseudo-elements (`::before`/`::after`) with opacity crossfade — a JS-free CSS trick but requires restructuring the card.
