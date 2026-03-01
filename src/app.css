@@ -20,8 +20,8 @@
   --color-timeline-scheduled: #9ca3af;
   --color-accent: #3182ce;
   --color-accent-hover: #2b6cb0;
-  --radius: 12px;
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --radius: 16px;
+  --font: 'Outfit', system-ui, -apple-system, sans-serif;
 
   color-scheme: light dark;
 }
@@ -47,6 +47,11 @@
     --color-border: #374151;
     --color-timeline-past: #4b5563;
     --color-timeline-scheduled: #6b7280;
+    /* Gradient tokens for StatusCard only — other components keep the solid --color-*-bg tokens */
+    --color-available-card-bg: radial-gradient(ellipse at 30% 0%, #064e20 0%, #052e16 55%);
+    --color-inuse-card-bg:     radial-gradient(ellipse at 30% 0%, #5a2500 0%, #451a03 55%);
+    --color-upcoming-card-bg:  radial-gradient(ellipse at 30% 0%, #0a4060 0%, #083344 55%);
+    --color-closed-card-bg:    radial-gradient(ellipse at 30% 0%, #5a0a0a 0%, #450a0a 55%);
   }
 }
 
@@ -63,6 +68,13 @@ html {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  html { background: linear-gradient(180deg, #0d1520 0%, #111827 60%); }
+}
+@media (prefers-color-scheme: light) {
+  html { background: linear-gradient(180deg, #f8fafc 0%, #ffffff 40%); }
 }
 
 body {

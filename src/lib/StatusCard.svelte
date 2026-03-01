@@ -53,19 +53,19 @@
     <p class="countdown" aria-label="Countdown: {formatCountdown(countdownMs)}">
       <span class="live-dot" aria-hidden="true"></span>
       {#if gymState.status === 'available' && gymState.currentActivity}
-        {formatCountdown(countdownMs)} left
+        <span class="countdown-label">Closes in</span><span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {:else if gymState.status === 'opening-soon'}
-        Opens in {formatCountdown(countdownMs)}
+        <span class="countdown-label">Opens in</span><span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {:else if gymState.status === 'in-use' && gymState.nextOpenGym && !gymState.nextOpenGymDay}
-        Next up in {formatCountdown(countdownMs)}
+        <span class="countdown-label">Next up in</span><span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay && gymState.currentActivity}
-        Closes in {formatCountdown(countdownMs)}
+        <span class="countdown-label">Closes in</span><span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {:else if gymState.status === 'in-use' && gymState.nextOpenGymDay}
-        Next up in {formatCountdown(countdownMs)}
+        <span class="countdown-label">Next up in</span><span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {:else if gymState.status === 'closed'}
-        Opens in {formatCountdown(countdownMs)}
+        <span class="countdown-label">Opens in</span><span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {:else}
-        {formatCountdown(countdownMs)}
+        <span class="countdown-value">{formatCountdown(countdownMs)}</span>
       {/if}
     </p>
   {/if}
@@ -97,7 +97,7 @@
     text-align: center;
     border-left: 4px solid;
     margin-bottom: 24px;
-    transition: background-color 0.4s ease, border-color 0.4s ease;
+    transition: background 0.4s ease, border-color 0.4s ease;
   }
 
   .status-card.available {
@@ -139,9 +139,9 @@
   .closed .status-icon       { color: var(--color-closed); }
 
   .status-label {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.1em;
   }
 
   .available .status-label    { color: var(--color-available); }
@@ -159,11 +159,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 10px;
-    font-size: 2rem;
-    font-weight: 700;
+    font-size: clamp(2rem, 6.5vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     margin-bottom: 4px;
+  }
+
+  .countdown-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    align-self: flex-end;
+    padding-bottom: 0.3em;
+    white-space: nowrap;
+  }
+
+  .countdown-value {
+    white-space: nowrap;
   }
 
   .live-dot {
@@ -229,9 +246,9 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    .status-card.opening-soon {
-      background: var(--color-upcoming-bg);
-      border-color: var(--color-upcoming);
-    }
+    .status-card.available    { background: var(--color-available-card-bg); }
+    .status-card.in-use       { background: var(--color-inuse-card-bg); }
+    .status-card.closed       { background: var(--color-closed-card-bg); }
+    .status-card.opening-soon { background: var(--color-upcoming-card-bg); }
   }
 </style>
