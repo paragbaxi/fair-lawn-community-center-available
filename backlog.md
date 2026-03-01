@@ -2,8 +2,14 @@
 
 ## Open
 
-### ⚠️ P2: Regenerate E2E visual regression baselines — stale after two design refreshes
-The Today tab design refresh (NOW glow line, section title rule, desaturated past items, DayPicker blue accent) joins the earlier Outfit/radius/gradient changes as a second wave of visual fingerprint shifts. All local snapshot baselines (`e2e/__snapshots__/`) must be regenerated before any new visual regression test is meaningful. **Run this before adding any new visual specs.** Steps: `npm run build && npm run preview -- --port 4174 &` then `npx playwright test --update-snapshots --project=chromium`. Visual tests are local-only (CI skips them due to Linux font rendering delta).
+### ⚠️ P2: Regenerate E2E visual regression baselines — stale after three design waves
+Visual fingerprints have shifted three times: Outfit/radius/gradient refresh, Today tab redesign (NOW glow line, DayPicker accent), and now the Schedule tab chronological reorder (new "Tomorrow" badge, "Earlier this week" toggle). All local snapshot baselines (`e2e/__snapshots__/`) must be regenerated before any new visual spec is meaningful. **Do this before writing any new visual regression tests.** Steps: `npm run build && npm run preview -- --port 4174 &` then `npx playwright test --update-snapshots --project=chromium`. Visual tests are local-only (CI skips due to Linux font delta).
+
+### P3: QA visual pass — Schedule tab chronological reorder unverified
+The "Rest of Week" chronological reorder (tomorrow first, "Earlier this week" collapsed) shipped without a Playwright QA video run. Run QA suite and verify: (1) on Saturday, Sunday appears first with a "Tomorrow" badge; (2) "Earlier this week (5)" toggle is present and collapsed; (3) expanding it reveals Mon–Fri in order; (4) badges render correctly in both light and dark mode. See MEMORY.md for QA run instructions.
+
+### P3: `--color-accent` CSS token — verify or promote to design system
+The "Tomorrow" badge uses `var(--color-accent, #3b82f6)`. If `--color-accent` is not defined as a root token in `app.css`, the hardcoded `#3b82f6` fallback is load-bearing and bypasses the design system (dark-mode overrides, future rebranding). Audit `app.css` for `--color-accent`. If absent, define it alongside `--color-available` and the other status tokens so the badge color is theme-aware.
 
 ### P3: Self-host Outfit font via `@fontsource/outfit` (performance + privacy)
 The current implementation loads Outfit from Google Fonts CDN (`fonts.googleapis.com`). This adds a render-blocking round-trip on first load and sends the visitor's IP to Google (GDPR concern for EU users). Replace with `npm install @fontsource-variable/outfit` and a CSS `@import` in `app.css`. Eliminates the three `<link>` tags in `index.html`, works offline/PWA, and removes the external dependency from Lighthouse audits. Estimated effort: ~15 min.
@@ -16,6 +22,12 @@ Resolved: CompactStatus now has dark-mode radial gradients (`--color-*-card-bg`)
 
 ### P3: NOW glow line — verify at-a-glance on a day with an active session
 The glowing green `::before` pseudo-element on `.list-item.current` was designed and QA'd on a day when the gym was closed (Saturday evening). The NOW line needs a visual pass during an active session (weekday mid-morning with Open Gym running) to confirm the glow renders as intended in both light and dark mode, and that the `top: -4px` offset doesn't clip under a preceding item's border-radius. Quick check: run `npm run dev` on a weekday while the gym is open.
+
+### P4: `WeeklySchedule` — accordion markup duplicated between upcoming and past sections
+The accordion-item template (header, chevron, content list) is copy-pasted verbatim for upcoming days and again for past days inside the collapsed section. Extract to a Svelte `{#snippet dayAccordion(dayName)}` block or a dedicated `DayAccordionItem.svelte` component. Reduces ~60 lines to a single call site and ensures future changes (e.g. new badges, activity row changes) apply to both sections automatically.
+
+### P4: `pastExpanded` state doesn't reset on midnight rollover
+When today changes at midnight, `expandedDays` correctly shifts (old today removed, new today added) via the `$effect`, but `pastExpanded` remains whatever the user last set. On Sunday night → Monday, a user who expanded "Earlier this week" will still see it open on Monday (when past days are now Mon→Sun-1, not a meaningful "earlier this week"). Consider resetting `pastExpanded = false` inside the midnight `$effect` branch when `today !== prevToday`.
 
 ### P4: DayPicker — green "today" border conflicts with disabled state at week boundaries
 On days when there is no schedule data, `.day-btn:disabled` applies `opacity: 0.35`. If today falls on a day with no data (e.g. Sunday when schedule is absent), `.is-today:not(.selected)` green border competes with the disabled opacity. The result is a faint green-bordered grayed-out button — slightly confusing. Consider suppressing the green border when `disabled`.
