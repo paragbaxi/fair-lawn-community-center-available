@@ -2,6 +2,21 @@
 
 ## Open
 
+### ⚠️ P2: Regenerate E2E visual regression baselines — stale after design refresh
+The Outfit font, `--radius: 16px`, and dark-mode radial-gradient card backgrounds changed the visual fingerprint significantly. All existing local snapshot baselines (`e2e/__snapshots__/`) will fail at the next `npx playwright test --update-snapshots` run. **Run this before the next round of visual QA** or any new visual regression tests will produce false positives. Steps: `npm run build && npm run preview -- --port 4174 &` then `npx playwright test --update-snapshots --project=chromium`. Visual tests are local-only (CI skips them due to Linux font rendering delta).
+
+### P3: Self-host Outfit font via `@fontsource/outfit` (performance + privacy)
+The current implementation loads Outfit from Google Fonts CDN (`fonts.googleapis.com`). This adds a render-blocking round-trip on first load and sends the visitor's IP to Google (GDPR concern for EU users). Replace with `npm install @fontsource-variable/outfit` and a CSS `@import` in `app.css`. Eliminates the three `<link>` tags in `index.html`, works offline/PWA, and removes the external dependency from Lighthouse audits. Estimated effort: ~15 min.
+
+### P3: QA Playwright run — design refresh visually unverified
+The design refresh (#38) was deployed without a QA video run. Run the full QA suite to catch any rendering regressions: countdown label/value layout at narrow widths, dark-mode gradient card rendering, `--radius: 16px` on all card types, and Outfit font load. See MEMORY.md for QA run instructions.
+
+### P4: `CompactStatus.svelte` — visual audit after design refresh
+`CompactStatus` inherits `--radius` and `--font` via CSS variables (tokens propagate automatically), but its card backgrounds use the solid `--color-*-bg` tokens — it does **not** get the dark-mode radial gradients (those are StatusCard-only via `--color-*-card-bg`). Verify the compact card looks intentionally consistent (not just forgotten) in dark mode, especially on the Sports and Schedule tabs where it appears in the sticky header.
+
+### P4: Dark-mode card gradient snap on status change — known limitation
+When the gym state changes (e.g. in-use → available), the dark-mode status card background snaps rather than cross-fading because CSS cannot interpolate between two different gradient functions. The plan accepted this tradeoff (`transition: background` was set but browsers don't animate between gradient images). If smooth transitions become a priority, the standard workaround is two overlapping pseudo-elements (`::before`/`::after`) with opacity crossfade — a JS-free CSS trick but requires restructuring the card.
+
 ### P3: cancelAlertSports end-to-end device verification
 The per-sport freed-slot filtering shipped in PR #36 has never been confirmed on a real device. **Logic is now unit-tested** (`worker/index.test.ts` — `describe('isSubscriberAllowed — cancelAlerts', ...)`, 5 cases covering all-sports mode, per-sport allow/deny, undefined sportId, and cancelAlerts=false guard). Remaining manual steps: (1) subscribe with `cancelAlerts=true`, `cancelAlertSports=['basketball']`; (2) trigger a freed-slot run with a volleyball cancellation → confirm no notification received; (3) trigger a basketball cancellation → confirm delivery. Real-device receipt is outside CI scope.
 
