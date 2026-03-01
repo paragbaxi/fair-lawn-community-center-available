@@ -246,7 +246,7 @@
     gap: 4px;
     padding: 8px 4px;
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: calc(var(--radius) / 2);
     background: var(--color-bg);
     color: var(--color-text);
     font-size: 0.82rem;
