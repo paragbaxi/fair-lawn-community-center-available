@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- JS redirect: runs synchronously before any rendering — most users never see the page body -->
+    <script>
+      window.location.replace(
+        'https://paragbaxi.github.io/fair-lawn-apps/cc/' + window.location.hash
+      );
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Meta refresh fallback for JS-disabled browsers; cannot preserve hash -->
+    <meta http-equiv="refresh" content="0; url=https://paragbaxi.github.io/fair-lawn-apps/cc/" />
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d1520" media="(prefers-color-scheme: dark)" />
+    <meta name="description" content="The Fair Lawn Community Center gym availability app has moved to a new address." />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Fair Lawn Community Center App Has Moved</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏟️</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* ── Reset ────────────────────────────────────────────────────── */
+      *, *::before, *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        touch-action: manipulation;
+      }
+
+      /* ── Tokens ───────────────────────────────────────────────────── */
+      :root {
+        --font: 'Outfit', system-ui, -apple-system, sans-serif;
+        --radius: 16px;
+
+        --color-text: #1f2937;
+        --color-text-secondary: #4b5563;
+        --color-text-muted: #6b7280;
+        --color-bg: #ffffff;
+        --color-surface: #f9fafb;
+        --color-border: #e5e7eb;
+
+        --color-cc:       #10b981;
+        --color-cc-muted: rgba(16, 185, 129, 0.12);
+
+        color-scheme: light dark;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-text: #f3f4f6;
+          --color-text-secondary: #b0b7c3;
+          --color-text-muted: #9ca3af;
+          --color-bg: #111827;
+          --color-surface: #1f2937;
+          --color-border: #374151;
+
+          --color-cc:       #34d399;
+          --color-cc-muted: rgba(52, 211, 153, 0.1);
+        }
+      }
+
+      /* ── Base ─────────────────────────────────────────────────────── */
+      html {
+        font-family: var(--font);
+        color: var(--color-text);
+        background: var(--color-bg);
+        -webkit-font-smoothing: antialiased;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html { background: linear-gradient(180deg, #0d1520 0%, #111827 60%); }
+      }
+      @media (prefers-color-scheme: light) {
+        html { background: linear-gradient(180deg, #f8fafc 0%, #ffffff 40%); }
+      }
+
+      body {
+        min-height: 100dvh;
+        padding: 24px 16px 40px;
+        padding-bottom: calc(40px + env(safe-area-inset-bottom));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--color-text);
+        outline-offset: 2px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :focus-visible { outline-color: #93c5fd; }
+      }
+
+      /* ── Card ─────────────────────────────────────────────────────── */
+      .card {
+        width: 100%;
+        max-width: 480px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        padding: 28px 24px 24px;
+      }
+
+      /* ── Card icon ────────────────────────────────────────────────── */
+      .card-icon {
+        font-size: 2.5rem;
+        line-height: 1;
+        margin-bottom: 16px;
+      }
+
+      /* ── Eyebrow label ────────────────────────────────────────────── */
+      .card-label {
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--color-cc);
+        margin-bottom: 8px;
+      }
+
+      /* ── Heading ──────────────────────────────────────────────────── */
+      .card-heading {
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.25;
+        margin-bottom: 12px;
+        color: var(--color-text);
+      }
+
+      /* ── Body copy ────────────────────────────────────────────────── */
+      .card-body {
+        font-size: 0.9rem;
+        color: var(--color-text-secondary);
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+
+      /* ── CTA button ───────────────────────────────────────────────── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--color-cc);
+        background: var(--color-cc-muted);
+        border: none;
+        border-radius: 10px;
+        padding: 11px 18px;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.15s ease, transform 0.1s ease;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .btn:hover {
+        background: rgba(16, 185, 129, 0.2);
+        transform: translateY(-1px);
+      }
+      @media (prefers-color-scheme: dark) {
+        .btn:hover { background: rgba(52, 211, 153, 0.18); }
+      }
+
+      .btn:active {
+        transform: translateY(0);
+        transition-duration: 0.05s;
+      }
+
+      .btn-arrow {
+        display: inline-block;
+        transition: transform 0.15s ease;
+      }
+      .btn:hover .btn-arrow {
+        transform: translateX(3px);
+      }
+
+      /* ── Divider ──────────────────────────────────────────────────── */
+      .divider {
+        border: none;
+        border-top: 1px solid var(--color-border);
+        margin: 20px 0;
+      }
+
+      /* ── Footnote ─────────────────────────────────────────────────── */
+      .footnote {
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      /* ── Desktop ──────────────────────────────────────────────────── */
+      @media (min-width: 520px) {
+        body { padding: 40px 24px 48px; }
+        .card { padding: 36px 32px 28px; }
+        .card-heading { font-size: 1.4rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" role="main">
+      <div class="card-icon" aria-hidden="true">🏟️</div>
+      <p class="card-label">Page moved</p>
+      <h1 class="card-heading">Fair Lawn Community Center App Has Moved</h1>
+      <p class="card-body">
+        This app is now at a new address. You'll be redirected automatically,
+        or click below to go there now.
+      </p>
+      <a
+        class="btn"
+        href="https://paragbaxi.github.io/fair-lawn-apps/cc/"
+        id="cta"
+      >
+        Go to Fair Lawn Community Center <span class="btn-arrow" aria-hidden="true">→</span>
+      </a>
+      <hr class="divider" />
+      <p class="footnote">Bookmark the new address to avoid seeing this page again.</p>
+    </div>
+
+    <!-- Update the CTA href to carry the hash, after redirect has already fired -->
+    <script>
+      var hash = window.location.hash;
+      if (hash) {
+        var cta = document.getElementById('cta');
+        if (cta) {
+          cta.href = 'https://paragbaxi.github.io/fair-lawn-apps/cc/' + hash;
+        }
+      }
+    </script>
+  </body>
+</html>
