@@ -5,12 +5,12 @@
     <!-- JS redirect: runs synchronously before any rendering — most users never see the page body -->
     <script>
       window.location.replace(
-        'https://paragbaxi.github.io/fair-lawn-apps/cc/' + window.location.hash
+        'https://fairlawn.paragbaxi.com/cc/' + window.location.hash
       );
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- Meta refresh fallback for JS-disabled browsers; cannot preserve hash -->
-    <meta http-equiv="refresh" content="0; url=https://paragbaxi.github.io/fair-lawn-apps/cc/" />
+    <meta http-equiv="refresh" content="0; url=https://fairlawn.paragbaxi.com/cc/" />
     <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0d1520" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="The Fair Lawn Community Center gym availability app has moved to a new address." />
@@ -214,7 +214,7 @@
       </p>
       <a
         class="btn"
-        href="https://paragbaxi.github.io/fair-lawn-apps/cc/"
+        href="https://fairlawn.paragbaxi.com/cc/"
         id="cta"
       >
         Go to Fair Lawn Community Center <span class="btn-arrow" aria-hidden="true">→</span>
@@ -229,7 +229,7 @@
       if (hash) {
         var cta = document.getElementById('cta');
         if (cta) {
-          cta.href = 'https://paragbaxi.github.io/fair-lawn-apps/cc/' + hash;
+          cta.href = 'https://fairlawn.paragbaxi.com/cc/' + hash;
         }
       }
     </script>
